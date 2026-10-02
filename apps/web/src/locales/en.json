@@ -1,0 +1,260 @@
+{
+  "views": {
+    "compare": {
+      "title": "DBC Config Lab",
+      "subtitle": "The same traders, different launch rules. See who profits and who pays under each Meteora DBC config.",
+      "caveat": "Bots are modelled two ways: snipers that buy in the first seconds, and patient bots that wait until the fee drops. Bots reacting to other signals — price, volume, other wallets — are not modelled. After graduation, trading continues on the migrated DAMM v2 pool.",
+      "sharedName": "Shared: {name}",
+      "sharedDefaultName": "config",
+      "sharedIntent": "Opened from a shared link.",
+      "sharedRejected": {
+        "too-long": "This share link is too long to be a config, so it was not opened.",
+        "not-decodable": "This share link is damaged, so it was not opened.",
+        "not-json": "This share link is damaged, so it was not opened.",
+        "wrong-version": "This share link was made by a different version of the tool, so it was not opened.",
+        "invalid-field": "This share link has an invalid value at {detail}, so it was not opened.",
+        "rejected-by-program": "This shared config would be rejected by Meteora ({detail}), so it was not opened."
+      },
+      "onChainName": "On-chain: {address} ({network})",
+      "onChainIntent": "Read from chain; compared as-is, not editable.",
+      "onChainFromPool": "Found via pool {pool}.",
+      "onChainSlots": "This config counts time in slots; scenario seconds are converted at {ms} ms per slot."
+    }
+  },
+  "components": {
+    "scenarioControls": {
+      "legend": "Trader scenario",
+      "seed": "Seed",
+      "snipers": "Snipers",
+      "humans": "Human buyers",
+      "summary": "{snipers} snipers buy within {sniperWindow}s and sell {hold}s later; {adaptive} patient bots wait until the fee is at most {maxFee}%, then buy and sell; {humans} humans buy between {from}s and {until}s.",
+      "preset": "Launch situation",
+      "custom": "Custom",
+      "adaptiveSnipers": "Patient bots",
+      "presets": {
+        "typical": {
+          "name": "Typical meme launch",
+          "description": "A handful of first-second snipers and a steady trickle of human buyers over ten minutes."
+        },
+        "hype": {
+          "name": "Hype launch",
+          "description": "A crowded launch: many snipers, patient bots and two hundred buyers in the first three minutes. Usually graduates."
+        },
+        "slow-burn": {
+          "name": "Slow burn",
+          "description": "Little bot interest and buyers spread over an hour."
+        },
+        "patient-bots": {
+          "name": "Patient bots",
+          "description": "No first-second snipers; bots instead wait for the fee to drop before buying."
+        }
+      }
+    },
+    "comparisonTable": {
+      "caption": "Outcome per config, in SOL. Profit counts tokens still held at what they would fetch if each group sold them all at the end.",
+      "config": "Config",
+      "sniperProfit": "Sniper profit",
+      "humanProfit": "Human profit",
+      "humanFees": "Fees paid by humans",
+      "partnerCreatorFees": "Fees to partner + creator",
+      "graduated": "Graduated",
+      "no": "No",
+      "refused": "Not simulated: {reason}",
+      "adaptiveSniperProfit": "Patient-bot profit",
+      "afterGraduation": "{sol} after graduation",
+      "graduatedAfter": "Yes, after {seconds}s"
+    },
+    "deployPanel": {
+      "title": "Deploy a config",
+      "preset": "Config",
+      "network": "Network",
+      "devnet": "Devnet (test SOL)",
+      "mainnet": "Mainnet (real SOL)",
+      "mainnetAcknowledge": "I understand this creates a real config on Solana mainnet and the transaction fee is paid in real SOL.",
+      "connect": "Connect {wallet}",
+      "connectedAs": "Connected: {wallet} · {address}",
+      "noWallet": "No Solana wallet found. Install Phantom, Solflare or Backpack to deploy.",
+      "prepare": "Prepare transaction",
+      "preparing": "Checking with a dry run…",
+      "sign": "Sign and send in wallet",
+      "signing": "Waiting for wallet…",
+      "done": "Config deployed.",
+      "viewConfig": "View config",
+      "viewTransaction": "View transaction",
+      "summary": {
+        "network": "Network",
+        "configAddress": "Config address",
+        "payer": "Paid by",
+        "feeClaimer": "Fees go to",
+        "leftoverReceiver": "Leftover tokens go to",
+        "quoteMint": "Quote token (wrapped SOL)",
+        "fee": "Trading fee",
+        "feeValue": "{start}% falling to {end}% over {seconds}s",
+        "threshold": "Graduates at",
+        "thresholdValue": "{sol} SOL"
+      }
+    },
+    "recommenderPanel": {
+      "title": "Find a config for your goal",
+      "goal": "Launch goal",
+      "goals": {
+        "fair-launch": "Fair launch for early buyers",
+        "sniper-deterrent": "Punish bots hardest",
+        "fee-income": "Maximise fee income",
+        "graduate-fast": "Graduate fast",
+        "max-raise": "Raise the most",
+        "stable-price": "Keep the price stable",
+        "early-fairness": "Keep early supply out of bots’ hands"
+      },
+      "weights": {
+        "human-outcome": "Human buyers’ outcome",
+        "bot-deterrence": "Bot losses",
+        "fee-income": "Partner + creator fees",
+        "graduation": "Graduating, and fast",
+        "raise": "SOL raised",
+        "price-stability": "Price stability",
+        "early-fairness": "Early supply in humans’ hands"
+      },
+      "run": "Find best configs",
+      "searching": "Simulating every candidate…",
+      "noResult": "No candidate could be simulated for this setup.",
+      "flat": "Flat {fee}%",
+      "schedule": "{start}% → {end}% over {seconds}s ({curve})",
+      "linear": "linear",
+      "exponential": "exponential",
+      "rationale": "Humans {human} SOL vs flat fee · bots {bots} SOL · {fees} SOL fees to partner + creator · average of {seeds} simulated launches",
+      "flatBaseline": "Flat 1% under the same launches: humans {human} SOL, bots {bots} SOL · {measures}.",
+      "use": "Use this config",
+      "recommendedName": "Recommended: {schedule}",
+      "recommendedIntent": "Found by simulating every fee schedule for your goal; humans {human} SOL vs flat over {seeds} launches.",
+      "sameAsPreset": "Same config as the built-in “{preset}” preset.",
+      "adjustWeights": "Adjust weights",
+      "indistinguishable": "Every fee schedule scores the same for this goal in this launch situation, so it cannot pick a winner here. Try another launch situation or goal.",
+      "measures": {
+        "graduates": "graduates in {rate} of launches (avg {seconds}s)",
+        "neverGraduates": "never graduates",
+        "raised": "raised {sol} SOL",
+        "drawdown": "worst price drop {percent}%",
+        "botShare": "bots took {share} of first-minute buys",
+        "noEarlyBuys": "no first-minute buys"
+      },
+      "undecided": "In this launch situation every fee schedule scores the same on: {criteria}. The ranking comes from your other weights.",
+      "includeCurves": "Also try other curve shapes and graduation thresholds (slower)",
+      "searchFailed": "The search failed: {reason}",
+      "curves": {
+        "standard": "curve graduating at {sol} SOL",
+        "market-cap": "market-cap curve {from} → {to} SOL",
+        "two-segments": "two-segment curve {from} → {to} SOL",
+        "liquidity-weights": "weighted curve {from} → {to} SOL, growth {growth}"
+      }
+    },
+    "configEditor": {
+      "title": "Edit a config",
+      "startFrom": "Start from",
+      "name": "Name",
+      "defaultName": "My config",
+      "intent": "Your own edited config.",
+      "add": "Add to comparison",
+      "groups": {
+        "token": "Token",
+        "curve": "Curve and graduation",
+        "fees": "Trading fee",
+        "migration": "Graduation pool",
+        "liquidity": "Liquidity after graduation"
+      },
+      "fields": {
+        "total-supply": "Total supply",
+        "base-decimals": "Token decimals",
+        "supply-on-migration": "Supply left for the graduation pool",
+        "migration-threshold": "Graduates at",
+        "fee-curve": "Fee over time",
+        "starting-fee": "Opening fee",
+        "ending-fee": "Settled fee",
+        "fee-window": "Falls over",
+        "creator-trading-fee-share": "Creator’s share of trading fees",
+        "migrated-pool-fee-option": "Graduation pool fee",
+        "migrated-pool-fee": "Custom pool fee",
+        "migration-fee": "Migration fee taken at graduation",
+        "partner-liquidity": "Partner LP",
+        "partner-locked-liquidity": "Partner LP, locked",
+        "creator-liquidity": "Creator LP",
+        "creator-locked-liquidity": "Creator LP, locked",
+        "leftover": "Leftover buffer",
+        "curve-shape": "Curve shape",
+        "initial-market-cap": "Starting market cap",
+        "migration-market-cap": "Graduates at market cap",
+        "weight-growth": "Liquidity growth per segment"
+      },
+      "units": {
+        "tokens": "tokens",
+        "percent": "%",
+        "sol": "SOL",
+        "seconds": "s"
+      },
+      "options": {
+        "decimals": {
+          "6": "6",
+          "7": "7",
+          "8": "8",
+          "9": "9"
+        },
+        "feeCurve": {
+          "0": "Flat",
+          "1": "Falls linearly",
+          "2": "Falls exponentially"
+        },
+        "migratedPoolFeeOption": {
+          "0": "0.25%",
+          "1": "0.3%",
+          "2": "1%",
+          "3": "2%",
+          "4": "4%",
+          "5": "6%",
+          "6": "Custom"
+        },
+        "curveShape": {
+          "standard": "Standard",
+          "market-cap": "Market cap",
+          "two-segments": "Two segments",
+          "liquidity-weights": "Liquidity weights"
+        }
+      },
+      "rejections": {
+        "not-a-number": "Enter a number.",
+        "not-an-option": "Pick one of the listed options.",
+        "hidden": "That setting does not apply to this config."
+      },
+      "status": {
+        "valid": "Meteora would accept this config.",
+        "invalid": "Meteora would reject this config: {reason}",
+        "notSimulatable": "Meteora would accept this config, but it cannot be simulated exactly: {reason}"
+      },
+      "copyLink": "Copy share link",
+      "showCode": "Show code",
+      "hideCode": "Hide code",
+      "copyCode": "Copy code",
+      "linkCopied": "Link copied. The config travels in the link itself and is never sent to a server.",
+      "codeCopied": "Code copied.",
+      "copyFailed": "Copying is not allowed here; select the text below and copy it.",
+      "manualCopy": "Text to copy"
+    },
+    "onChainLoader": {
+      "title": "Load an existing config",
+      "hint": "Paste the address of a DBC config, or of a token’s bonding-curve pool, to see how its rules fare under the same traders. Read-only: nothing is signed.",
+      "network": "Network",
+      "devnet": "Devnet",
+      "mainnet": "Mainnet",
+      "address": "Config or pool address",
+      "load": "Load",
+      "loading": "Reading from chain…",
+      "loaded": "Loaded. It is now in the comparison below.",
+      "rejections": {
+        "not-an-address": "That is not a Solana address.",
+        "not-found": "No account exists at that address on this network.",
+        "not-dbc-account": "That account does not belong to Meteora’s DBC program.",
+        "not-a-config-or-pool": "That DBC account is neither a config nor a pool.",
+        "network-error": "Could not reach the network ({detail}). Try again."
+      }
+    }
+  }
+}

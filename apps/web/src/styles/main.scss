@@ -1,0 +1,16 @@
+@use './tokens';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-background-foreground);
+  font-family: var(--font-family);
+  font-size: var(--font-size-3);
+  line-height: var(--line-height-body);
+}

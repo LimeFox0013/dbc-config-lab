@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+!libs/*/dist
+.git
+.github
+.nx
+**/.vite
+coverage
+.env
+.env.*

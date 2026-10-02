@@ -1,0 +1,10 @@
+node_modules/
+dist/
+!libs/*/dist/
+.nx/
+.vite/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+.DS_Store

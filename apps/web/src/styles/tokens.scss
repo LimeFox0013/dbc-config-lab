@@ -1,0 +1,36 @@
+// The only file allowed to hold raw visual values (rules/brand-tokens.md).
+:root {
+  --color-background: #101418;
+  --color-background-foreground: #e6edf3;
+  --color-surface: #1a2028;
+  --color-surface-foreground: #e6edf3;
+  --color-muted-foreground: #9aa7b4;
+  --color-border: #2c3540;
+  --color-gain: #3fb950;
+  --color-gain-foreground: #101418;
+  --color-loss: #ff7b72;
+  --color-loss-foreground: #101418;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-2: 8px;
+  --border-width-1: 1px;
+
+  --font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-family-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-size-1: 12px;
+  --font-size-2: 14px;
+  --font-size-3: 16px;
+  --font-size-5: 24px;
+  --line-height-body: 1.5;
+
+  --content-max-width: 1040px;
+  --text-max-width-narrow: 360px;
+  --input-width-number: 128px;
+  --code-max-height: 360px;
+}

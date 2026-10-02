@@ -1,0 +1,75 @@
+{
+  "name": "@dbc-config-lab/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@meteora-ag/cp-amm-sdk": "^1.5.1",
+    "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.13",
+    "@solana/wallet-standard-features": "^1.5.0",
+    "@solana/web3.js": "^1.98.4",
+    "@wallet-standard/app": "^1.1.1",
+    "@wallet-standard/base": "^1.1.1",
+    "@wallet-standard/features": "^1.1.1",
+    "bn.js": "^5.2.1",
+    "bs58": "^6.0.0",
+    "buffer": "^6.0.3",
+    "vue": "^3.5.41",
+    "vue-i18n": "^11.4.8",
+    "vue-router": "^5.2.0"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@types/bn.js": "^5.1.6",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "sass": "^1.102.0",
+    "typescript": "^5.7.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18",
+    "vue-tsc": "^3.3.9"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "vue-tsc --noEmit",
+    "verify:devnet": "tsx scripts/devnet-verify.ts"
+  },
+  "nx": {
+    "name": "web",
+    "targets": {
+      "serve": {
+        "executor": "nx:run-commands",
+        "continuous": true,
+        "options": {
+          "command": "vite",
+          "cwd": "apps/web"
+        }
+      },
+      "build": {
+        "executor": "nx:run-commands",
+        "outputs": [
+          "{workspaceRoot}/apps/web/dist"
+        ],
+        "options": {
+          "command": "vite build",
+          "cwd": "apps/web"
+        }
+      },
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "vue-tsc --noEmit",
+          "cwd": "apps/web"
+        }
+      },
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "vitest run",
+          "cwd": "apps/web"
+        }
+      }
+    }
+  }
+}

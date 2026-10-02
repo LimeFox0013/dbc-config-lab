@@ -1,0 +1,206 @@
+<template>
+  <table class="comparison-table">
+    <caption class="comparison-table__caption">
+      {{ t('components.comparisonTable.caption') }}
+    </caption>
+    <thead>
+      <tr>
+        <th
+          scope="col"
+          class="comparison-table__head"
+        >
+          {{ t('components.comparisonTable.config') }}
+        </th>
+        <th
+          scope="col"
+          class="comparison-table__head comparison-table__head--number"
+        >
+          {{ t('components.comparisonTable.sniperProfit') }}
+        </th>
+        <th
+          scope="col"
+          class="comparison-table__head comparison-table__head--number"
+        >
+          {{ t('components.comparisonTable.adaptiveSniperProfit') }}
+        </th>
+        <th
+          scope="col"
+          class="comparison-table__head comparison-table__head--number"
+        >
+          {{ t('components.comparisonTable.humanProfit') }}
+        </th>
+        <th
+          scope="col"
+          class="comparison-table__head comparison-table__head--number"
+        >
+          {{ t('components.comparisonTable.humanFees') }}
+        </th>
+        <th
+          scope="col"
+          class="comparison-table__head comparison-table__head--number"
+        >
+          {{ t('components.comparisonTable.partnerCreatorFees') }}
+        </th>
+        <th
+          scope="col"
+          class="comparison-table__head"
+        >
+          {{ t('components.comparisonTable.graduated') }}
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr
+        v-for="row in rows"
+        :key="row.entry.id"
+        class="comparison-table__row"
+      >
+        <th
+          scope="row"
+          class="comparison-table__config"
+        >
+          <span class="comparison-table__name">{{ row.entry.name }}</span>
+          <span class="comparison-table__intent">{{ row.entry.intent }}</span>
+        </th>
+        <template v-if="row.ok">
+          <td :class="amountClass(row.metrics.sniperProfit)">
+            {{ formatSolChange(row.metrics.sniperProfit) }}
+          </td>
+          <td :class="amountClass(row.metrics.adaptiveSniperProfit)">
+            {{ formatSolChange(row.metrics.adaptiveSniperProfit) }}
+          </td>
+          <td :class="amountClass(row.metrics.humanProfit)">
+            {{ formatSolChange(row.metrics.humanProfit) }}
+          </td>
+          <td class="comparison-table__amount">
+            {{ formatSol(row.metrics.humanFees) }}
+          </td>
+          <td class="comparison-table__amount">
+            {{ formatSol(row.metrics.partnerCreatorFees + row.metrics.postGraduationFees) }}
+            <span
+              v-if="row.metrics.postGraduationFees > 0"
+              class="comparison-table__detail"
+            >{{ t('components.comparisonTable.afterGraduation', { sol: formatSol(row.metrics.postGraduationFees) }) }}</span>
+          </td>
+          <td class="comparison-table__cell">
+            {{
+              row.metrics.graduationSeconds === null
+                ? t('components.comparisonTable.no')
+                : t('components.comparisonTable.graduatedAfter', { seconds: row.metrics.graduationSeconds })
+            }}
+          </td>
+        </template>
+        <td
+          v-else
+          colspan="6"
+          class="comparison-table__refused"
+        >
+          {{ t('components.comparisonTable.refused', { reason: row.reason }) }}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</template>
+
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+import { formatSol, formatSolChange } from '../../features/comparison'
+import type { ComparisonTableProps } from './types'
+
+defineProps<ComparisonTableProps>()
+const { t } = useI18n()
+
+const amountClass = (sol: number): string[] => [
+  'comparison-table__amount',
+  sol < 0 ? 'comparison-table__amount--loss' : 'comparison-table__amount--gain',
+]
+</script>
+
+<style lang="scss">
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  color: var(--color-surface-foreground);
+  border-radius: var(--radius-2);
+  overflow: hidden;
+}
+
+.comparison-table__caption {
+  padding: var(--space-3) 0;
+  text-align: left;
+  font-size: var(--font-size-2);
+  color: var(--color-muted-foreground);
+}
+
+.comparison-table__head {
+  padding: var(--space-3);
+  border-bottom: var(--border-width-1) solid var(--color-border);
+  text-align: left;
+  font-size: var(--font-size-2);
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+}
+
+.comparison-table__head--number {
+  text-align: right;
+}
+
+.comparison-table__row + .comparison-table__row {
+  border-top: var(--border-width-1) solid var(--color-border);
+}
+
+.comparison-table__config {
+  padding: var(--space-3);
+  text-align: left;
+  font-weight: normal;
+  vertical-align: top;
+}
+
+.comparison-table__name {
+  display: block;
+  font-weight: 600;
+}
+
+.comparison-table__intent {
+  display: block;
+  max-width: var(--text-max-width-narrow);
+  font-size: var(--font-size-2);
+  color: var(--color-muted-foreground);
+}
+
+.comparison-table__amount,
+.comparison-table__cell {
+  padding: var(--space-3);
+  vertical-align: top;
+  font-family: var(--font-family-mono);
+}
+
+.comparison-table__amount {
+  text-align: right;
+}
+
+.comparison-table__cell {
+  white-space: nowrap;
+}
+
+.comparison-table__amount--gain {
+  color: var(--color-gain);
+}
+
+.comparison-table__amount--loss {
+  color: var(--color-loss);
+}
+
+.comparison-table__detail {
+  display: block;
+  font-size: var(--font-size-1);
+  color: var(--color-muted-foreground);
+}
+
+.comparison-table__refused {
+  padding: var(--space-3);
+  color: var(--color-muted-foreground);
+  font-style: italic;
+}
+</style>

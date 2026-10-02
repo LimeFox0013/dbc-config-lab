@@ -1,0 +1,17 @@
+{
+  "name": "@lf/deploy-templates",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-contained deploy-trigger templates a graduating client repo vendors, one per platform hosting target. First template: arbitrary-workload-hosting (Keycloak client-credentials token + create/redeploy against lime-fox-infra's arbitrary-pod API, server-side-only pod identity). Vendored build output (compiled JS + .d.ts) from the LimeFox platform; not edited in this repo.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  }
+}

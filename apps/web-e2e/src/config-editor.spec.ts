@@ -1,0 +1,78 @@
+import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+test.describe('config editor', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+  })
+
+  const editor = (page: Page) => page.locator('.config-editor')
+
+  test('starts from a preset and says Meteora would accept it', async ({
+    page,
+  }) => {
+    await expect(editor(page).getByRole('status')).toHaveText(
+      'Meteora would accept this config.',
+    )
+    await expect(
+      editor(page).getByRole('button', { name: 'Add to comparison' }),
+    ).toBeEnabled()
+  })
+
+  test('shows the program’s reason and blocks adding when the LP split is wrong', async ({
+    page,
+  }) => {
+    const partner = editor(page).getByRole('spinbutton', {
+      name: /Partner LP \(/,
+    })
+    await partner.fill('10')
+    await partner.press('Enter')
+    await expect(editor(page).getByRole('status')).toContainText(
+      'Meteora would reject this config',
+    )
+    await expect(
+      editor(page).getByRole('button', { name: 'Add to comparison' }),
+    ).toBeDisabled()
+  })
+
+  test('a falling fee reveals its opening fee and window', async ({ page }) => {
+    await expect(
+      editor(page).getByRole('spinbutton', { name: /Falls over/ }),
+    ).toHaveCount(0)
+    await editor(page)
+      .getByRole('combobox', { name: 'Fee over time' })
+      .selectOption('1')
+    await expect(
+      editor(page).getByRole('spinbutton', { name: /Opening fee/ }),
+    ).toHaveValue('50')
+    await expect(
+      editor(page).getByRole('spinbutton', { name: /Falls over/ }),
+    ).toHaveValue('10')
+  })
+
+  test('an added config joins the comparison and the deploy picker without changing its source', async ({
+    page,
+  }) => {
+    const flatRow = page.getByRole('row', { name: /^Flat 1%/ })
+    const before = await flatRow.textContent()
+    const threshold = editor(page).getByRole('spinbutton', {
+      name: /Graduates at/,
+    })
+    await threshold.fill('40')
+    await threshold.press('Enter')
+    await editor(page)
+      .getByRole('textbox', { name: 'Name' })
+      .fill('Quick graduation')
+    await editor(page)
+      .getByRole('button', { name: 'Add to comparison' })
+      .click()
+
+    await expect(page.locator('tbody tr').first()).toContainText(
+      'Quick graduation',
+    )
+    await expect(
+      page.locator('.deploy-panel').getByRole('combobox', { name: 'Config' }),
+    ).toContainText('Quick graduation')
+    await expect(flatRow).toHaveText(before ?? '')
+  })
+})

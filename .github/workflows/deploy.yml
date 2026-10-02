@@ -1,0 +1,89 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  check:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    name: Browser tests
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+
+  image:
+    name: Build and push image
+    needs: [check, e2e]
+    # Skipped until the registry and deploy credentials are configured for this repo.
+    if: github.event_name != 'pull_request' && vars.REGISTRY_URL != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ${{ vars.REGISTRY_URL }}/limefox0013/dbc-config-lab-web:${{ env.IMAGE_TAG }}
+
+  deploy:
+    name: Declare/redeploy on lime-fox-infra
+    needs: image
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run deploy
+        env:
+          REGISTRY_URL: ${{ vars.REGISTRY_URL }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          LFI_API_URL: https://lime-fox.net/api
+          LFI_KEYCLOAK_URL: https://lime-fox.net/auth
+          LFI_KEYCLOAK_REALM: limefox
+          LFI_DEPLOY_CLIENT_ID: ${{ secrets.LFI_DEPLOY_CLIENT_ID }}
+          LFI_DEPLOY_CLIENT_SECRET: ${{ secrets.LFI_DEPLOY_CLIENT_SECRET }}
