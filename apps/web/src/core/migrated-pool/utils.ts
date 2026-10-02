@@ -6,6 +6,7 @@ import {
   bpsToFeeNumerator,
   CollectFeeMode as DammCollectFeeMode,
   cpAmmCoder,
+  CURRENT_POOL_VERSION,
   MAX_SQRT_PRICE,
   MIN_SQRT_PRICE,
   PoolStatus,
@@ -15,6 +16,7 @@ import {
   getInitialLiquidityFromDeltaQuote,
   getMigrationBaseToken,
   getMigrationQuoteAmountFromMigrationQuoteThreshold,
+  MAX_BASIS_POINT,
   MigratedCollectFeeMode,
   MigrationFeeOption,
   MigrationOption,
@@ -28,6 +30,7 @@ import {
   FIXED_MIGRATED_FEE_BPS,
   MIGRATED_PROTOCOL_FEE_PERCENT,
   MIGRATED_REFERRAL_FEE_PERCENT,
+  PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS,
 } from './constants'
 import { isEnumValue } from '../shared'
 import type { MigratedPool } from './types'
@@ -70,19 +73,25 @@ const flatBaseFeeData = (feeBps: number): number[] => [
 
 /**
  * The DAMM v2 pool the DBC program opens at graduation: full price range, priced at the
- * migration price, with liquidity from the migrated quote (threshold minus migration fee).
+ * migration price, with liquidity from the migrated quote — the threshold minus the
+ * config's migration fee, minus the program's protocol share of what is migrated.
  */
 export const toMigratedPool = (
   parameters: ConfigParameters,
   config: PoolConfig,
 ): MigratedPool => {
-  const quoteAmount = new BN(
+  const migratedQuote = new BN(
     getMigrationQuoteAmountFromMigrationQuoteThreshold(
       new Decimal(config.migrationQuoteThreshold.toString()),
       parameters.migrationFee.feePercentage,
     )
       .floor()
       .toFixed(),
+  )
+  const quoteAmount = migratedQuote.sub(
+    migratedQuote
+      .muln(PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS)
+      .divn(MAX_BASIS_POINT),
   )
   const sqrtPrice = config.migrationSqrtPrice
   const liquidity = getInitialLiquidityFromDeltaQuote(
@@ -151,7 +160,7 @@ export const toMigratedPool = (
     tokenBFlag: 0,
     collectFeeMode,
     poolType: 0,
-    feeVersion: 0,
+    feeVersion: CURRENT_POOL_VERSION,
     padding3: 0,
     feeAPerLiquidity: new Array(32).fill(0),
     feeBPerLiquidity: new Array(32).fill(0),

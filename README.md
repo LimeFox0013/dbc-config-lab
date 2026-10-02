@@ -8,7 +8,7 @@ A DBC config sets the rules of a token launch: curve shape, fee schedule, gradua
 
 | | |
 |---|---|
-| **Simulate the whole launch** | Trades run through the DBC SDK's own quote math on an in-memory pool, including the volatility fee, whose state the program carries from swap to swap. When the curve graduates, trading continues on a DAMM v2 pool opened the way the DBC program opens it (full range, migrated SOL after the migration fee, at the migration price) and priced with the DAMM v2 SDK. Deterministic per seed, no network. |
+| **Simulate the whole launch** | Trades run through the DBC SDK's own quote math on an in-memory pool, including the volatility fee, whose state the program carries from swap to swap. When the curve graduates, trading continues on a DAMM v2 pool opened the way the DBC program opens it (full range, migrated SOL after the migration fee and the program's 0.2% protocol share, at the migration price) and priced with the DAMM v2 SDK. Deterministic per seed, no network. |
 | **Bots vs humans** | Four launch situations — typical, hype, slow burn, patient bots — with first-second snipers, *patient* bots that wait until the program's own fee for their buy has fallen, and human buyers. Every config sees the same traders and random draws. |
 | **Compare** | Built-in, recommended, edited, shared and on-chain configs side by side: sniper and patient-bot profit, human profit, fees paid, partner + creator fees (with the post-graduation share), and when the launch graduated. |
 | **Recommend for a goal** | Seven goals — fair launch, punish bots, fee income, graduate fast, raise the most, stable price, keep early supply out of bots' hands — or your own weights. Each measure is scaled across the candidates before weighting, so no unit dominates; when a measure cannot tell candidates apart in the current situation, the tool says so. Optionally also searches curve shapes and graduation thresholds. Runs in a Web Worker; every figure is simulated. |
@@ -35,6 +35,8 @@ Averages over 20 seeded scenarios. Profit counts tokens still held at what each 
 
 **Hype launches graduate** (20 of 20 runs). After graduation, fast snipers dump into the migrated pool: +26 SOL under a flat fee, −21 SOL under the sniper shield. With 200 holders, selling everything at the end is a fire sale, so human profit is strongly negative under every schedule.
 
+**The volatility fee is a small fee-income lever, not a sniper defence.** Switched on for each built-in schedule, it adds 0.03–0.41 SOL of partner + creator fees per launch, humans pay 0.02–0.23 SOL more in fees, and sniper profit barely moves (10 seeds × 4 situations).
+
 ## Limitations
 
 - **Bot behaviour.** Bots are modelled as first-second snipers and as patient bots that react to the fee. Bots reacting to other signals — price, volume, other wallets — are not modelled.
@@ -42,7 +44,7 @@ Averages over 20 seeded scenarios. Profit counts tokens still held at what each 
 - **Rate-limiter fee mode** is deprecated for new configs and not offered.
 - **Slot-based configs** (often from other launchpads) count time in slots; scenario seconds are converted at 400 ms per slot.
 - **Exit values** assume each group sells all remaining tokens at the end.
-- **Checked against real pools:** the full swap history of three mainnet pools — 322 swaps, covering the volatility fee and fees taken in SOL and in the token — replays with every fee, output, price and pool balance equal to what the program recorded (`apps/web/scripts/mainnet-replay-verify.ts`). Post-graduation trading on the DAMM v2 pool has not been replayed against a real pool yet.
+- **Checked against real pools:** the full swap history of three mainnet launches replays with every fee, output, price and pool balance equal to what the programs recorded (`apps/web/scripts/mainnet-replay-verify.ts`): 322 bonding-curve swaps, covering the volatility fee and fees taken in SOL and in the token, and — for the two launches that graduated — the migrated DAMM v2 pool's opening liquidity and its 883 swaps since. Liquidity providers adding or removing liquidity after graduation is not modelled; the replay applies it as recorded.
 - **Fees in either token:** a fee a config collects in the launched token is reported in SOL, valued at the price of the trade that paid it.
 
 ## Security
@@ -72,7 +74,7 @@ npm run build
 npx tsx apps/web/scripts/mainnet-replay-verify.ts <pool address>
 ```
 
-Read-only, over the public mainnet RPC. Loads a DBC pool and its config, then replays every swap the pool ever executed — from its on-chain swap events — through the simulator's math from a fresh pool, and compares each swap's fees, output, price and quote reserve with what the program recorded.
+Read-only, over the public mainnet RPC. Loads a DBC pool and its config, then replays every swap the pool ever executed — from its on-chain swap events — through the simulator's math from a fresh pool, and compares each swap's fees, output, price and quote reserve with what the program recorded. Add the address of the DAMM v2 pool the launch migrated to (`<pool> <migrated pool>`) to also check the simulator's migrated pool against the one the program opened and replay that pool's swaps.
 
 ### Verify the simulator against devnet
 

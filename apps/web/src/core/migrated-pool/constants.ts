@@ -12,6 +12,12 @@ export const FIXED_MIGRATED_FEE_BPS: Partial<
   [MigrationFeeOption.FixedBps600]: 600,
 }
 
+/**
+ * Share of the migrated quote the DBC program keeps as its protocol fee when it opens the
+ * DAMM v2 pool (program constant PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS; not exported by the SDK).
+ */
+export const PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS = 20
+
 /** DAMM v2 protocol and referral shares of a trading fee, in percent. */
 export const MIGRATED_PROTOCOL_FEE_PERCENT = 20
 export const MIGRATED_REFERRAL_FEE_PERCENT = 20

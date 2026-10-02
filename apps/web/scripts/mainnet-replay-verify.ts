@@ -2,14 +2,27 @@
  * Opt-in, read-only check against a real pool: loads a DBC pool and its config from
  * mainnet, then replays every swap the pool ever executed — from its on-chain swap events —
  * through the simulator's own math, starting from a fresh pool, and compares each swap's
- * fees, output, price and quote reserve with what the program recorded. Public RPC only;
+ * fees, output, price and quote reserve with what the program recorded. Given the DAMM v2
+ * pool the launch migrated to, it then checks the simulator's migrated pool against the
+ * one the program opened and replays that pool's swaps too; liquidity that LPs add or
+ * remove later is applied as recorded, since it is a decision, not math. Public RPC only;
  * no keys, no transactions sent.
  *
- *   npx tsx apps/web/scripts/mainnet-replay-verify.ts <pool>
+ *   npx tsx apps/web/scripts/mainnet-replay-verify.ts <pool> [migrated pool]
  */
 import BN from 'bn.js'
 import bs58 from 'bs58'
 import { PublicKey } from '@solana/web3.js'
+import {
+  CP_AMM_PROGRAM_ID,
+  cpAmmCoder,
+  getFeeMode as getMigratedFeeMode,
+  getSwapResultFromExactInput,
+  getSwapResultFromExactOutput,
+  getSwapResultFromPartialInput,
+  TradeDirection as MigratedTradeDirection,
+} from '@meteora-ag/cp-amm-sdk'
+import type { SwapResult2 as MigratedSwapResult } from '@meteora-ag/cp-amm-sdk'
 import {
   ActivationType,
   createDbcProgram,
@@ -25,6 +38,8 @@ import type {
   VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { connectionFor, SolanaNetwork } from '../src/core/config-deploy'
+import { toMigratedPool } from '../src/core/migrated-pool'
+import type { MigratedPool } from '../src/core/migrated-pool'
 import { loadOnChainConfig } from '../src/features/onchain-config'
 import {
   nextQuoteReserve,
@@ -50,6 +65,17 @@ const SWAP_EVENTS = new Set([
   'evtSwap2WithTransferHook',
 ])
 const REPORTED_MISMATCHES = 12
+/** Newest transaction format the RPC returns when asked. */
+const MAX_TRANSACTION_VERSION = 1
+const MIGRATED_SWAP_EVENT = 'EvtSwap2'
+const MIGRATED_INIT_EVENT = 'EvtInitializePool'
+const MIGRATED_LIQUIDITY_EVENT = 'EvtLiquidityChange'
+
+/** DAMM v2 EvtLiquidityChange.change_type. */
+enum LiquidityChange {
+  Add = 0,
+  Remove = 1,
+}
 
 enum SwapMode {
   ExactIn = 0,
@@ -144,11 +170,13 @@ interface SwapEvent {
 }
 
 /**
- * DBC events of one transaction, in emission order. The program emits each event both as a
- * log line and as a self-CPI; the self-CPI copy is used when present (logs can be truncated).
+ * One program's events in a transaction, in emission order. Programs emit each event both
+ * as a log line and as a self-CPI; the self-CPI copy is used when present (logs can be
+ * truncated).
  */
 const eventsOf = (
   transaction: unknown,
+  programId: PublicKey,
   decode: (base64: string) => { name: string; data: unknown } | null,
 ): SwapEvent[] => {
   const slot = numberField(transaction, 'slot')
@@ -160,7 +188,7 @@ const eventsOf = (
     ...stringList(field(loaded, 'writable')),
     ...stringList(field(loaded, 'readonly')),
   ]
-  const dbc = DYNAMIC_BONDING_CURVE_PROGRAM_ID.toBase58()
+  const program = programId.toBase58()
 
   const fromLogs = stringList(field(meta, 'logMessages'))
     .filter((line) => line.startsWith(PROGRAM_DATA_PREFIX))
@@ -168,7 +196,7 @@ const eventsOf = (
 
   const fromCpi = recordList(field(meta, 'innerInstructions'))
     .flatMap((group) => recordList(group.instructions))
-    .filter((ix) => keys[Number(ix.programIdIndex)] === dbc)
+    .filter((ix) => keys[Number(ix.programIdIndex)] === program)
     .map((ix) => Buffer.from(bs58.decode(String(ix.data))))
     .filter((data) =>
       data.subarray(0, EVENT_IX_TAG.length).equals(EVENT_IX_TAG),
@@ -245,6 +273,169 @@ const quoteFor = (
   }
 }
 
+const migratedQuoteFor = (
+  pool: MigratedPool,
+  data: unknown,
+  point: BN,
+): MigratedSwapResult => {
+  const direction =
+    numberField(data, 'trade_direction') === MigratedTradeDirection.AtoB
+      ? MigratedTradeDirection.AtoB
+      : MigratedTradeDirection.BtoA
+  const feeMode = getMigratedFeeMode(
+    pool.collectFeeMode,
+    direction,
+    field(data, 'has_referral') === true,
+  )
+  const recorded = field(data, 'swap_result')
+  // The amounts the swap math saw, after any token transfer fee.
+  const amountIn = bnField(recorded, 'included_fee_input_amount').add(
+    bnField(recorded, 'amount_left'),
+  )
+  switch (numberField(field(data, 'params'), 'swap_mode')) {
+    case SwapMode.ExactIn:
+      return getSwapResultFromExactInput(
+        pool,
+        amountIn,
+        feeMode,
+        direction,
+        point,
+      )
+    case SwapMode.PartialFill:
+      return getSwapResultFromPartialInput(
+        pool,
+        amountIn,
+        feeMode,
+        direction,
+        point,
+      )
+    case SwapMode.ExactOut:
+      return getSwapResultFromExactOutput(
+        pool,
+        bnField(recorded, 'output_amount'),
+        feeMode,
+        direction,
+        point,
+      )
+    default:
+      throw new Error('Unknown swap mode')
+  }
+}
+
+/**
+ * Replays the DAMM v2 pool a launch migrated to, starting from the simulator's own migrated
+ * pool: its liquidity must equal the program's once the migration transaction completes,
+ * and every swap after that must match.
+ */
+const replayMigratedPool = async (
+  endpoint: string,
+  address: string,
+  pool: MigratedPool,
+): Promise<{ swaps: number; mismatches: string[] }> => {
+  const decode = (base64: string) => {
+    try {
+      return cpAmmCoder.events.decode(base64)
+    } catch {
+      return null
+    }
+  }
+  const signatures = await signaturesOf(endpoint, address)
+  console.log(
+    `Migrated pool ${address}: ${signatures.length} successful transactions; fetching…`,
+  )
+
+  const mismatches: string[] = []
+  let state = pool
+  let chainLiquidity: BN | null = null
+  let opened = false
+  let swaps = 0
+
+  for (const signature of signatures) {
+    await sleep(REQUEST_GAP_MS)
+    const transaction = await rpc(endpoint, 'getTransaction', [
+      signature,
+      {
+        encoding: 'json',
+        maxSupportedTransactionVersion: MAX_TRANSACTION_VERSION,
+        commitment: 'confirmed',
+      },
+    ])
+    const events = eventsOf(transaction, CP_AMM_PROGRAM_ID, decode).filter(
+      (event) => String(field(event.data, 'pool')) === address,
+    )
+    const opensHere = events.some((event) => event.name === MIGRATED_INIT_EVENT)
+
+    for (const event of events) {
+      if (event.name === MIGRATED_INIT_EVENT) {
+        chainLiquidity = bnField(event.data, 'liquidity')
+        state = {
+          ...state,
+          activationPoint: bnField(event.data, 'activation_point'),
+        }
+        continue
+      }
+      if (event.name === MIGRATED_LIQUIDITY_EVENT) {
+        const delta = bnField(event.data, 'liquidity_delta')
+        const signed =
+          numberField(event.data, 'change_type') === LiquidityChange.Remove
+            ? delta.neg()
+            : delta
+        chainLiquidity = (chainLiquidity ?? new BN(0)).add(signed)
+        // Liquidity added inside the migration itself is part of what the simulator models.
+        if (opened) state = { ...state, liquidity: state.liquidity.add(signed) }
+        continue
+      }
+      if (event.name !== MIGRATED_SWAP_EVENT) continue
+
+      swaps++
+      const point = bnField(event.data, 'current_timestamp')
+      const recorded = field(event.data, 'swap_result')
+      try {
+        const quote = migratedQuoteFor(state, event.data, point)
+        const pairs: Array<[string, BN, BN]> = [
+          ['claimingFee', quote.claimingFee, bnField(recorded, 'claiming_fee')],
+          ['protocolFee', quote.protocolFee, bnField(recorded, 'protocol_fee')],
+          ['referralFee', quote.referralFee, bnField(recorded, 'referral_fee')],
+          [
+            'outputAmount',
+            quote.outputAmount,
+            bnField(recorded, 'output_amount'),
+          ],
+          [
+            'nextSqrtPrice',
+            quote.nextSqrtPrice,
+            bnField(recorded, 'next_sqrt_price'),
+          ],
+        ]
+        pairs
+          .filter(([, ours, chain]) => !ours.eq(chain))
+          .forEach(([name, ours, chain]) =>
+            mismatches.push(
+              `migrated swap ${swaps} (${signature.slice(0, 12)}…) ${name}: simulated ${ours} on-chain ${chain}`,
+            ),
+          )
+      } catch (error) {
+        mismatches.push(
+          `migrated swap ${swaps} (${signature.slice(0, 12)}…): quote failed (${error instanceof Error ? error.message : String(error)})`,
+        )
+      }
+      // Continue from the chain's own price so one mismatch cannot cascade.
+      state = { ...state, sqrtPrice: bnField(recorded, 'next_sqrt_price') }
+    }
+
+    if (opensHere) {
+      opened = true
+      if (!chainLiquidity || !state.liquidity.eq(chainLiquidity))
+        mismatches.push(
+          `migrated pool liquidity after migration: simulated ${state.liquidity} on-chain ${chainLiquidity ?? 'missing'}`,
+        )
+    }
+  }
+  if (!opened)
+    mismatches.push('migration transaction not found in the pool history')
+  return { swaps, mismatches }
+}
+
 const main = async () => {
   const address = process.argv[2]
   if (!address)
@@ -298,11 +489,15 @@ const main = async () => {
       signature,
       {
         encoding: 'json',
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: MAX_TRANSACTION_VERSION,
         commitment: 'confirmed',
       },
     ])
-    const poolEvents = eventsOf(transaction, decode).filter(
+    const poolEvents = eventsOf(
+      transaction,
+      DYNAMIC_BONDING_CURVE_PROGRAM_ID,
+      decode,
+    ).filter(
       (event) =>
         SWAP_EVENTS.has(event.name) &&
         String(field(event.data, 'pool')) === address,
@@ -415,10 +610,23 @@ const main = async () => {
   console.log(
     `${swaps} swaps replayed; ${mismatches.length} mismatching values`,
   )
-  mismatches
-    .slice(0, REPORTED_MISMATCHES)
-    .forEach((line) => console.log(`  ${line}`))
-  process.exitCode = swaps > 0 && mismatches.length === 0 ? 0 : 1
+
+  const migratedAddress = process.argv[3]
+  const migrated = migratedAddress
+    ? await replayMigratedPool(
+        connection.rpcEndpoint,
+        migratedAddress,
+        toMigratedPool(parameters, config),
+      )
+    : { swaps: 0, mismatches: [] }
+  if (migratedAddress)
+    console.log(
+      `${migrated.swaps} migrated-pool swaps replayed; ${migrated.mismatches.length} mismatching values`,
+    )
+
+  const all = [...mismatches, ...migrated.mismatches]
+  all.slice(0, REPORTED_MISMATCHES).forEach((line) => console.log(`  ${line}`))
+  process.exitCode = swaps > 0 && all.length === 0 ? 0 : 1
 }
 
 main().catch((error: unknown) => {

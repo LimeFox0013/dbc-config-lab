@@ -38,13 +38,12 @@ describe('toMigratedPool', () => {
     expect(decoded.numberOfPeriod).toBe(0)
   })
 
-  it('opens at the migration price with the threshold minus the migration fee', () => {
+  it('opens at the migration price with the migrated SOL less the program’s 0.2% share', () => {
     expect(pool.sqrtPrice.eq(toPoolConfig(parameters).migrationSqrtPrice)).toBe(
       true,
     )
-    expect(pool.tokenBAmount.toString()).toBe(
-      new BN(85).mul(new BN(1_000_000_000)).toString(),
-    )
+    // 85 SOL threshold, no config migration fee; the program keeps 20 bps of it.
+    expect(pool.tokenBAmount.toString()).toBe('84830000000')
   })
 
   it('reads the fixed fee rate from the migration fee option', () => {
