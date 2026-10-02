@@ -59,3 +59,8 @@ export interface SimulationResult {
   /** The migrated pool after the replay, or null if the launch never graduated. */
   migratedPool: MigratedPool | null
 }
+
+export interface SimulationOptions {
+  /** Whoever holds unlocked liquidity in the migrated pool withdraws it right after graduation. */
+  unlockedLiquidityPulled: boolean
+}

@@ -37,6 +37,7 @@ export const sanitizeScenario = (spec: ScenarioSpec): ScenarioSpec => ({
       SCENARIO_LIMITS.maxTraders,
     ),
   },
+  unlockedLiquidityPulled: spec.unlockedLiquidityPulled === true,
 })
 
 /** A preset as a comparison entry, compiled once. */

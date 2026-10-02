@@ -71,6 +71,14 @@
         />
       </label>
     </div>
+    <label class="scenario-controls__toggle">
+      <input
+        type="checkbox"
+        :checked="modelValue.unlockedLiquidityPulled"
+        @change="update({ unlockedLiquidityPulled: readChecked($event) })"
+      />
+      {{ t('components.scenarioControls.liquidityPulled') }}
+    </label>
     <p
       v-if="presetId !== CUSTOM"
       class="scenario-controls__summary"
@@ -110,6 +118,9 @@ const { t } = useI18n()
 const readNumber = (event: Event): number =>
   event.target instanceof HTMLInputElement ? event.target.valueAsNumber : Number.NaN
 
+const readChecked = (event: Event): boolean =>
+  event.target instanceof HTMLInputElement && event.target.checked
+
 const update = (patch: Partial<ScenarioSpec>): void => {
   emit('update:modelValue', sanitizeScenario({ ...props.modelValue, ...patch }))
 }
@@ -117,16 +128,21 @@ const update = (patch: Partial<ScenarioSpec>): void => {
 const presetIds = Object.values(ScenarioPresetId)
 const isPresetId = (value: string): value is ScenarioPresetId => presetIds.some((id) => id === value)
 
-/** Compares everything but the seed, which the user may vary within a preset. */
-const withoutSeed = (spec: ScenarioSpec): string => JSON.stringify({ ...spec, seed: 0 })
+/** Compares the traders only: the seed and the liquidity option apply to any preset. */
+const tradersOf = (spec: ScenarioSpec): string =>
+  JSON.stringify({ ...spec, seed: 0, unlockedLiquidityPulled: false })
 
 const presetId = computed<ScenarioPresetId | typeof CUSTOM>(
-  () => presetIds.find((id) => withoutSeed(SCENARIO_PRESETS[id]) === withoutSeed(props.modelValue)) ?? CUSTOM,
+  () => presetIds.find((id) => tradersOf(SCENARIO_PRESETS[id]) === tradersOf(props.modelValue)) ?? CUSTOM,
 )
 
 const selectPreset = (event: Event): void => {
   if (!(event.target instanceof HTMLSelectElement) || !isPresetId(event.target.value)) return
-  emit('update:modelValue', { ...SCENARIO_PRESETS[event.target.value], seed: props.modelValue.seed })
+  emit('update:modelValue', {
+    ...SCENARIO_PRESETS[event.target.value],
+    seed: props.modelValue.seed,
+    unlockedLiquidityPulled: props.modelValue.unlockedLiquidityPulled,
+  })
 }
 </script>
 
@@ -181,6 +197,15 @@ const selectPreset = (event: Event): void => {
   color: var(--color-background-foreground);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-3);
+}
+
+.scenario-controls__toggle {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-3);
+  font-size: var(--font-size-2);
+  color: var(--color-muted-foreground);
 }
 
 .scenario-controls__summary {

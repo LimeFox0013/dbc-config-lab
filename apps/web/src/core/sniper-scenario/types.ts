@@ -32,6 +32,8 @@ export interface ScenarioSpec {
     solPerBuy: Range
     holdSeconds: number
   }
+  /** Unlocked liquidity in the migrated pool is withdrawn right after graduation. */
+  unlockedLiquidityPulled: boolean
 }
 
 /** The program's base fee in bps for a buy of `amountIn` at second `at`. */

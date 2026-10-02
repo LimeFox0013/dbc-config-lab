@@ -85,4 +85,19 @@ test.describe('comparison', () => {
       page.getByRole('combobox', { name: 'Launch situation' }),
     ).toHaveValue('custom')
   })
+
+  test('pulling unlocked liquidity is an option of any launch situation', async ({
+    page,
+  }) => {
+    const situation = page.getByRole('combobox', { name: 'Launch situation' })
+    const pulled = page.getByRole('checkbox', {
+      name: 'Unlocked liquidity is pulled right after graduation',
+    })
+    await situation.selectOption('hype')
+    await pulled.check()
+    await expect(situation).toHaveValue('hype')
+
+    await situation.selectOption('slow-burn')
+    await expect(pulled).toBeChecked()
+  })
 })

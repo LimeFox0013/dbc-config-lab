@@ -13,6 +13,7 @@ import { compileLaunchConfig, DEFAULT_LAUNCH_CONFIG } from '../launch-config'
 import type { LaunchConfig } from '../launch-config'
 import { toPoolConfig } from '../launch-simulator/utils'
 import {
+  lockedLiquidity,
   migratedFeeBps,
   migratedUnsupportedReason,
   quoteMigratedSwap,
@@ -107,5 +108,32 @@ describe('migratedUnsupportedReason', () => {
         },
       }),
     ).not.toBeNull()
+  })
+})
+
+describe('lockedLiquidity', () => {
+  it('keeps exactly what a real pool kept after its creator withdrew', () => {
+    // Pool Abi3ww…UhUUC opened with this liquidity; the creator vested 11% and withdrew
+    // the unlocked 89%, leaving the vested share rounded down as the program splits it.
+    const opened = new BN('7845ca5bb2b539280647b6b46f', 16)
+    const split = {
+      ...parameters,
+      partnerPermanentLockedLiquidityPercentage: 0,
+      creatorPermanentLockedLiquidityPercentage: 0,
+      creatorLiquidityPercentage: 89,
+      creatorLiquidityVestingInfo: {
+        ...parameters.creatorLiquidityVestingInfo,
+        vestingPercentage: 11,
+      },
+    }
+    expect(lockedLiquidity(split, opened).toString(16)).toBe(
+      'd3ae07fd8c722727b9220e5c4',
+    )
+  })
+
+  it('keeps everything when all liquidity is permanently locked', () => {
+    expect(lockedLiquidity(parameters, pool.liquidity).eq(pool.liquidity)).toBe(
+      true,
+    )
   })
 })

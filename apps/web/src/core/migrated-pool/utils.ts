@@ -184,6 +184,28 @@ export const toMigratedPool = (
   }
 }
 
+const PERCENT = 100
+
+/**
+ * The part of the migrated pool's liquidity nobody can withdraw at graduation: the
+ * permanently locked and vesting shares of partner and creator, each rounded down as the
+ * program splits it (config.rs, get_liquidity_distribution). Vesting liquidity unlocks
+ * after its cliff, which is later than any scenario runs.
+ */
+export const lockedLiquidity = (
+  parameters: ConfigParameters,
+  liquidity: BN,
+): BN =>
+  [
+    parameters.partnerPermanentLockedLiquidityPercentage,
+    parameters.creatorPermanentLockedLiquidityPercentage,
+    parameters.partnerLiquidityVestingInfo.vestingPercentage,
+    parameters.creatorLiquidityVestingInfo.vestingPercentage,
+  ].reduce(
+    (total, percentage) => total.add(liquidity.muln(percentage).divn(PERCENT)),
+    zero(),
+  )
+
 /**
  * Why the post-graduation pool cannot be simulated exactly, or null. Compounding liquidity
  * and the DAMM v2 dynamic fee change pool state in ways this model does not replay.

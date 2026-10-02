@@ -59,7 +59,9 @@ export const runScenario = (
   const trades = generateTrades(spec, (at, amountIn) =>
     baseFeeBpsAt(parameters, at, amountIn),
   )
-  const simulation = simulateLaunch(parameters, trades)
+  const simulation = simulateLaunch(parameters, trades, {
+    unlockedLiquidityPulled: spec.unlockedLiquidityPulled,
+  })
   const exitAt = Math.max(0, ...trades.map((t) => t.at)) + 1
 
   const empty = <T>(

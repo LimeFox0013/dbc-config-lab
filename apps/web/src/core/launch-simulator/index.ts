@@ -12,8 +12,20 @@ import type {
   SwapQuote2Result,
   VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { FeeToken, TradeSide, TradeStatus, Venue } from './constants'
-import type { FeeShares, SimulationResult, Trade, TradeOutcome } from './types'
+import {
+  DEFAULT_SIMULATION_OPTIONS,
+  FeeToken,
+  TradeSide,
+  TradeStatus,
+  Venue,
+} from './constants'
+import type {
+  FeeShares,
+  SimulationOptions,
+  SimulationResult,
+  Trade,
+  TradeOutcome,
+} from './types'
 import {
   addFeeShares,
   emptyFeeShares,
@@ -30,6 +42,7 @@ import {
 import { errorMessage } from '../shared'
 import {
   afterMigratedSwap,
+  lockedLiquidity,
   migratedUnsupportedReason,
   quoteMigratedSwap,
   toMigratedPool,
@@ -43,7 +56,13 @@ export {
   TradeStatus,
   Venue,
 } from './constants'
-export type { FeeShares, SimulationResult, Trade, TradeOutcome } from './types'
+export type {
+  FeeShares,
+  SimulationOptions,
+  SimulationResult,
+  Trade,
+  TradeOutcome,
+} from './types'
 export { feeTotal } from './utils'
 
 type Replay = Omit<SimulationResult, 'finalPool' | 'migratedPool'> & {
@@ -203,8 +222,24 @@ const applyMigratedTrade = (
   }
 }
 
+/** The pool the program opens at graduation, less any liquidity withdrawn right after. */
+const migratedPoolAt = (
+  parameters: ConfigParameters,
+  config: PoolConfig,
+  options: SimulationOptions,
+): MigratedPool => {
+  const pool = toMigratedPool(parameters, config)
+  return options.unlockedLiquidityPulled
+    ? { ...pool, liquidity: lockedLiquidity(parameters, pool.liquidity) }
+    : pool
+}
+
 const applyTrade =
-  (parameters: ConfigParameters, config: PoolConfig) =>
+  (
+    parameters: ConfigParameters,
+    config: PoolConfig,
+    options: SimulationOptions,
+  ) =>
   (replay: Replay, trade: Trade): Replay => {
     const { pool } = replay
     const reject = (reason: string): Replay => ({
@@ -321,7 +356,7 @@ const applyTrade =
       },
       migrated:
         graduatesNow && migratedUnsupportedReason(parameters) === null
-          ? toMigratedPool(parameters, config)
+          ? migratedPoolAt(parameters, config, options)
           : replay.migrated,
       outcomes: appended(replay.outcomes, outcome),
       graduatedAt: graduatesNow ? trade.at : replay.graduatedAt,
@@ -353,6 +388,7 @@ const applyTrade =
 export const simulateLaunch = (
   parameters: ConfigParameters,
   trades: Trade[],
+  options: SimulationOptions = DEFAULT_SIMULATION_OPTIONS,
 ): SimulationResult => {
   const initial: Replay = {
     pool: toInitialPool(parameters),
@@ -375,7 +411,7 @@ export const simulateLaunch = (
   }
   const ordered = [...trades].sort((a, b) => a.at - b.at)
   const { pool, migrated, ...result } = ordered.reduce(
-    applyTrade(parameters, toPoolConfig(parameters)),
+    applyTrade(parameters, toPoolConfig(parameters), options),
     initial,
   )
   return { ...result, finalPool: pool, migratedPool: migrated }
@@ -398,6 +434,7 @@ export const exitValue = (
   at: Trade['at'],
 ): BN => {
   if (tokens.isZero()) return new BN(0)
+  if (simulation.migratedPool?.liquidity.isZero()) return new BN(0)
   if (simulation.migratedPool)
     return quoteMigratedSwap(simulation.migratedPool, true, tokens, at).quote
       .outputAmount

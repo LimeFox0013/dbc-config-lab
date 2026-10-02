@@ -36,6 +36,7 @@ export const DEFAULT_SCENARIO: ScenarioSpec = {
     solPerBuy: { min: 1, max: 3 },
     holdSeconds: 30,
   },
+  unlockedLiquidityPulled: false,
 }
 
 export enum ScenarioPresetId {
@@ -63,6 +64,7 @@ export const SCENARIO_PRESETS: Record<ScenarioPresetId, ScenarioSpec> = {
       solPerBuy: { min: 0.2, max: 3 },
     },
     adaptiveSnipers: { ...DEFAULT_SCENARIO.adaptiveSnipers, count: 5 },
+    unlockedLiquidityPulled: false,
   },
   [ScenarioPresetId.SlowBurn]: {
     seed: 42,
@@ -79,6 +81,7 @@ export const SCENARIO_PRESETS: Record<ScenarioPresetId, ScenarioSpec> = {
       solPerBuy: { min: 0.1, max: 1.5 },
     },
     adaptiveSnipers: { ...DEFAULT_SCENARIO.adaptiveSnipers, count: 2 },
+    unlockedLiquidityPulled: false,
   },
   [ScenarioPresetId.PatientBots]: {
     ...DEFAULT_SCENARIO,

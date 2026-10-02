@@ -10,6 +10,7 @@ import type { MigratedPool } from './types'
 
 export type { MigratedPool } from './types'
 export {
+  lockedLiquidity,
   migratedFeeBps,
   migratedUnsupportedReason,
   toMigratedPool,
@@ -34,6 +35,7 @@ export const quoteMigratedSwap = (
   at: number,
 ): MigratedSwap => {
   if (amountIn.lten(0)) throw new Error('Amount in must be greater than 0')
+  if (pool.liquidity.isZero()) throw new Error('The pool has no liquidity')
   const currentPoint = new BN(at)
   if (!isSwapEnabled(pool, currentPoint)) throw new Error('Swap is disabled')
   const direction = isSell ? TradeDirection.AtoB : TradeDirection.BtoA

@@ -1,3 +1,5 @@
+import type { SimulationOptions } from './types'
+
 export enum TradeSide {
   Buy = 'buy',
   Sell = 'sell',
@@ -31,3 +33,8 @@ export const SIMULATED_ACTIVATION_TIMESTAMP = 1_767_225_600
 
 /** Solana's target slot time, used to turn scenario seconds into slots for slot-activated configs. */
 export const SLOT_DURATION_MS = 400
+
+/** By default nobody withdraws liquidity from the migrated pool. */
+export const DEFAULT_SIMULATION_OPTIONS: SimulationOptions = {
+  unlockedLiquidityPulled: false,
+}

@@ -31,6 +31,7 @@
       "preset": "Launch situation",
       "custom": "Custom",
       "adaptiveSnipers": "Patient bots",
+      "liquidityPulled": "Unlocked liquidity is pulled right after graduation",
       "presets": {
         "typical": {
           "name": "Typical meme launch",
