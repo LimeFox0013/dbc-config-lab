@@ -22,5 +22,12 @@ export enum Venue {
   Migrated = 'migrated',
 }
 
+/**
+ * Unix time the simulated pool activates at. The volatility tracker starts at timestamp 0
+ * and compares against the clock, so the replay needs absolute time, not seconds since
+ * activation; any time past the longest decay period behaves the same.
+ */
+export const SIMULATED_ACTIVATION_TIMESTAMP = 1_767_225_600
+
 /** Solana's target slot time, used to turn scenario seconds into slots for slot-activated configs. */
 export const SLOT_DURATION_MS = 400

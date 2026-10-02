@@ -8,11 +8,11 @@ A DBC config sets the rules of a token launch: curve shape, fee schedule, gradua
 
 | | |
 |---|---|
-| **Simulate the whole launch** | Trades run through the DBC SDK's own quote math on an in-memory pool. When the curve graduates, trading continues on a DAMM v2 pool opened the way the DBC program opens it (full range, migrated SOL after the migration fee, at the migration price) and priced with the DAMM v2 SDK. Deterministic per seed, no network. |
+| **Simulate the whole launch** | Trades run through the DBC SDK's own quote math on an in-memory pool, including the volatility fee, whose state the program carries from swap to swap. When the curve graduates, trading continues on a DAMM v2 pool opened the way the DBC program opens it (full range, migrated SOL after the migration fee, at the migration price) and priced with the DAMM v2 SDK. Deterministic per seed, no network. |
 | **Bots vs humans** | Four launch situations — typical, hype, slow burn, patient bots — with first-second snipers, *patient* bots that wait until the program's own fee for their buy has fallen, and human buyers. Every config sees the same traders and random draws. |
 | **Compare** | Built-in, recommended, edited, shared and on-chain configs side by side: sniper and patient-bot profit, human profit, fees paid, partner + creator fees (with the post-graduation share), and when the launch graduated. |
 | **Recommend for a goal** | Seven goals — fair launch, punish bots, fee income, graduate fast, raise the most, stable price, keep early supply out of bots' hands — or your own weights. Each measure is scaled across the candidates before weighting, so no unit dominates; when a measure cannot tell candidates apart in the current situation, the tool says so. Optionally also searches curve shapes and graduation thresholds. Runs in a Web Worker; every figure is simulated. |
-| **Edit any config** | Token, curve (standard, market cap, two segments, liquidity weights), fee schedule, graduation pool fee, migration fee, LP split — each change validated by the DBC program's own rules as you type. |
+| **Edit any config** | Token, curve (standard, market cap, two segments, liquidity weights), fee schedule, volatility fee, fees taken in SOL or in the token, graduation pool fee, migration fee, LP split — each change validated by the DBC program's own rules as you type. |
 | **Share and reuse** | A share link reopens the config (it travels in the URL fragment, never sent to a server). "Show code" gives ready-to-run TypeScript that calls the right SDK builder and `createConfig`. |
 | **Inspect a live config** | Paste a DBC config address — or the address of a token's bonding-curve pool — to load that launchpad's rules from chain and test them against the same traders, read-only. |
 | **Deploy** | Publishes the config on devnet or mainnet with `createConfig`, signed by your own wallet (any Wallet Standard wallet: Phantom, Solflare, Backpack). |
@@ -38,11 +38,11 @@ Averages over 20 seeded scenarios. Profit counts tokens still held at what each 
 ## Limitations
 
 - **Bot behaviour.** Bots are modelled as first-second snipers and as patient bots that react to the fee. Bots reacting to other signals — price, volume, other wallets — are not modelled.
-- **Refused rather than approximated.** Configs whose fees the simulator cannot reproduce exactly are refused with a reason: the DBC dynamic (volatility) fee, and compounding or dynamic fees on the migrated pool.
+- **Refused rather than approximated.** Configs whose fees the simulator cannot reproduce exactly are refused with a reason: compounding or dynamic fees on the migrated pool.
 - **Rate-limiter fee mode** is deprecated for new configs and not offered.
 - **Slot-based configs** (often from other launchpads) count time in slots; scenario seconds are converted at 400 ms per slot.
 - **Exit values** assume each group sells all remaining tokens at the end.
-- **Live checks:** the on-chain loader has been run against live mainnet configs and pools; one simulated partner fee matched the real pool's to the lamport. Pool balance bookkeeping between swaps follows the SDK's fee modes and has not yet been compared with a real devnet pool (`apps/web/scripts/devnet-verify.ts` does that).
+- **Checked against real pools:** the full swap history of three mainnet pools — 322 swaps, covering the volatility fee and fees taken in SOL and in the token — replays with every fee, output, price and pool balance equal to what the program recorded (`apps/web/scripts/mainnet-replay-verify.ts`). Post-graduation trading on the DAMM v2 pool has not been replayed against a real pool yet.
 - **Fees in either token:** a fee a config collects in the launched token is reported in SOL, valued at the price of the trade that paid it.
 
 ## Security
@@ -66,6 +66,14 @@ npm run typecheck
 npm run build
 ```
 
+### Replay a real pool
+
+```bash
+npx tsx apps/web/scripts/mainnet-replay-verify.ts <pool address>
+```
+
+Read-only, over the public mainnet RPC. Loads a DBC pool and its config, then replays every swap the pool ever executed — from its on-chain swap events — through the simulator's math from a fresh pool, and compares each swap's fees, output, price and quote reserve with what the program recorded.
+
 ### Verify the simulator against devnet
 
 ```bash
@@ -87,6 +95,7 @@ apps/web/
   src/core/onchain-config     on-chain config account → simulation parameters
   src/features/…              comparison, editor, recommendation (Web Worker), sharing, wallet, on-chain lookup
   src/views, src/components   the single-page UI
+  scripts/mainnet-replay-verify.ts  replays a real pool's swap history and compares it swap by swap
   scripts/devnet-verify.ts    live check against devnet
 apps/web-e2e/                 Playwright browser tests (fake wallet, mocked RPC)
 libs/deploy-templates         vendored deploy trigger for the hosting platform (build output)

@@ -1,5 +1,6 @@
 import {
   BaseFeeMode,
+  CollectFeeMode,
   DammV2DynamicFeeMode,
   MigratedCollectFeeMode,
   MigrationFeeOption,
@@ -25,6 +26,7 @@ import {
   BPS_PER_PERCENT,
   CURVE_SHAPE_ORDER,
   DEFAULT_CUSTOM_MIGRATED_POOL_FEE_BPS,
+  DynamicFeeChoice,
   EditorFieldId,
   FeeCurve,
   FieldGroup,
@@ -43,6 +45,12 @@ const isMigrationFeeOption = isEnumValue<MigrationFeeOption>(
   Object.values(MigrationFeeOption),
 )
 const isFeeCurve = isEnumValue<FeeCurve>(Object.values(FeeCurve))
+const isDynamicFeeChoice = isEnumValue<DynamicFeeChoice>(
+  Object.values(DynamicFeeChoice),
+)
+const isCollectFeeMode = isEnumValue<CollectFeeMode>(
+  Object.values(CollectFeeMode),
+)
 
 const always = (): boolean => true
 
@@ -349,6 +357,39 @@ export const EDITOR_FIELDS: EditorField[] = [
       fee: { ...c.fee, creatorTradingFeePercentage: Math.trunc(v) },
     }),
   ),
+  {
+    id: EditorFieldId.DynamicFee,
+    group: FieldGroup.Fees,
+    kind: FieldKind.Select,
+    unit: FieldUnit.None,
+    options: [DynamicFeeChoice.Off, DynamicFeeChoice.On].map((value) => ({
+      value,
+      labelKey: `dynamicFee.${value}`,
+    })),
+    read: (c) =>
+      c.fee.dynamicFeeEnabled ? DynamicFeeChoice.On : DynamicFeeChoice.Off,
+    write: (c, v) =>
+      isDynamicFeeChoice(v)
+        ? {
+            ...c,
+            fee: { ...c.fee, dynamicFeeEnabled: v === DynamicFeeChoice.On },
+          }
+        : c,
+    visible: always,
+  },
+  {
+    id: EditorFieldId.FeeCollection,
+    group: FieldGroup.Fees,
+    kind: FieldKind.Select,
+    unit: FieldUnit.None,
+    options: [CollectFeeMode.QuoteToken, CollectFeeMode.OutputToken].map(
+      (value) => ({ value, labelKey: `feeCollection.${value}` }),
+    ),
+    read: (c) => c.fee.collectFeeMode,
+    write: (c, v) =>
+      isCollectFeeMode(v) ? { ...c, fee: { ...c.fee, collectFeeMode: v } } : c,
+    visible: always,
+  },
   {
     id: EditorFieldId.MigratedPoolFeeOption,
     group: FieldGroup.Migration,

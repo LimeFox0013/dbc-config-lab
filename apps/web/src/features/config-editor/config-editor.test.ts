@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { MigrationFeeOption } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import {
+  CollectFeeMode,
+  MigrationFeeOption,
+} from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   CurveShape,
   DEFAULT_LAUNCH_CONFIG,
@@ -12,6 +15,7 @@ import {
 import type { LaunchConfig } from '../../core/launch-config'
 import {
   applyEdit,
+  DynamicFeeChoice,
   EDITOR_FIELDS,
   EditorFieldId,
   editorStatus,
@@ -151,6 +155,26 @@ describe('applyEdit', () => {
 })
 
 describe('editorStatus', () => {
+  it('turns on the volatility fee as a config Meteora accepts and the tool simulates', () => {
+    const config = edit(
+      DEFAULT_LAUNCH_CONFIG,
+      EditorFieldId.DynamicFee,
+      DynamicFeeChoice.On,
+    )
+    expect(config.fee.dynamicFeeEnabled).toBe(true)
+    expect(editorStatus(config)).toEqual({ valid: true, simulatable: true })
+  })
+
+  it('takes fees in the bought token when asked', () => {
+    const config = edit(
+      DEFAULT_LAUNCH_CONFIG,
+      EditorFieldId.FeeCollection,
+      CollectFeeMode.OutputToken,
+    )
+    expect(config.fee.collectFeeMode).toBe(CollectFeeMode.OutputToken)
+    expect(editorStatus(config)).toEqual({ valid: true, simulatable: true })
+  })
+
   it('accepts every built-in preset', () => {
     LAUNCH_PRESETS.forEach((p) =>
       expect(editorStatus(p.config)).toEqual({

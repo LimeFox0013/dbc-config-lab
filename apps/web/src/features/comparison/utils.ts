@@ -1,6 +1,5 @@
 import { compileLaunchConfig } from '../../core/launch-config'
 import type { LaunchPreset } from '../../core/launch-config'
-import { unsupportedReason } from '../../core/launch-simulator'
 import { scenarioMetrics } from '../../core/sniper-scenario'
 import type { ScenarioSpec } from '../../core/sniper-scenario'
 import { clamp } from '../../core/shared'
@@ -55,8 +54,6 @@ export const compareRow = (
   if (!entry.compiled.ok)
     return { entry, ok: false, reason: entry.compiled.reason }
   const { parameters } = entry.compiled
-  const unsupported = unsupportedReason(parameters)
-  if (unsupported) return { entry, ok: false, reason: unsupported }
   return { entry, ok: true, metrics: scenarioMetrics(parameters, spec) }
 }
 

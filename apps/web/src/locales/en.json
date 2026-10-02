@@ -172,6 +172,8 @@
         "ending-fee": "Settled fee",
         "fee-window": "Falls over",
         "creator-trading-fee-share": "Creator’s share of trading fees",
+        "dynamic-fee": "Volatility fee",
+        "fee-collection": "Fees taken in",
         "migrated-pool-fee-option": "Graduation pool fee",
         "migrated-pool-fee": "Custom pool fee",
         "migration-fee": "Migration fee taken at graduation",
@@ -197,6 +199,14 @@
           "7": "7",
           "8": "8",
           "9": "9"
+        },
+        "dynamicFee": {
+          "0": "Off",
+          "1": "On — rises after sharp price moves"
+        },
+        "feeCollection": {
+          "0": "SOL",
+          "1": "The token bought (SOL on sells)"
         },
         "feeCurve": {
           "0": "Flat",

@@ -22,7 +22,7 @@ describe('compareConfigs', () => {
     expect(rows.every((row) => row.ok)).toBe(true)
   })
 
-  it('shows a refusal reason instead of numbers for an unsupported config', () => {
+  it('simulates a dynamic-fee config, charging more than without it', () => {
     const dynamic = {
       id: 'dynamic',
       name: 'Dynamic',
@@ -32,8 +32,14 @@ describe('compareConfigs', () => {
         fee: { ...DEFAULT_LAUNCH_CONFIG.fee, dynamicFeeEnabled: true },
       },
     }
-    const [row] = compareConfigs([presetEntry(dynamic)], DEFAULT_SCENARIO)
-    expect(row).toMatchObject({ ok: false })
+    const base = { ...dynamic, id: 'base', config: DEFAULT_LAUNCH_CONFIG }
+    const [withFee, without] = compareConfigs(
+      [presetEntry(dynamic), presetEntry(base)],
+      DEFAULT_SCENARIO,
+    )
+    if (!withFee?.ok || !without?.ok)
+      throw new Error('both configs should simulate')
+    expect(withFee.metrics.humanFees).toBeGreaterThan(without.metrics.humanFees)
   })
 
   it('shows a refusal reason for an invalid config', () => {

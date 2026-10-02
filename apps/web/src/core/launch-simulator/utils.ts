@@ -3,13 +3,22 @@ import { PublicKey } from '@solana/web3.js'
 import {
   ActivationType,
   getMigrationThresholdPrice,
+  MAX_BASIS_POINT,
+  ONE_Q64,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type {
   ConfigParameters,
+  DynamicFeeConfig,
   PoolConfig,
+  SwapQuote2Result,
   VirtualPool,
+  VolatilityTracker,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { FeeToken, SLOT_DURATION_MS } from './constants'
+import {
+  FeeToken,
+  SIMULATED_ACTIVATION_TIMESTAMP,
+  SLOT_DURATION_MS,
+} from './constants'
 import type { FeeShares } from './types'
 
 const zero = (): BN => new BN(0)
@@ -27,6 +36,27 @@ export const addFeeShares = (a: FeeShares, b: FeeShares): FeeShares => ({
   protocol: a.protocol.add(b.protocol),
   referral: a.referral.add(b.referral),
 })
+
+/** Quote reserve after a swap, following the program's accounting for each fee mode. */
+export const nextQuoteReserve = (
+  pool: VirtualPool,
+  quote: SwapQuote2Result,
+  isBuy: boolean,
+  feesOnInput: boolean,
+): BN => {
+  const reserve = pool.poolState.quoteReserve
+  if (isBuy) {
+    return reserve.add(
+      feesOnInput ? quote.excludedFeeInputAmount : quote.includedFeeInputAmount,
+    )
+  }
+  const totalFee = quote.tradingFee
+    .add(quote.protocolFee)
+    .add(quote.referralFee)
+  return reserve.sub(
+    feesOnInput ? quote.outputAmount : quote.outputAmount.add(totalFee),
+  )
+}
 
 export const feeTotal = (shares: FeeShares): BN =>
   shares.partner.add(shares.creator).add(shares.protocol).add(shares.referral)
@@ -227,3 +257,78 @@ export const pointAt = (seconds: number, activationType: number): BN =>
       ? Math.floor((seconds * 1000) / SLOT_DURATION_MS)
       : seconds,
   )
+
+/** The program clock, in unix seconds, `seconds` after the simulated pool activated. */
+export const timestampAt = (seconds: number): BN =>
+  new BN(SIMULATED_ACTIVATION_TIMESTAMP + seconds)
+
+/*
+ * The DBC program's volatility tracker (state/fee.rs, VolatilityTracker; virtual_pool.rs,
+ * update_pre_swap / update_post_swap), ported so the dynamic fee can be replayed: the SDK
+ * quotes from the stored tracker but does not advance it between swaps.
+ */
+
+const Q64_SHIFT = 64
+
+/** Bins crossed between two sqrt prices, as the program counts them (times two, rounded down). */
+export const deltaBinId = (
+  binStepU128: BN,
+  sqrtPriceA: BN,
+  sqrtPriceB: BN,
+): BN => {
+  const [upper, lower] = sqrtPriceA.gt(sqrtPriceB)
+    ? [sqrtPriceA, sqrtPriceB]
+    : [sqrtPriceB, sqrtPriceA]
+  return upper.shln(Q64_SHIFT).div(lower).sub(ONE_Q64).div(binStepU128).muln(2)
+}
+
+/** Before a swap: refreshes the price reference and decays the volatility once trading pauses. */
+export const trackerBeforeSwap = (
+  tracker: VolatilityTracker,
+  dynamicFee: DynamicFeeConfig,
+  sqrtPrice: BN,
+  timestamp: BN,
+): VolatilityTracker => {
+  const elapsed = BN.max(timestamp.sub(tracker.lastUpdateTimestamp), new BN(0))
+  if (elapsed.ltn(dynamicFee.filterPeriod)) return tracker
+  return {
+    ...tracker,
+    sqrtPriceReference: sqrtPrice,
+    volatilityReference: elapsed.ltn(dynamicFee.decayPeriod)
+      ? tracker.volatilityAccumulator
+          .muln(dynamicFee.reductionFactor)
+          .divn(MAX_BASIS_POINT)
+      : new BN(0),
+  }
+}
+
+/** After a swap: accumulates the move from the reference price, stamped only if a bin was crossed. */
+export const trackerAfterSwap = (
+  tracker: VolatilityTracker,
+  dynamicFee: DynamicFeeConfig,
+  sqrtPriceBefore: BN,
+  sqrtPriceAfter: BN,
+  timestamp: BN,
+): VolatilityTracker => {
+  const accumulated = tracker.volatilityReference.add(
+    deltaBinId(
+      dynamicFee.binStepU128,
+      sqrtPriceAfter,
+      tracker.sqrtPriceReference,
+    ).muln(MAX_BASIS_POINT),
+  )
+  return {
+    ...tracker,
+    volatilityAccumulator: BN.min(
+      accumulated,
+      new BN(dynamicFee.maxVolatilityAccumulator),
+    ),
+    lastUpdateTimestamp: deltaBinId(
+      dynamicFee.binStepU128,
+      sqrtPriceBefore,
+      sqrtPriceAfter,
+    ).isZero()
+      ? tracker.lastUpdateTimestamp
+      : timestamp,
+  }
+}

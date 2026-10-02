@@ -1,6 +1,5 @@
 import { compileLaunchConfig } from '../../core/launch-config'
 import type { LaunchConfig } from '../../core/launch-config'
-import { unsupportedReason } from '../../core/launch-simulator'
 import { migratedUnsupportedReason } from '../../core/migrated-pool'
 import { EditRejection, FieldKind } from './constants'
 import type { EditorField, EditorStatus, EditResult } from './types'
@@ -30,9 +29,7 @@ export const applyEdit = (
 export const editorStatus = (config: LaunchConfig): EditorStatus => {
   const compiled = compileLaunchConfig(config)
   if (!compiled.ok) return { valid: false, reason: compiled.reason }
-  const unsupported =
-    unsupportedReason(compiled.parameters) ??
-    migratedUnsupportedReason(compiled.parameters)
+  const unsupported = migratedUnsupportedReason(compiled.parameters)
   return unsupported
     ? { valid: true, simulatable: false, reason: unsupported }
     : { valid: true, simulatable: true }

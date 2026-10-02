@@ -1,6 +1,5 @@
 import { compileLaunchConfig, withCurve, withSchedule } from '../launch-config'
 import type { CurveSpec, FeeSchedule, LaunchConfig } from '../launch-config'
-import { unsupportedReason } from '../launch-simulator'
 import { scenarioMetrics } from '../sniper-scenario'
 import type { MeanMetrics, SearchRequest, SearchResult } from './types'
 import {
@@ -51,7 +50,7 @@ export const searchConfigs = (request: SearchRequest): SearchResult => {
       schedule,
     )
     const compiled = compileLaunchConfig(config)
-    if (!compiled.ok || unsupportedReason(compiled.parameters)) return []
+    if (!compiled.ok) return []
     const metrics = meanMetrics(
       request.seeds.map((seed) =>
         scenarioMetrics(compiled.parameters, { ...request.scenario, seed }),

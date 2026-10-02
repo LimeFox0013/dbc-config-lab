@@ -1,6 +1,7 @@
 export {
   EditorFieldId,
   EditRejection,
+  DynamicFeeChoice,
   FeeCurve,
   FieldGroup,
   FieldKind,

@@ -6,16 +6,15 @@ import {
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { compileLaunchConfig, DEFAULT_LAUNCH_CONFIG } from '../launch-config'
 import type { LaunchConfig } from '../launch-config'
-import {
-  FeeToken,
-  simulateLaunch,
-  TradeSide,
-  TradeStatus,
-  unsupportedReason,
-  Venue,
-} from '.'
+import { FeeToken, simulateLaunch, TradeSide, TradeStatus, Venue } from '.'
 import type { Trade } from '.'
-import { feeValueInQuote, toInitialPool, toPoolConfig } from './utils'
+import {
+  deltaBinId,
+  feeTotal,
+  feeValueInQuote,
+  toInitialPool,
+  toPoolConfig,
+} from './utils'
 
 const SOL = new BN(1_000_000_000)
 
@@ -159,14 +158,68 @@ describe('simulateLaunch', () => {
     expect(early.fee.protocol.gt(late.fee.protocol.muln(10))).toBe(true)
   })
 
-  it('refuses a dynamic-fee config instead of simulating it wrongly', () => {
-    const parameters = compile({
-      ...DEFAULT_LAUNCH_CONFIG,
-      fee: { ...DEFAULT_LAUNCH_CONFIG.fee, dynamicFeeEnabled: true },
+  describe('dynamic fee', () => {
+    const withDynamicFee = (dynamicFeeEnabled: boolean) =>
+      compile({
+        ...DEFAULT_LAUNCH_CONFIG,
+        fee: { ...DEFAULT_LAUNCH_CONFIG.fee, dynamicFeeEnabled },
+      })
+    const feesOf = (dynamicFeeEnabled: boolean, trades: Trade[]): BN[] =>
+      simulateLaunch(withDynamicFee(dynamicFeeEnabled), trades).outcomes.map(
+        (outcome) => feeTotal(outcome.fee),
+      )
+
+    it('adds a capped volatility fee after a large price move', () => {
+      const trades = [buy(0, 20), buy(1, 1)]
+      const [firstBase, secondBase] = feesOf(false, trades)
+      const [firstDynamic, secondDynamic] = feesOf(true, trades)
+
+      expect(firstDynamic?.eq(firstBase ?? new BN(0))).toBe(true)
+      expect(secondDynamic?.gt(secondBase ?? new BN(0))).toBe(true)
+      // The SDK's default dynamic-fee parameters cap the extra at 20% of the base fee.
+      expect(
+        secondDynamic?.lte((secondBase ?? new BN(0)).muln(12).divn(10)),
+      ).toBe(true)
     })
 
-    expect(unsupportedReason(parameters)).not.toBeNull()
-    expect(() => simulateLaunch(parameters, [buy(0, 1)])).toThrow()
+    it('partly decays the extra within the decay window', () => {
+      const [, raised, decayed] = feesOf(true, [
+        buy(0, 20),
+        buy(20, 1),
+        buy(21, 1),
+      ])
+      const [, base] = feesOf(false, [buy(0, 20), buy(20, 1)])
+
+      expect(decayed?.lt(raised ?? new BN(0))).toBe(true)
+      expect(decayed?.gt(base ?? new BN(0))).toBe(true)
+    })
+
+    it('drops the extra after a pause past the decay period, one trade later as on chain', () => {
+      const [, stillRaised, reset] = feesOf(true, [
+        buy(0, 20),
+        buy(1000, 1),
+        buy(1001, 1),
+      ])
+      const [, raised] = feesOf(true, [buy(0, 20), buy(1, 1)])
+      const [, base] = feesOf(false, [buy(0, 20), buy(1000, 1)])
+
+      expect(stillRaised?.eq(raised ?? new BN(0))).toBe(true)
+      expect(reset?.lt((base ?? new BN(0)).muln(102).divn(100))).toBe(true)
+    })
+
+    it('counts bins symmetrically and none for an unchanged price', () => {
+      const { dynamicFee } = withDynamicFee(true).poolFees
+      if (!dynamicFee) throw new Error('dynamic fee expected')
+      const low = new BN(2).pow(new BN(64))
+      const high = low.muln(101).divn(100)
+
+      expect(deltaBinId(dynamicFee.binStepU128, low, low).isZero()).toBe(true)
+      expect(
+        deltaBinId(dynamicFee.binStepU128, low, high).eq(
+          deltaBinId(dynamicFee.binStepU128, high, low),
+        ),
+      ).toBe(true)
+    })
   })
 })
 

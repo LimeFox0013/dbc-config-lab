@@ -18,10 +18,14 @@ import {
   addFeeShares,
   emptyFeeShares,
   feeValueInQuote,
+  nextQuoteReserve,
   pointAt,
   splitTradingFee,
+  timestampAt,
   toInitialPool,
   toPoolConfig,
+  trackerAfterSwap,
+  trackerBeforeSwap,
 } from './utils'
 import { errorMessage } from '../shared'
 import {
@@ -64,27 +68,6 @@ const rejected = (
   quoteReserveAfter: replay.pool.poolState.quoteReserve,
   reason,
 })
-
-/** Quote reserve after a swap, following the program's accounting for each fee mode. */
-const nextQuoteReserve = (
-  pool: VirtualPool,
-  quote: SwapQuote2Result,
-  isBuy: boolean,
-  feesOnInput: boolean,
-): BN => {
-  const reserve = pool.poolState.quoteReserve
-  if (isBuy) {
-    return reserve.add(
-      feesOnInput ? quote.excludedFeeInputAmount : quote.includedFeeInputAmount,
-    )
-  }
-  const totalFee = quote.tradingFee
-    .add(quote.protocolFee)
-    .add(quote.referralFee)
-  return reserve.sub(
-    feesOnInput ? quote.outputAmount : quote.outputAmount.add(totalFee),
-  )
-}
 
 /*
  * A replay's outcome list and holdings map belong to a single simulateLaunch call and never
@@ -252,10 +235,22 @@ const applyTrade =
       : TradeDirection.BaseToQuote
     const feeMode = getFeeMode(config.collectFeeMode, direction, false)
 
+    const timestamp = timestampAt(trade.at)
+    const { dynamicFee } = config.poolFees
+    const hasDynamicFee = dynamicFee.initialized !== 0
+    const tracker = hasDynamicFee
+      ? trackerBeforeSwap(
+          pool.poolState.volatilityTracker,
+          dynamicFee,
+          pool.poolState.sqrtPrice,
+          timestamp,
+        )
+      : pool.poolState.volatilityTracker
+
     let quote: SwapQuote2Result
     try {
       quote = swapQuotePartialFill(
-        pool,
+        { poolState: { ...pool.poolState, volatilityTracker: tracker } },
         config,
         !isBuy,
         amountIn,
@@ -313,6 +308,15 @@ const applyTrade =
           ...pool.poolState,
           sqrtPrice: quote.nextSqrtPrice,
           quoteReserve: quoteReserveAfter,
+          volatilityTracker: hasDynamicFee
+            ? trackerAfterSwap(
+                tracker,
+                dynamicFee,
+                pool.poolState.sqrtPrice,
+                quote.nextSqrtPrice,
+                timestamp,
+              )
+            : tracker,
         },
       },
       migrated:
@@ -343,18 +347,6 @@ const applyTrade =
   }
 
 /**
- * Why these parameters cannot be simulated faithfully, or null when they can. The dynamic
- * fee depends on a volatility tracker the program updates on every swap; the SDK does not
- * expose that update, so simulating it would silently diverge from the chain.
- */
-export const unsupportedReason = (
-  parameters: ConfigParameters,
-): string | null =>
-  parameters.poolFees.dynamicFee
-    ? 'Dynamic (volatility) fee is not simulated'
-    : null
-
-/**
  * Replays trades, in time order, against a fresh pool for these config parameters using
  * the SDK's own swap math. Offline and deterministic.
  */
@@ -362,9 +354,6 @@ export const simulateLaunch = (
   parameters: ConfigParameters,
   trades: Trade[],
 ): SimulationResult => {
-  const unsupported = unsupportedReason(parameters)
-  if (unsupported) throw new Error(unsupported)
-
   const initial: Replay = {
     pool: toInitialPool(parameters),
     outcomes: [],

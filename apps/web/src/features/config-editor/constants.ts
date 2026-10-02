@@ -36,6 +36,8 @@ export enum EditorFieldId {
   EndingFee = 'ending-fee',
   FeeWindow = 'fee-window',
   CreatorTradingFeeShare = 'creator-trading-fee-share',
+  DynamicFee = 'dynamic-fee',
+  FeeCollection = 'fee-collection',
   MigratedPoolFeeOption = 'migrated-pool-fee-option',
   MigratedPoolFee = 'migrated-pool-fee',
   MigrationFee = 'migration-fee',
@@ -43,6 +45,12 @@ export enum EditorFieldId {
   PartnerLockedLiquidity = 'partner-locked-liquidity',
   CreatorLiquidity = 'creator-liquidity',
   CreatorLockedLiquidity = 'creator-locked-liquidity',
+}
+
+/** Whether the program adds its volatility fee on top of the base fee. */
+export enum DynamicFeeChoice {
+  Off = 0,
+  On = 1,
 }
 
 /** How the trading fee moves over the launch: flat, or falling along a curve. */

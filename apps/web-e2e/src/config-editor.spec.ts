@@ -50,6 +50,27 @@ test.describe('config editor', () => {
     ).toHaveValue('10')
   })
 
+  test('a config with the volatility fee is accepted and simulated', async ({
+    page,
+  }) => {
+    await editor(page)
+      .getByRole('combobox', { name: 'Volatility fee' })
+      .selectOption('1')
+    await expect(editor(page).getByRole('status')).toHaveText(
+      'Meteora would accept this config.',
+    )
+    await editor(page)
+      .getByRole('textbox', { name: 'Name' })
+      .fill('Volatility fee')
+    await editor(page)
+      .getByRole('button', { name: 'Add to comparison' })
+      .click()
+
+    const row = page.locator('tbody tr').first()
+    await expect(row).toContainText('Volatility fee')
+    await expect(row.getByRole('cell').first()).toHaveText(/^[+−-]?\d/)
+  })
+
   test('an added config joins the comparison and the deploy picker without changing its source', async ({
     page,
   }) => {
