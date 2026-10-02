@@ -33,6 +33,8 @@ export interface TradeOutcome {
   amountOut: BN
   fee: FeeShares
   feeToken: FeeToken
+  /** The fee in quote lamports; equals `fee` when it was taken in the quote token. */
+  feeValue: FeeShares
   /** Price after the trade on the venue it executed on (Q64 sqrt price, same scale on both). */
   sqrtPriceAfter: BN
   /** The curve's quote reserve after the trade; frozen once the launch has migrated. */
@@ -48,6 +50,8 @@ export interface SimulationResult {
   fees: Record<FeeToken, FeeShares>
   /** Trading fees on the migrated pool; partner and creator shares follow their LP split. */
   migratedFees: Record<FeeToken, FeeShares>
+  /** Trading fees on each venue in quote lamports, base-token fees valued at their trade's price. */
+  feeValue: Record<Venue, FeeShares>
   /** Base units each trader holds after the replay. */
   holdings: Record<Trade['trader'], BN>
   /** Curve state after the replay. */

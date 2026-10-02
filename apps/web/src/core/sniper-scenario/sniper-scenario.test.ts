@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { BaseFeeMode } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import {
+  BaseFeeMode,
+  CollectFeeMode,
+} from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   compileLaunchConfig,
   DEFAULT_LAUNCH_CONFIG,
@@ -13,6 +16,7 @@ import {
   generateTrades,
   runScenario,
   SCENARIO_PRESETS,
+  scenarioMetrics,
   TraderGroup,
 } from '.'
 
@@ -185,5 +189,45 @@ describe('baseFeeBpsAt', () => {
     expect(baseFeeBpsAt(compile(DEFAULT_LAUNCH_CONFIG), 0, amount)).toBe(100)
     expect(baseFeeBpsAt(compile(ANTI_SNIPE), 0, amount)).toBe(5000)
     expect(baseFeeBpsAt(compile(ANTI_SNIPE), 600, amount)).toBe(100)
+  })
+})
+
+describe('fees in either token', () => {
+  const withCollectFeeMode = (
+    collectFeeMode: CollectFeeMode,
+  ): LaunchConfig => ({
+    ...DEFAULT_LAUNCH_CONFIG,
+    fee: { ...DEFAULT_LAUNCH_CONFIG.fee, collectFeeMode },
+  })
+  const SOL = 1_000_000_000
+
+  it.each([CollectFeeMode.QuoteToken, CollectFeeMode.OutputToken])(
+    'a flat fee costs humans its rate on the SOL they trade (collect fee mode %s)',
+    (mode) => {
+      const parameters = compile(withCollectFeeMode(mode))
+      const { groups } = runScenario(parameters, DEFAULT_SCENARIO)
+      const human = groups[TraderGroup.Human]
+      const traded = human.spent.add(human.received).toNumber() / SOL
+      const { humanFees } = scenarioMetrics(parameters, DEFAULT_SCENARIO)
+      expect(humanFees / traded).toBeGreaterThan(0.0099)
+      expect(humanFees / traded).toBeLessThan(0.0102)
+    },
+  )
+
+  it('counts fees taken in the token as partner and creator income', () => {
+    const quote = scenarioMetrics(
+      compile(withCollectFeeMode(CollectFeeMode.QuoteToken)),
+      DEFAULT_SCENARIO,
+    )
+    const output = scenarioMetrics(
+      compile(withCollectFeeMode(CollectFeeMode.OutputToken)),
+      DEFAULT_SCENARIO,
+    )
+    expect(output.partnerCreatorFees).toBeGreaterThan(
+      quote.partnerCreatorFees * 0.9,
+    )
+    expect(output.partnerCreatorFees).toBeLessThan(
+      quote.partnerCreatorFees * 1.1,
+    )
   })
 })

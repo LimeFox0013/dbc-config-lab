@@ -9,7 +9,7 @@ import type {
   PoolConfig,
   VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { SLOT_DURATION_MS } from './constants'
+import { FeeToken, SLOT_DURATION_MS } from './constants'
 import type { FeeShares } from './types'
 
 const zero = (): BN => new BN(0)
@@ -27,6 +27,41 @@ export const addFeeShares = (a: FeeShares, b: FeeShares): FeeShares => ({
   protocol: a.protocol.add(b.protocol),
   referral: a.referral.add(b.referral),
 })
+
+export const feeTotal = (shares: FeeShares): BN =>
+  shares.partner.add(shares.creator).add(shares.protocol).add(shares.referral)
+
+const scaleFeeShares = (
+  shares: FeeShares,
+  numerator: BN,
+  denominator: BN,
+): FeeShares =>
+  denominator.lten(0)
+    ? emptyFeeShares()
+    : {
+        partner: shares.partner.mul(numerator).div(denominator),
+        creator: shares.creator.mul(numerator).div(denominator),
+        protocol: shares.protocol.mul(numerator).div(denominator),
+        referral: shares.referral.mul(numerator).div(denominator),
+      }
+
+/**
+ * A trade's fee in quote lamports. A fee taken in the base token is valued at the trade's
+ * own average price, fee excluded, so fees in either token add up in one unit.
+ */
+export const feeValueInQuote = (
+  fee: FeeShares,
+  feeToken: FeeToken,
+  isBuy: boolean,
+  amountInUsed: BN,
+  amountOut: BN,
+): FeeShares => {
+  if (feeToken === FeeToken.Quote) return fee
+  const total = feeTotal(fee)
+  return isBuy
+    ? scaleFeeShares(fee, amountInUsed, amountOut.add(total))
+    : scaleFeeShares(fee, amountOut, amountInUsed.sub(total))
+}
 
 /** Splits the trading fee (protocol share already removed) between creator and partner. */
 export const splitTradingFee = (

@@ -42,7 +42,8 @@ Averages over 20 seeded scenarios. Profit counts tokens still held at what each 
 - **Rate-limiter fee mode** is deprecated for new configs and not offered.
 - **Slot-based configs** (often from other launchpads) count time in slots; scenario seconds are converted at 400 ms per slot.
 - **Exit values** assume each group sells all remaining tokens at the end.
-- **Live checks pending:** pool balance bookkeeping between swaps follows the SDK's fee modes and has not yet been compared with a real devnet pool (`apps/web/scripts/devnet-verify.ts` does that); the on-chain loader is verified against accounts encoded with the program's own layout, not yet against a live config.
+- **Live checks:** the on-chain loader has been run against live mainnet configs and pools; one simulated partner fee matched the real pool's to the lamport. Pool balance bookkeeping between swaps follows the SDK's fee modes and has not yet been compared with a real devnet pool (`apps/web/scripts/devnet-verify.ts` does that).
+- **Fees in either token:** a fee a config collects in the launched token is reported in SOL, valued at the price of the trade that paid it.
 
 ## Security
 

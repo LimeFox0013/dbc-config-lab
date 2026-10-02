@@ -3,8 +3,8 @@ import type { ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   baseFeeBpsAt,
   exitValue,
-  FeeToken,
   simulateLaunch,
+  Venue,
 } from '../launch-simulator'
 import { TraderGroup } from './constants'
 import type {
@@ -107,8 +107,8 @@ export const scenarioMetrics = (
   spec: ScenarioSpec,
 ): ScenarioMetrics => {
   const { groups, simulation } = runScenario(parameters, spec)
-  const earned = simulation.fees[FeeToken.Quote]
-  const earnedAfter = simulation.migratedFees[FeeToken.Quote]
+  const earned = simulation.feeValue[Venue.Curve]
+  const earnedAfter = simulation.feeValue[Venue.Migrated]
   return {
     sniperProfit: toSol(groups[TraderGroup.Sniper].profit),
     adaptiveSniperProfit: toSol(groups[TraderGroup.AdaptiveSniper].profit),

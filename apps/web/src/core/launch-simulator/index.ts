@@ -17,6 +17,7 @@ import type { FeeShares, SimulationResult, Trade, TradeOutcome } from './types'
 import {
   addFeeShares,
   emptyFeeShares,
+  feeValueInQuote,
   pointAt,
   splitTradingFee,
   toInitialPool,
@@ -39,6 +40,7 @@ export {
   Venue,
 } from './constants'
 export type { FeeShares, SimulationResult, Trade, TradeOutcome } from './types'
+export { feeTotal } from './utils'
 
 type Replay = Omit<SimulationResult, 'finalPool' | 'migratedPool'> & {
   pool: VirtualPool
@@ -57,6 +59,7 @@ const rejected = (
   amountOut: new BN(0),
   fee: emptyFeeShares(),
   feeToken: FeeToken.Quote,
+  feeValue: emptyFeeShares(),
   sqrtPriceAfter: replay.migrated?.sqrtPrice ?? replay.pool.poolState.sqrtPrice,
   quoteReserveAfter: replay.pool.poolState.quoteReserve,
   reason,
@@ -173,6 +176,13 @@ const applyMigratedTrade = (
     parameters,
   )
   const feeToken = swap.feesOnBaseToken ? FeeToken.Base : FeeToken.Quote
+  const feeValue = feeValueInQuote(
+    fee,
+    feeToken,
+    !isSell,
+    quote.includedFeeInputAmount,
+    quote.outputAmount,
+  )
   const outcome: TradeOutcome = {
     trade,
     venue: Venue.Migrated,
@@ -181,6 +191,7 @@ const applyMigratedTrade = (
     amountOut: quote.outputAmount,
     fee,
     feeToken,
+    feeValue,
     sqrtPriceAfter: quote.nextSqrtPrice,
     quoteReserveAfter: replay.pool.poolState.quoteReserve,
   }
@@ -191,6 +202,10 @@ const applyMigratedTrade = (
     migratedFees: {
       ...replay.migratedFees,
       [feeToken]: addFeeShares(replay.migratedFees[feeToken], fee),
+    },
+    feeValue: {
+      ...replay.feeValue,
+      [Venue.Migrated]: addFeeShares(replay.feeValue[Venue.Migrated], feeValue),
     },
     holdings: withHolding(
       replay.holdings,
@@ -266,6 +281,13 @@ const applyTrade =
       config.creatorTradingFeePercentage,
     )
     const feeToken = feeMode.feesOnBaseToken ? FeeToken.Base : FeeToken.Quote
+    const feeValue = feeValueInQuote(
+      fee,
+      feeToken,
+      isBuy,
+      quote.includedFeeInputAmount,
+      quote.outputAmount,
+    )
     const outcome: TradeOutcome = {
       trade,
       venue: Venue.Curve,
@@ -276,6 +298,7 @@ const applyTrade =
       amountOut: quote.outputAmount,
       fee,
       feeToken,
+      feeValue,
       sqrtPriceAfter: quote.nextSqrtPrice,
       quoteReserveAfter,
     }
@@ -301,6 +324,10 @@ const applyTrade =
       fees: {
         ...replay.fees,
         [feeToken]: addFeeShares(replay.fees[feeToken], fee),
+      },
+      feeValue: {
+        ...replay.feeValue,
+        [Venue.Curve]: addFeeShares(replay.feeValue[Venue.Curve], feeValue),
       },
       holdings: withHolding(
         replay.holdings,
@@ -349,6 +376,10 @@ export const simulateLaunch = (
     migratedFees: {
       [FeeToken.Quote]: emptyFeeShares(),
       [FeeToken.Base]: emptyFeeShares(),
+    },
+    feeValue: {
+      [Venue.Curve]: emptyFeeShares(),
+      [Venue.Migrated]: emptyFeeShares(),
     },
     holdings: {},
     migrated: null,

@@ -15,7 +15,7 @@ import {
   Venue,
 } from '.'
 import type { Trade } from '.'
-import { toInitialPool, toPoolConfig } from './utils'
+import { feeValueInQuote, toInitialPool, toPoolConfig } from './utils'
 
 const SOL = new BN(1_000_000_000)
 
@@ -167,5 +167,57 @@ describe('simulateLaunch', () => {
 
     expect(unsupportedReason(parameters)).not.toBeNull()
     expect(() => simulateLaunch(parameters, [buy(0, 1)])).toThrow()
+  })
+})
+
+describe('feeValueInQuote', () => {
+  const shares = (partner: number, protocol: number) => ({
+    partner: new BN(partner),
+    creator: new BN(0),
+    protocol: new BN(protocol),
+    referral: new BN(0),
+  })
+
+  it('passes a quote-token fee through unchanged', () => {
+    const fee = shares(80, 20)
+    expect(
+      feeValueInQuote(fee, FeeToken.Quote, true, new BN(10_000), new BN(5)),
+    ).toBe(fee)
+  })
+
+  it('values a base-token fee on a buy at the price the buyer paid', () => {
+    // 1,000 lamports bought 990 tokens plus a 10-token fee: 1 lamport per token.
+    const value = feeValueInQuote(
+      shares(8, 2),
+      FeeToken.Base,
+      true,
+      new BN(1_000),
+      new BN(990),
+    )
+    expect(value.partner.toNumber()).toBe(8)
+    expect(value.protocol.toNumber()).toBe(2)
+  })
+
+  it('values a base-token fee on a sell at the price the seller got', () => {
+    // 1,000 tokens in, 10 of them fee, 1,980 lamports out: 2 lamports per token.
+    const value = feeValueInQuote(
+      shares(10, 0),
+      FeeToken.Base,
+      false,
+      new BN(1_000),
+      new BN(1_980),
+    )
+    expect(value.partner.toNumber()).toBe(20)
+  })
+
+  it('values a fee as nothing when the trade moved nothing', () => {
+    const value = feeValueInQuote(
+      shares(10, 0),
+      FeeToken.Base,
+      true,
+      new BN(0),
+      new BN(0),
+    )
+    expect(value.partner.isZero()).toBe(true)
   })
 })

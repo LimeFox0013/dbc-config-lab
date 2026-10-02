@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { TradeSide, TradeStatus } from '../launch-simulator'
+import { feeTotal, TradeSide, TradeStatus } from '../launch-simulator'
 import type { Trade, TradeOutcome } from '../launch-simulator'
 import {
   EARLY_WINDOW_SECONDS,
@@ -120,12 +120,6 @@ export const generateTrades = (
   return [...sniperTrades, ...humanTrades, ...adaptiveTrades]
 }
 
-const totalFee = (outcome: TradeOutcome): BN =>
-  outcome.fee.partner
-    .add(outcome.fee.creator)
-    .add(outcome.fee.protocol)
-    .add(outcome.fee.referral)
-
 export const emptyGroupOutcome = (group: TraderGroup): GroupOutcome => ({
   group,
   traders: 0,
@@ -145,12 +139,12 @@ export const addOutcome = (
     ? {
         ...group,
         spent: group.spent.add(outcome.amountInUsed),
-        feesPaid: group.feesPaid.add(totalFee(outcome)),
+        feesPaid: group.feesPaid.add(feeTotal(outcome.feeValue)),
       }
     : {
         ...group,
         received: group.received.add(outcome.amountOut),
-        feesPaid: group.feesPaid.add(totalFee(outcome)),
+        feesPaid: group.feesPaid.add(feeTotal(outcome.feeValue)),
       }
 
 /** Lamports to SOL; float precision is ample for ranking and two-decimal display. */
