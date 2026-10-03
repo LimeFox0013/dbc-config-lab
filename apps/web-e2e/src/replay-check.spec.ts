@@ -7,7 +7,7 @@ test.describe('replay check', () => {
     await page.goto('/')
     const check = page.locator('.replay-check')
     await expect(check.locator('summary')).toContainText(
-      '3 mainnet launches, 322 bonding-curve swaps, 2 graduations and 883 swaps after graduation',
+      '3 mainnet launches, 322 bonding-curve swaps, 2 graduations and 889 swaps after graduation',
     )
     await check.locator('summary').click()
     const links = check.getByRole('link')

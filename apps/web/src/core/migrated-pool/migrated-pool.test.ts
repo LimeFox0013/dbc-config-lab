@@ -16,8 +16,10 @@ import {
   lockedLiquidity,
   migratedFeeBps,
   migratedUnsupportedReason,
+  pullableLiquidityPercent,
   quoteMigratedSwap,
   toMigratedPool,
+  withUnlockedLiquidityPulled,
 } from '.'
 
 const compile = (config: LaunchConfig) => {
@@ -135,5 +137,40 @@ describe('lockedLiquidity', () => {
     expect(lockedLiquidity(parameters, pool.liquidity).eq(pool.liquidity)).toBe(
       true,
     )
+  })
+})
+
+describe('withUnlockedLiquidityPulled', () => {
+  it('returns the unlocked share of the pool and leaves the rest', () => {
+    const split = {
+      ...parameters,
+      partnerPermanentLockedLiquidityPercentage: 0,
+      creatorPermanentLockedLiquidityPercentage: 10,
+      creatorLiquidityPercentage: 90,
+    }
+    const { pool: left, pulled } = withUnlockedLiquidityPulled(split, pool)
+    const unlockedQuote = pool.tokenBAmount.muln(9).divn(10)
+
+    expect(left.liquidity.eq(lockedLiquidity(split, pool.liquidity))).toBe(true)
+    // Rounded down, so at most a few lamports under 90% of the deposited SOL.
+    expect(pulled.quote.lte(unlockedQuote)).toBe(true)
+    expect(unlockedQuote.sub(pulled.quote).ltn(10)).toBe(true)
+    // The tokens returned are worth something at the pool's price too.
+    expect(pulled.value.gt(pulled.quote)).toBe(true)
+  })
+})
+
+describe('pullableLiquidityPercent', () => {
+  it('is zero when everything is locked, and the unlocked shares otherwise', () => {
+    expect(pullableLiquidityPercent(parameters)).toBe(0)
+    expect(
+      pullableLiquidityPercent({
+        ...parameters,
+        partnerLiquidityPercentage: 15,
+        partnerPermanentLockedLiquidityPercentage: 35,
+        creatorLiquidityPercentage: 40,
+        creatorPermanentLockedLiquidityPercentage: 10,
+      }),
+    ).toBe(55)
   })
 })

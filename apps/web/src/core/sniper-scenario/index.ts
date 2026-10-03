@@ -103,12 +103,11 @@ export const runScenario = (
   return { simulation, groups }
 }
 
-/** Runs the scenario and reduces it to the SOL figures configs are compared on. */
-export const scenarioMetrics = (
-  parameters: ConfigParameters,
-  spec: ScenarioSpec,
-): ScenarioMetrics => {
-  const { groups, simulation } = runScenario(parameters, spec)
+/** Reduces a scenario run to the SOL figures configs are compared on. */
+export const metricsOf = ({
+  groups,
+  simulation,
+}: ScenarioResult): ScenarioMetrics => {
   const earned = simulation.feeValue[Venue.Curve]
   const earnedAfter = simulation.feeValue[Venue.Migrated]
   return {
@@ -123,5 +122,14 @@ export const scenarioMetrics = (
     raised: toSol(simulation.finalPool.poolState.quoteReserve),
     maxDrawdownPercent: maxDrawdownPercent(simulation.outcomes),
     botShareOfEarlyBuys: botShareOfEarlyBuys(simulation.outcomes),
+    liquidityPulled: simulation.liquidityPulled
+      ? toSol(simulation.liquidityPulled.value)
+      : null,
   }
 }
+
+/** Runs the scenario and reduces it to the SOL figures configs are compared on. */
+export const scenarioMetrics = (
+  parameters: ConfigParameters,
+  spec: ScenarioSpec,
+): ScenarioMetrics => metricsOf(runScenario(parameters, spec))

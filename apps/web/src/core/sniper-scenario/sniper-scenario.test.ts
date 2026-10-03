@@ -237,11 +237,13 @@ describe('liquidity pulled after graduation', () => {
   const hype = SCENARIO_PRESETS[ScenarioPresetId.Hype]
   const pulled = { ...hype, unlockedLiquidityPulled: true }
 
-  it('changes nothing when all liquidity is locked', () => {
+  it('changes nothing when all liquidity is locked, and says nothing was pulled', () => {
     const parameters = compile(DEFAULT_LAUNCH_CONFIG)
-    expect(scenarioMetrics(parameters, pulled)).toEqual(
-      scenarioMetrics(parameters, hype),
-    )
+    const kept = scenarioMetrics(parameters, hype)
+    const withdrawn = scenarioMetrics(parameters, pulled)
+    expect(kept.liquidityPulled).toBeNull()
+    expect(withdrawn.liquidityPulled).toBe(0)
+    expect({ ...withdrawn, liquidityPulled: null }).toEqual(kept)
   })
 
   it('leaves human buyers worse off when most liquidity is unlocked', () => {
@@ -258,5 +260,6 @@ describe('liquidity pulled after graduation', () => {
     const withdrawn = scenarioMetrics(parameters, pulled)
     expect(kept.graduated).toBe(true)
     expect(withdrawn.humanProfit).toBeLessThan(kept.humanProfit)
+    expect(withdrawn.liquidityPulled).toBeGreaterThan(0)
   })
 })

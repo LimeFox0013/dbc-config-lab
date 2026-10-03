@@ -8,9 +8,10 @@ export enum FeeSetup {
 }
 
 /**
- * Results of `scripts/mainnet-replay-verify.ts` (2026-10-02): every swap of these mainnet
- * launches, replayed from a fresh pool, matched the program's recorded fees, output and
- * price exactly, as did each migrated pool's opening liquidity.
+ * Results of `scripts/mainnet-replay-verify.ts` (latest runs 2026-10-02/03): every swap of
+ * these mainnet launches, replayed from a fresh pool, matched the program's recorded fees,
+ * output and price exactly, as did each migrated pool's opening liquidity and the
+ * liquidity its creator later withdrew.
  */
 export const REPLAYED_LAUNCHES: readonly ReplayedLaunch[] = [
   {
@@ -24,7 +25,7 @@ export const REPLAYED_LAUNCHES: readonly ReplayedLaunch[] = [
     feeSetup: FeeSetup.FeesInToken,
     migrated: {
       pool: 'Abi3ww223iVFgv7zfTBxPoAR1f7XxFWHLufQHNvGhUUC',
-      swaps: 875,
+      swaps: 878,
     },
   },
   {
@@ -33,7 +34,7 @@ export const REPLAYED_LAUNCHES: readonly ReplayedLaunch[] = [
     feeSetup: FeeSetup.FeesInSol,
     migrated: {
       pool: 'BrL83GbzF6BdCkqNkarH2ghX2ZzhDAjWgFDm4jztWeEp',
-      swaps: 8,
+      swaps: 11,
     },
   },
 ]

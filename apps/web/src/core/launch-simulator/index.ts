@@ -42,12 +42,16 @@ import {
 import { errorMessage } from '../shared'
 import {
   afterMigratedSwap,
-  lockedLiquidity,
   migratedUnsupportedReason,
   quoteMigratedSwap,
   toMigratedPool,
+  withUnlockedLiquidityPulled,
 } from '../migrated-pool'
-import type { MigratedPool, MigratedSwap } from '../migrated-pool'
+import type {
+  MigratedPool,
+  MigratedSwap,
+  PulledLiquidity,
+} from '../migrated-pool'
 
 export {
   FeeToken,
@@ -223,15 +227,15 @@ const applyMigratedTrade = (
 }
 
 /** The pool the program opens at graduation, less any liquidity withdrawn right after. */
-const migratedPoolAt = (
+const openMigratedPool = (
   parameters: ConfigParameters,
   config: PoolConfig,
   options: SimulationOptions,
-): MigratedPool => {
+): { pool: MigratedPool; pulled: PulledLiquidity | null } => {
   const pool = toMigratedPool(parameters, config)
   return options.unlockedLiquidityPulled
-    ? { ...pool, liquidity: lockedLiquidity(parameters, pool.liquidity) }
-    : pool
+    ? withUnlockedLiquidityPulled(parameters, pool)
+    : { pool, pulled: null }
 }
 
 const applyTrade =
@@ -335,6 +339,10 @@ const applyTrade =
     const graduatesNow =
       replay.graduatedAt === null &&
       quoteReserveAfter.gte(config.migrationQuoteThreshold)
+    const opened =
+      graduatesNow && migratedUnsupportedReason(parameters) === null
+        ? openMigratedPool(parameters, config, options)
+        : null
 
     return {
       ...replay,
@@ -354,10 +362,8 @@ const applyTrade =
             : tracker,
         },
       },
-      migrated:
-        graduatesNow && migratedUnsupportedReason(parameters) === null
-          ? migratedPoolAt(parameters, config, options)
-          : replay.migrated,
+      migrated: opened?.pool ?? replay.migrated,
+      liquidityPulled: opened ? opened.pulled : replay.liquidityPulled,
       outcomes: appended(replay.outcomes, outcome),
       graduatedAt: graduatesNow ? trade.at : replay.graduatedAt,
       fees: {
@@ -407,6 +413,7 @@ export const simulateLaunch = (
       [Venue.Migrated]: emptyFeeShares(),
     },
     holdings: {},
+    liquidityPulled: null,
     migrated: null,
   }
   const ordered = [...trades].sort((a, b) => a.at - b.at)

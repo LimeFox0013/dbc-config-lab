@@ -62,6 +62,10 @@
           >
             <span class="comparison-table__name">{{ row.entry.name }}</span>
             <span class="comparison-table__intent">{{ row.entry.intent }}</span>
+            <span
+              v-if="pullable(row) > 0"
+              class="comparison-table__intent comparison-table__intent--risk"
+            >{{ t('components.comparisonTable.pullable', { percent: pullable(row) }) }}</span>
           </th>
           <template v-if="row.ok">
             <td :class="amountClass(row.metrics.sniperProfit)">
@@ -84,11 +88,10 @@
               >{{ t('components.comparisonTable.afterGraduation', { sol: formatSol(row.metrics.postGraduationFees) }) }}</span>
             </td>
             <td class="comparison-table__cell">
-              {{
-                row.metrics.graduationSeconds === null
-                  ? t('components.comparisonTable.no')
-                  : t('components.comparisonTable.graduatedAfter', { seconds: row.metrics.graduationSeconds })
-              }}
+              {{ graduationText(row.metrics) }}<span
+                v-if="row.metrics.liquidityPulled !== null && row.metrics.liquidityPulled > 0"
+                class="comparison-table__detail"
+              >{{ t('components.comparisonTable.liquidityPulled', { sol: formatSol(row.metrics.liquidityPulled) }) }}</span>
             </td>
           </template>
           <td
@@ -107,6 +110,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { formatSol, formatSolChange } from '../../features/comparison'
+import type { ComparisonMetrics, ComparisonRow } from '../../features/comparison'
+import { pullableLiquidityPercent } from '../../core/migrated-pool'
 import type { ComparisonTableProps } from './types'
 
 defineProps<ComparisonTableProps>()
@@ -116,6 +121,14 @@ const amountClass = (sol: number): string[] => [
   'comparison-table__amount',
   sol < 0 ? 'comparison-table__amount--loss' : 'comparison-table__amount--gain',
 ]
+
+const graduationText = (metrics: ComparisonMetrics): string =>
+  metrics.graduationSeconds === null ?
+      t('components.comparisonTable.no') :
+      t('components.comparisonTable.graduatedAfter', { seconds: metrics.graduationSeconds })
+
+const pullable = (row: ComparisonRow): number =>
+  row.entry.compiled.ok ? pullableLiquidityPercent(row.entry.compiled.parameters) : 0
 </script>
 
 <style lang="scss">
@@ -173,6 +186,10 @@ const amountClass = (sol: number): string[] => [
   max-width: var(--text-max-width-narrow);
   font-size: var(--font-size-2);
   color: var(--color-muted-foreground);
+}
+
+.comparison-table__intent--risk {
+  color: var(--color-loss);
 }
 
 .comparison-table__amount,

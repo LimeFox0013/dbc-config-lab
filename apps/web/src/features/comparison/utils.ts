@@ -1,10 +1,14 @@
 import { compileLaunchConfig } from '../../core/launch-config'
 import type { LaunchPreset } from '../../core/launch-config'
-import { scenarioMetrics } from '../../core/sniper-scenario'
+import BN from 'bn.js'
+import type { ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { TradeStatus } from '../../core/launch-simulator'
+import type { SimulationResult } from '../../core/launch-simulator'
+import { metricsOf, runScenario } from '../../core/sniper-scenario'
 import type { ScenarioSpec } from '../../core/sniper-scenario'
 import { clamp } from '../../core/shared'
-import { SCENARIO_LIMITS } from './constants'
-import type { ComparisonEntry, ComparisonRow } from './types'
+import { MULTIPLE_PRECISION, SCENARIO_LIMITS } from './constants'
+import type { ComparisonEntry, ComparisonRow, PricePoint } from './types'
 
 const clampInteger = (value: number, min: number, max: number): number =>
   clamp(Math.trunc(value), min, max)
@@ -48,6 +52,32 @@ export const presetEntry = (preset: LaunchPreset): ComparisonEntry => ({
   compiled: compileLaunchConfig(preset.config),
 })
 
+const precision = new BN(MULTIPLE_PRECISION)
+
+/** (sqrtPrice / sqrtStart)², as a float; prices share the Q64 scale on both venues. */
+const multipleOf = (sqrtPrice: BN, sqrtStart: BN): number =>
+  Number(
+    sqrtPrice
+      .mul(sqrtPrice)
+      .mul(precision)
+      .div(sqrtStart.mul(sqrtStart))
+      .toString(),
+  ) / MULTIPLE_PRECISION
+
+/** Price after each executed trade, from the opening price, curve and migrated pool alike. */
+export const pricePath = (
+  parameters: ConfigParameters,
+  simulation: SimulationResult,
+): PricePoint[] => [
+  { at: 0, multiple: 1 },
+  ...simulation.outcomes
+    .filter((outcome) => outcome.status !== TradeStatus.Rejected)
+    .map((outcome) => ({
+      at: outcome.trade.at,
+      multiple: multipleOf(outcome.sqrtPriceAfter, parameters.sqrtStartPrice),
+    })),
+]
+
 export const compareRow = (
   entry: ComparisonEntry,
   spec: ScenarioSpec,
@@ -55,7 +85,13 @@ export const compareRow = (
   if (!entry.compiled.ok)
     return { entry, ok: false, reason: entry.compiled.reason }
   const { parameters } = entry.compiled
-  return { entry, ok: true, metrics: scenarioMetrics(parameters, spec) }
+  const result = runScenario(parameters, spec)
+  return {
+    entry,
+    ok: true,
+    metrics: metricsOf(result),
+    path: pricePath(parameters, result.simulation),
+  }
 }
 
 export const compareConfigs = (

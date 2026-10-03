@@ -1,6 +1,6 @@
 import type BN from 'bn.js'
 import type { VirtualPool } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import type { MigratedPool } from '../migrated-pool'
+import type { MigratedPool, PulledLiquidity } from '../migrated-pool'
 import type { FeeToken, TradeSide, TradeStatus, Venue } from './constants'
 
 interface TradeBase {
@@ -56,6 +56,8 @@ export interface SimulationResult {
   holdings: Record<Trade['trader'], BN>
   /** Curve state after the replay. */
   finalPool: VirtualPool
+  /** What the unlocked-liquidity withdrawal at graduation returned, or null if none happened. */
+  liquidityPulled: PulledLiquidity | null
   /** The migrated pool after the replay, or null if the launch never graduated. */
   migratedPool: MigratedPool | null
 }

@@ -27,6 +27,7 @@
     />
     <OnChainLoader @load="addOnChain" />
     <ComparisonTable :rows="rows" />
+    <PriceChart :rows="rows" />
     <DeployPanel :presets="presets" />
     <p class="compare-view__caveat">
       {{ t('views.compare.caveat') }}
@@ -41,6 +42,7 @@ import { ComparisonTable } from '../components/ComparisonTable'
 import { ConfigEditor } from '../components/ConfigEditor'
 import { DeployPanel } from '../components/DeployPanel'
 import { OnChainLoader } from '../components/OnChainLoader'
+import { PriceChart } from '../components/PriceChart'
 import { RecommenderPanel } from '../components/RecommenderPanel'
 import { ReplayCheck } from '../components/ReplayCheck'
 import { ScenarioControls } from '../components/ScenarioControls'

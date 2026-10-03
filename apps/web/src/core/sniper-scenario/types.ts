@@ -77,4 +77,6 @@ export interface ScenarioMetrics {
   maxDrawdownPercent: number
   /** Share (0–1) of tokens bought in the early window that went to bots; null with no early buys. */
   botShareOfEarlyBuys: number | null
+  /** SOL worth of liquidity withdrawn right after graduation; null when none was. */
+  liquidityPulled: number | null
 }

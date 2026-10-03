@@ -12,7 +12,7 @@ describe('replayTotals', () => {
       launches: 3,
       curveSwaps: 322,
       migrations: 2,
-      migratedSwaps: 883,
+      migratedSwaps: 889,
     })
   })
 })

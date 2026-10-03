@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LAUNCH_CONFIG, LAUNCH_PRESETS } from '../../core/launch-config'
-import { DEFAULT_SCENARIO } from '../../core/sniper-scenario'
+import { DEFAULT_SCENARIO, runScenario } from '../../core/sniper-scenario'
+import { compileLaunchConfig } from '../../core/launch-config'
 import {
   compareConfigs,
   formatSol,
   formatSolChange,
   presetEntry,
+  pricePath,
   sanitizeScenario,
   SCENARIO_LIMITS,
 } from '.'
@@ -76,5 +78,19 @@ describe('formatting', () => {
     expect(formatSolChange(1.044)).toBe('+1.04')
     expect(formatSolChange(-4.756)).toBe('-4.76')
     expect(formatSol(0.613)).toBe('0.61')
+  })
+})
+
+describe('pricePath', () => {
+  it('starts at the opening price and follows every executed trade', () => {
+    const compiled = compileLaunchConfig(DEFAULT_LAUNCH_CONFIG)
+    if (!compiled.ok) throw new Error(compiled.reason)
+    const { simulation } = runScenario(compiled.parameters, DEFAULT_SCENARIO)
+    const path = pricePath(compiled.parameters, simulation)
+
+    expect(path[0]).toEqual({ at: 0, multiple: 1 })
+    expect(path).toHaveLength(simulation.outcomes.length + 1)
+    // The first buy moves the price up from the opening price.
+    expect(path[1]?.multiple).toBeGreaterThan(1)
   })
 })

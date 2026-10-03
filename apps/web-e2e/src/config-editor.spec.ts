@@ -71,6 +71,43 @@ test.describe('config editor', () => {
     await expect(row.getByRole('cell').first()).toHaveText(/^[+−-]?\d/)
   })
 
+  test('unlocked liquidity shows what pulling it after graduation takes', async ({
+    page,
+  }) => {
+    const percent = (name: RegExp) =>
+      editor(page).getByRole('spinbutton', { name })
+    const set = async (name: RegExp, value: string) => {
+      await percent(name).fill(value)
+      await percent(name).press('Enter')
+    }
+    await set(/^Creator LP, locked \(/, '10')
+    await set(/^Creator LP \(/, '40')
+    await expect(editor(page).getByRole('status')).toHaveText(
+      'Meteora would accept this config.',
+    )
+    await editor(page)
+      .getByRole('textbox', { name: 'Name' })
+      .fill('Unlocked LP')
+    await editor(page)
+      .getByRole('button', { name: 'Add to comparison' })
+      .click()
+
+    await page
+      .getByRole('combobox', { name: 'Launch situation' })
+      .selectOption('hype')
+    await page
+      .getByRole('checkbox', {
+        name: 'Unlocked liquidity is pulled right after graduation',
+      })
+      .check()
+    const row = page.getByRole('row', { name: /^Unlocked LP/ })
+    await expect(row).toContainText('40% of graduation liquidity can be pulled')
+    await expect(row).toContainText(/\d+\.\d{2} SOL of liquidity pulled/)
+    await expect(page.getByRole('row', { name: /^Flat 1%/ })).not.toContainText(
+      'liquidity',
+    )
+  })
+
   test('an added config joins the comparison and the deploy picker without changing its source', async ({
     page,
   }) => {

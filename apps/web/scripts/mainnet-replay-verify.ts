@@ -20,6 +20,9 @@ import {
   getSwapResultFromExactInput,
   getSwapResultFromExactOutput,
   getSwapResultFromPartialInput,
+  getAmountAFromLiquidityDelta,
+  getAmountBFromLiquidityDelta,
+  Rounding,
   TradeDirection as MigratedTradeDirection,
 } from '@meteora-ag/cp-amm-sdk'
 import type { SwapResult2 as MigratedSwapResult } from '@meteora-ag/cp-amm-sdk'
@@ -331,7 +334,11 @@ const replayMigratedPool = async (
   endpoint: string,
   address: string,
   pool: MigratedPool,
-): Promise<{ swaps: number; mismatches: string[] }> => {
+): Promise<{
+  swaps: number
+  liquidityChanges: number
+  mismatches: string[]
+}> => {
   const decode = (base64: string) => {
     try {
       return cpAmmCoder.events.decode(base64)
@@ -349,6 +356,7 @@ const replayMigratedPool = async (
   let chainLiquidity: BN | null = null
   let opened = false
   let swaps = 0
+  let liquidityChanges = 0
 
   for (const signature of signatures) {
     await sleep(REQUEST_GAP_MS)
@@ -382,7 +390,44 @@ const replayMigratedPool = async (
             : delta
         chainLiquidity = (chainLiquidity ?? new BN(0)).add(signed)
         // Liquidity added inside the migration itself is part of what the simulator models.
-        if (opened) state = { ...state, liquidity: state.liquidity.add(signed) }
+        if (opened) {
+          liquidityChanges++
+          // Amounts for this change at the pool's current price, rounded as the program does:
+          // down when paying out a removal, up when collecting a deposit.
+          const rounding = signed.isNeg() ? Rounding.Down : Rounding.Up
+          const amounts: Array<[string, BN, BN]> = [
+            [
+              'tokenA',
+              getAmountAFromLiquidityDelta(
+                state.sqrtPrice,
+                state.sqrtMaxPrice,
+                delta,
+                rounding,
+                state.collectFeeMode,
+              ),
+              bnField(event.data, 'token_a_amount'),
+            ],
+            [
+              'tokenB',
+              getAmountBFromLiquidityDelta(
+                state.sqrtMinPrice,
+                state.sqrtPrice,
+                delta,
+                rounding,
+                state.collectFeeMode,
+              ),
+              bnField(event.data, 'token_b_amount'),
+            ],
+          ]
+          amounts
+            .filter(([, ours, chain]) => !ours.eq(chain))
+            .forEach(([name, ours, chain]) =>
+              mismatches.push(
+                `liquidity change ${liquidityChanges} (${signature.slice(0, 12)}…) ${name}: simulated ${ours} on-chain ${chain}`,
+              ),
+            )
+          state = { ...state, liquidity: state.liquidity.add(signed) }
+        }
         continue
       }
       if (event.name !== MIGRATED_SWAP_EVENT) continue
@@ -433,7 +478,7 @@ const replayMigratedPool = async (
   }
   if (!opened)
     mismatches.push('migration transaction not found in the pool history')
-  return { swaps, mismatches }
+  return { swaps, liquidityChanges, mismatches }
 }
 
 const main = async () => {
@@ -618,10 +663,10 @@ const main = async () => {
         migratedAddress,
         toMigratedPool(parameters, config),
       )
-    : { swaps: 0, mismatches: [] }
+    : { swaps: 0, liquidityChanges: 0, mismatches: [] }
   if (migratedAddress)
     console.log(
-      `${migrated.swaps} migrated-pool swaps replayed; ${migrated.mismatches.length} mismatching values`,
+      `${migrated.swaps} migrated-pool swaps and ${migrated.liquidityChanges} liquidity changes replayed; ${migrated.mismatches.length} mismatching values`,
     )
 
   const all = [...mismatches, ...migrated.mismatches]

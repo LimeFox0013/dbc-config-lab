@@ -22,9 +22,18 @@
     }
   },
   "components": {
+    "priceChart": {
+      "title": "Price over the launch",
+      "description": "Price of each simulated config over the launch, as a multiple of its opening price on a logarithmic scale; dots mark graduation. The list below states each line's peak and final price.",
+      "multiple": "{value}×",
+      "seconds": "{value}s",
+      "legend": "{name}: peak {peak}×, final {final}× of the opening price, {graduation}",
+      "graduatedAt": "graduated after {seconds}s",
+      "notGraduated": "did not graduate"
+    },
     "replayCheck": {
       "summary": "Checked against real launches: {launches} mainnet launches, {curveSwaps} bonding-curve swaps, {migrations} graduations and {migratedSwaps} swaps after graduation — every fee, amount and price equal to the chain.",
-      "explanation": "Each launch was rebuilt from a fresh pool by replaying its own on-chain swap history through this simulator; every swap's fees, output and resulting price, and each graduation pool's opening liquidity, matched what the programs recorded. Run the command to check it yourself — read-only, over the public RPC.",
+      "explanation": "Each launch was rebuilt from a fresh pool by replaying its own on-chain swap history through this simulator; every swap's fees, output and resulting price, each graduation pool's opening liquidity and the liquidity its creator later withdrew, matched what the programs recorded. Run the command to check it yourself — read-only, over the public RPC.",
       "curveSwaps": "{n} curve swap | {n} curve swaps",
       "migratedSwaps": "{n} swap after graduation | {n} swaps after graduation",
       "feeSetup": {
@@ -74,6 +83,8 @@
       "refused": "Not simulated: {reason}",
       "adaptiveSniperProfit": "Patient-bot profit",
       "afterGraduation": "{sol} after graduation",
+      "liquidityPulled": "{sol} SOL of liquidity pulled",
+      "pullable": "{percent}% of graduation liquidity can be pulled",
       "graduatedAfter": "Yes, after {seconds}s"
     },
     "deployPanel": {

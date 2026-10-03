@@ -8,8 +8,11 @@ import {
   cpAmmCoder,
   CURRENT_POOL_VERSION,
   MAX_SQRT_PRICE,
+  getAmountAFromLiquidityDelta,
+  getAmountBFromLiquidityDelta,
   MIN_SQRT_PRICE,
   PoolStatus,
+  Rounding,
 } from '@meteora-ag/cp-amm-sdk'
 import {
   ActivationType,
@@ -33,7 +36,7 @@ import {
   PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS,
 } from './constants'
 import { isEnumValue } from '../shared'
-import type { MigratedPool } from './types'
+import type { MigratedPool, PulledLiquidity } from './types'
 
 const zero = (): BN => new BN(0)
 
@@ -205,6 +208,48 @@ export const lockedLiquidity = (
     (total, percentage) => total.add(liquidity.muln(percentage).divn(PERCENT)),
     zero(),
   )
+
+/** Percent of the graduation pool's liquidity that is neither locked nor vesting. */
+export const pullableLiquidityPercent = (
+  parameters: ConfigParameters,
+): number =>
+  parameters.partnerLiquidityPercentage + parameters.creatorLiquidityPercentage
+
+const Q128_SHIFT = 128
+
+/**
+ * Withdraws everything not locked or vesting: the pool left behind, and what the withdrawal
+ * returns — rounded down as the program rounds a removal.
+ */
+export const withUnlockedLiquidityPulled = (
+  parameters: ConfigParameters,
+  pool: MigratedPool,
+): { pool: MigratedPool; pulled: PulledLiquidity } => {
+  const kept = lockedLiquidity(parameters, pool.liquidity)
+  const delta = pool.liquidity.sub(kept)
+  const base = getAmountAFromLiquidityDelta(
+    pool.sqrtPrice,
+    pool.sqrtMaxPrice,
+    delta,
+    Rounding.Down,
+    pool.collectFeeMode,
+  )
+  const quote = getAmountBFromLiquidityDelta(
+    pool.sqrtMinPrice,
+    pool.sqrtPrice,
+    delta,
+    Rounding.Down,
+    pool.collectFeeMode,
+  )
+  const baseValue = base
+    .mul(pool.sqrtPrice)
+    .mul(pool.sqrtPrice)
+    .shrn(Q128_SHIFT)
+  return {
+    pool: { ...pool, liquidity: kept },
+    pulled: { base, quote, value: quote.add(baseValue) },
+  }
+}
 
 /**
  * Why the post-graduation pool cannot be simulated exactly, or null. Compounding liquidity

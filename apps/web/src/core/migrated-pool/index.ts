@@ -8,12 +8,14 @@ import {
 import type { SwapResult2 } from '@meteora-ag/cp-amm-sdk'
 import type { MigratedPool } from './types'
 
-export type { MigratedPool } from './types'
+export type { MigratedPool, PulledLiquidity } from './types'
 export {
   lockedLiquidity,
   migratedFeeBps,
   migratedUnsupportedReason,
+  pullableLiquidityPercent,
   toMigratedPool,
+  withUnlockedLiquidityPulled,
 } from './utils'
 
 export interface MigratedSwap {
