@@ -1,0 +1,40 @@
+// Shared rule blocks. Components include these rather than repeating the declarations.
+
+/** A bordered panel on the surface colour. */
+@mixin surface {
+  padding: var(--space-4);
+  border: var(--border-width-1) solid var(--color-border);
+  border-radius: var(--radius-2);
+  background: var(--color-surface);
+  color: var(--color-surface-foreground);
+}
+
+/** Inputs, selects and buttons. */
+@mixin control {
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-1) solid var(--color-border);
+  border-radius: var(--radius-2);
+  background: var(--color-background);
+  color: var(--color-background-foreground);
+  font-family: var(--font-family);
+  font-size: var(--font-size-2);
+}
+
+/** A pointer when it can be used, a muted not-allowed when disabled. */
+@mixin clickable {
+  cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+    color: var(--color-muted-foreground);
+  }
+}
+
+/** Hidden on screen, still read by assistive technology. */
+@mixin visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

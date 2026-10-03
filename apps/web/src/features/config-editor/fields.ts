@@ -23,13 +23,14 @@ import type {
   LaunchConfig,
 } from '../../core/launch-config'
 import { QUOTE_TOKEN_ORDER } from '../../core/quote-token'
-import { isEnumValue } from '../../core/shared'
+import { bpsFromPercent, isEnumValue, percentFromBps } from '../../core/shared'
 import {
-  BPS_PER_PERCENT,
   CURVE_SHAPE_ORDER,
+  DEFAULT_COMPOUNDING_FEE_BPS,
   DEFAULT_CUSTOM_MIGRATED_POOL_FEE_BPS,
   DynamicFeeChoice,
   EditorFieldId,
+  FALLING_FEE_DEFAULTS,
   FeeCurve,
   FieldGroup,
   FieldKind,
@@ -40,9 +41,6 @@ import {
 } from './constants'
 import type { EditorField } from './types'
 
-/** Opening fee and window given to a flat fee when the user switches it to a falling one. */
-const FALLING_FEE_DEFAULTS = { startingFeeBps: 5000, windowSeconds: 10 }
-
 const isTokenDecimal = isEnumValue<TokenDecimal>(Object.values(TokenDecimal))
 const isMigrationFeeOption = isEnumValue<MigrationFeeOption>(
   Object.values(MigrationFeeOption),
@@ -50,6 +48,9 @@ const isMigrationFeeOption = isEnumValue<MigrationFeeOption>(
 const isFeeCurve = isEnumValue<FeeCurve>(Object.values(FeeCurve))
 const isDynamicFeeChoice = isEnumValue<DynamicFeeChoice>(
   Object.values(DynamicFeeChoice),
+)
+const isMigratedCollectFeeMode = isEnumValue<MigratedCollectFeeMode>(
+  Object.values(MigratedCollectFeeMode),
 )
 const isFirstBuyFeeChoice = isEnumValue<FirstBuyFeeChoice>(
   Object.values(FirstBuyFeeChoice),
@@ -166,6 +167,31 @@ const marketCapField = (
     ),
   visible: hasMarketCaps,
 })
+
+const isCustomMigratedFee = (config: LaunchConfig): boolean =>
+  config.migration.migrationFeeOption === MigrationFeeOption.Customizable
+
+/** Applies a change to the graduated pool's custom fee; other configs are left as they are. */
+const patchMigratedPoolFee = (
+  config: LaunchConfig,
+  patch: (
+    fee: NonNullable<LaunchConfig['migration']['migratedPoolFee']>,
+  ) => NonNullable<LaunchConfig['migration']['migratedPoolFee']>,
+): LaunchConfig =>
+  config.migration.migratedPoolFee
+    ? {
+        ...config,
+        migration: {
+          ...config.migration,
+          migratedPoolFee: patch(config.migration.migratedPoolFee),
+        },
+      }
+    : config
+
+const isCompounding = (config: LaunchConfig): boolean =>
+  isCustomMigratedFee(config) &&
+  config.migration.migratedPoolFee?.collectFeeMode ===
+    MigratedCollectFeeMode.Compounding
 
 /** Every editable field, in display order. */
 export const EDITOR_FIELDS: EditorField[] = [
@@ -333,11 +359,11 @@ export const EDITOR_FIELDS: EditorField[] = [
     min: LIMITS.minFeePercent,
     max: LIMITS.maxFeePercent,
     step: 0.25,
-    read: (c) => (scheduleOf(c)?.startingFeeBps ?? 0) / BPS_PER_PERCENT,
+    read: (c) => percentFromBps(scheduleOf(c)?.startingFeeBps ?? 0),
     write: (c, v) =>
       patchSchedule(c, (s) => ({
         ...s,
-        startingFeeBps: Math.round(v * BPS_PER_PERCENT),
+        startingFeeBps: Math.round(bpsFromPercent(v)),
       })),
     visible: isFalling,
   },
@@ -349,10 +375,10 @@ export const EDITOR_FIELDS: EditorField[] = [
     min: LIMITS.minFeePercent,
     max: LIMITS.maxFeePercent,
     step: 0.25,
-    read: (c) => (scheduleOf(c)?.endingFeeBps ?? 0) / BPS_PER_PERCENT,
+    read: (c) => percentFromBps(scheduleOf(c)?.endingFeeBps ?? 0),
     write: (c, v) =>
       patchSchedule(c, (s) => {
-        const endingFeeBps = Math.round(v * BPS_PER_PERCENT)
+        const endingFeeBps = Math.round(bpsFromPercent(v))
         return feeCurveOf(s) === FeeCurve.Flat
           ? { ...s, startingFeeBps: endingFeeBps, endingFeeBps }
           : { ...s, endingFeeBps }
@@ -478,24 +504,52 @@ export const EDITOR_FIELDS: EditorField[] = [
     min: LIMITS.minMigratedPoolFeePercent,
     max: LIMITS.maxMigratedPoolFeePercent,
     step: 0.05,
-    read: (c) =>
-      (c.migration.migratedPoolFee?.poolFeeBps ?? 0) / BPS_PER_PERCENT,
+    read: (c) => percentFromBps(c.migration.migratedPoolFee?.poolFeeBps ?? 0),
     write: (c, v) =>
-      c.migration.migratedPoolFee
-        ? {
-            ...c,
-            migration: {
-              ...c.migration,
-              migratedPoolFee: {
-                ...c.migration.migratedPoolFee,
-                poolFeeBps: Math.round(v * BPS_PER_PERCENT),
-              },
-            },
-          }
-        : c,
-    visible: (c) =>
-      c.migration.migrationFeeOption === MigrationFeeOption.Customizable,
+      patchMigratedPoolFee(c, (fee) => ({
+        ...fee,
+        poolFeeBps: Math.round(bpsFromPercent(v)),
+      })),
+    visible: isCustomMigratedFee,
   },
+  {
+    id: EditorFieldId.MigratedFeeCollection,
+    group: FieldGroup.Migration,
+    kind: FieldKind.Select,
+    unit: FieldUnit.None,
+    options: [
+      MigratedCollectFeeMode.QuoteToken,
+      MigratedCollectFeeMode.OutputToken,
+      MigratedCollectFeeMode.Compounding,
+    ].map((value) => ({ value, labelKey: `migratedFeeCollection.${value}` })),
+    read: (c) =>
+      c.migration.migratedPoolFee?.collectFeeMode ??
+      MigratedCollectFeeMode.QuoteToken,
+    write: (c, v) =>
+      isMigratedCollectFeeMode(v)
+        ? patchMigratedPoolFee(c, (fee) => ({
+            ...fee,
+            collectFeeMode: v,
+            compoundingFeeBps:
+              v === MigratedCollectFeeMode.Compounding
+                ? fee.compoundingFeeBps || DEFAULT_COMPOUNDING_FEE_BPS
+                : 0,
+          }))
+        : c,
+    visible: isCustomMigratedFee,
+  },
+  percentField(
+    EditorFieldId.CompoundingShare,
+    FieldGroup.Migration,
+    (c) => percentFromBps(c.migration.migratedPoolFee?.compoundingFeeBps ?? 0),
+    (c, v) =>
+      patchMigratedPoolFee(c, (fee) => ({
+        ...fee,
+        compoundingFeeBps: Math.round(bpsFromPercent(v)),
+      })),
+    100,
+    isCompounding,
+  ),
   percentField(
     EditorFieldId.MigrationFee,
     FieldGroup.Migration,

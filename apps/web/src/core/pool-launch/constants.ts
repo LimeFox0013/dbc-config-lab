@@ -35,3 +35,8 @@ export const PARTNER_AUTHORITY_OPTIONS: ReadonlySet<TokenAuthorityOption> =
     TokenAuthorityOption.PartnerUpdateAuthority,
     TokenAuthorityOption.PartnerUpdateAndMintAuthority,
   ])
+
+/** Why a launch is refused before it reaches the SDK. */
+export const LAUNCH_REASONS = {
+  negativeFirstBuy: 'The first buy must be zero or more.',
+} as const

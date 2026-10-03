@@ -91,4 +91,20 @@ test.describe('launch a token', () => {
     await fill(page, 'Symbol', 'LAB2')
     await expect(summary).toHaveCount(0)
   })
+
+  test('finds the connected wallet’s earnings — here, none on this network', async ({
+    page,
+  }) => {
+    await mockDevnetRpc(page, { simulationError: null })
+    await page.goto('/')
+    const earnings = page.locator('.earnings-section')
+    await expect(
+      earnings.getByRole('button', { name: 'Find my earnings' }),
+    ).toBeDisabled()
+    await page
+      .getByRole('button', { name: `Connect ${FAKE_WALLET_NAME}` })
+      .click()
+    await earnings.getByRole('button', { name: 'Find my earnings' }).click()
+    await expect(earnings).toContainText('Nothing to claim on this network.')
+  })
 })

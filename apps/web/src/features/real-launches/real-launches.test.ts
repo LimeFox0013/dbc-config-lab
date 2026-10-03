@@ -5,15 +5,23 @@ import type { AccountInfo, PublicKey } from '@solana/web3.js'
 import {
   ActivationType,
   DYNAMIC_BONDING_CURVE_PROGRAM_ID,
+  getBaseTokenForSwap,
+  getMigrationThresholdPrice,
+  MAX_SQRT_PRICE,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { connectionFor, SolanaNetwork } from '../../core/config-deploy'
+import { connectionFor } from '../../core/config-deploy'
 import {
   compileLaunchConfig,
   DEFAULT_LAUNCH_CONFIG,
 } from '../../core/launch-config'
-import { QuoteToken, quoteUnitsFromSol } from '../../core/quote-token'
+import {
+  QuoteToken,
+  quoteUnitsFromSol,
+  solFromQuoteUnits,
+} from '../../core/quote-token'
 import { poolAccountData } from '../../testing/dbc-accounts'
 import { evenSample, fetchRealLaunches, RealLaunchesRejection } from '.'
+import { SolanaNetwork } from '../../core/shared'
 
 const compiled = compileLaunchConfig({
   ...DEFAULT_LAUNCH_CONFIG,
@@ -118,6 +126,50 @@ describe('fetchRealLaunches', () => {
     // A migrated pool raised the full threshold; median of 85, 85, 5, 0.
     expect(result.launches.medianRaised).toBeCloseTo(45, 6)
     expect(result.launches.meanCurveFees).toBeCloseTo(0.875, 6)
+  })
+
+  it('values fees in the launched token at the curve average price and counts old pools as traded', async () => {
+    const curveTokens = getBaseTokenForSwap(
+      parameters.sqrtStartPrice,
+      getMigrationThresholdPrice(
+        parameters.migrationQuoteThreshold,
+        parameters.sqrtStartPrice,
+        parameters.curve,
+      ),
+      parameters.curve,
+    )
+    // A pool from before the swap flag, its curve ending at an extreme price.
+    const oldPool = poolAccountData(parameters, configAddress, {
+      isMigrated: 1,
+      hasSwap: 0,
+      quoteReserve: new BN(0),
+      sqrtPrice: MAX_SQRT_PRICE,
+      metrics: {
+        ...metrics(0),
+        totalTradingBaseFee: curveTokens.divn(100),
+      },
+    })
+    const address = Keypair.generate().publicKey
+    vi.spyOn(connection, 'getProgramAccounts').mockResolvedValue([
+      { pubkey: address, account: account(Buffer.alloc(0)) },
+    ])
+    vi.spyOn(connection, 'getMultipleAccountsInfo').mockResolvedValue([
+      account(oldPool),
+    ])
+    const result = await fetchRealLaunches(
+      connection,
+      configAddress.toBase58(),
+      parameters,
+      QuoteToken.Sol,
+    )
+    if (!result.ok) throw new Error(result.rejection)
+    expect(result.launches.neverTradedShare).toBe(0)
+    // 1% of the curve's tokens is worth 1% of what the curve raises.
+    expect(result.launches.meanCurveFees).toBeCloseTo(
+      solFromQuoteUnits(parameters.migrationQuoteThreshold, QuoteToken.Sol) /
+        100,
+      6,
+    )
   })
 
   it('leaves out a pool it cannot decode instead of failing', async () => {

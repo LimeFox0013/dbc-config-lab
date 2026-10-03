@@ -37,7 +37,9 @@ test.describe('deploy with a wallet', () => {
     await expect(prepare).toBeDisabled()
     await page
       .locator('.deploy-panel')
-      .getByRole('checkbox', { name: /real config on Solana mainnet/ })
+      .getByRole('checkbox', {
+        name: /on Solana mainnet everything signed here is real/,
+      })
       .check()
     await expect(prepare).toBeEnabled()
   })
@@ -57,7 +59,12 @@ test.describe('deploy with a wallet', () => {
     await expect(
       page.getByRole('button', { name: 'Sign and send in wallet' }),
     ).toBeVisible()
-    expect(methods).toEqual(['getLatestBlockhash', 'simulateTransaction'])
+    // Connecting reads whether the wallet has published launchpad branding.
+    expect(methods).toEqual([
+      'getAccountInfo',
+      'getLatestBlockhash',
+      'simulateTransaction',
+    ])
   })
 
   test('a failing dry run is reported and nothing is offered for signing', async ({
@@ -152,6 +159,6 @@ test.describe('deploy with a wallet', () => {
     const summary = page.locator('.deploy-panel__summary')
     await expect(summary).toContainText('Creator can update metadata')
     await expect(summary).toContainText('Creator’s share of trading fees100%')
-    await expect(summary).toContainText('You 0% + 50% locked')
+    await expect(summary).toContainText('Launchpad 0% + 50% locked')
   })
 })

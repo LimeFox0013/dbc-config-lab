@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CollectFeeMode,
+  MigratedCollectFeeMode,
   MigrationFeeOption,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
@@ -52,6 +53,12 @@ const customMigration = edit(
   MigrationFeeOption.Customizable,
 )
 
+const compoundingMigration = edit(
+  customMigration,
+  EditorFieldId.MigratedFeeCollection,
+  MigratedCollectFeeMode.Compounding,
+)
+
 /** A config on which the field is visible. */
 const weighted = withCurve(
   DEFAULT_LAUNCH_CONFIG,
@@ -59,9 +66,13 @@ const weighted = withCurve(
 )
 
 const configFor = (f: EditorField): LaunchConfig =>
-  [DEFAULT_LAUNCH_CONFIG, shield, customMigration, weighted].find((c) =>
-    f.visible(c),
-  ) ?? DEFAULT_LAUNCH_CONFIG
+  [
+    DEFAULT_LAUNCH_CONFIG,
+    shield,
+    customMigration,
+    compoundingMigration,
+    weighted,
+  ].find((c) => f.visible(c)) ?? DEFAULT_LAUNCH_CONFIG
 
 describe('EDITOR_FIELDS', () => {
   it.each(
@@ -255,5 +266,46 @@ describe('curve shapes', () => {
     const config = edit(DEFAULT_LAUNCH_CONFIG, EditorFieldId.CurveShape, 2) // two segments
     expect(field(EditorFieldId.Leftover).read(config)).toBeGreaterThan(0)
     expect(editorStatus(config)).toMatchObject({ valid: true })
+  })
+})
+
+describe('compounding graduation pool fields', () => {
+  const custom = field(EditorFieldId.MigratedPoolFeeOption).write(
+    DEFAULT_LAUNCH_CONFIG,
+    MigrationFeeOption.Customizable,
+  )
+
+  it('offers compounding only with a custom graduation pool fee, at 50% to start', () => {
+    expect(
+      field(EditorFieldId.MigratedFeeCollection).visible(DEFAULT_LAUNCH_CONFIG),
+    ).toBe(false)
+    expect(field(EditorFieldId.MigratedFeeCollection).visible(custom)).toBe(
+      true,
+    )
+    const compounding = field(EditorFieldId.MigratedFeeCollection).write(
+      custom,
+      MigratedCollectFeeMode.Compounding,
+    )
+    expect(field(EditorFieldId.CompoundingShare).visible(compounding)).toBe(
+      true,
+    )
+    expect(field(EditorFieldId.CompoundingShare).read(compounding)).toBe(50)
+    expect(editorStatus(compounding)).toMatchObject({
+      valid: true,
+      simulatable: true,
+    })
+  })
+
+  it('drops the compounding share when fees go back to being paid out', () => {
+    const compounding = field(EditorFieldId.MigratedFeeCollection).write(
+      custom,
+      MigratedCollectFeeMode.Compounding,
+    )
+    const paidOut = field(EditorFieldId.MigratedFeeCollection).write(
+      compounding,
+      MigratedCollectFeeMode.QuoteToken,
+    )
+    expect(paidOut.migration.migratedPoolFee?.compoundingFeeBps).toBe(0)
+    expect(editorStatus(paidOut)).toMatchObject({ valid: true })
   })
 })

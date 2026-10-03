@@ -1,4 +1,104 @@
 {
+  "common": {
+    "feeSchedule": {
+      "flat": "{fee}% throughout",
+      "falling": "{start}% falling to {end}% over {seconds} s",
+      "shaped": "{schedule} ({shape})",
+      "shapes": {
+        "0": "linear",
+        "1": "exponential"
+      }
+    },
+    "signing": {
+      "preparing": "Checking with a dry run…",
+      "sign": "Sign and send in wallet",
+      "signing": "Waiting for wallet…",
+      "viewTransaction": "View transaction"
+    },
+    "loadRejections": {
+      "not-an-address": "That is not a Solana address.",
+      "not-found": "No account exists at that address on this network.",
+      "not-dbc-account": "That account does not belong to Meteora’s DBC program.",
+      "not-a-config-or-pool": "That DBC account is neither a config nor a pool.",
+      "network-error": "Could not reach the network ({detail}). Try again.",
+      "unsupported-quote-token": "This config is priced in a token the lab cannot simulate yet ({detail}); SOL and USDC configs are supported."
+    },
+    "pullable": "{percent}% of graduation liquidity can be pulled",
+    "refused": "Not simulated: {reason}",
+    "launchpadTerms": {
+      "quoteToken": {
+        "sol": "SOL",
+        "usdc": "USDC"
+      },
+      "thresholdBand": {
+        "small": "under 15 SOL",
+        "medium": "15–60 SOL",
+        "large": "60–120 SOL",
+        "huge": "over 120 SOL"
+      },
+      "feeShape": {
+        "flat": "flat",
+        "falling": "falls after launch",
+        "rate-limiter": "rises with trade size"
+      },
+      "creatorShare": {
+        "none": "none",
+        "minority": "under half",
+        "half": "half",
+        "majority": "over half",
+        "all": "all"
+      }
+    },
+    "configOptions": {
+      "firstBuyFee": {
+        "0": "Pays the fee schedule",
+        "1": "Pays only the minimum fee"
+      },
+      "migratedPoolFeeOption": {
+        "0": "0.25%",
+        "1": "0.3%",
+        "2": "1%",
+        "3": "2%",
+        "4": "4%",
+        "5": "6%",
+        "6": "Custom"
+      },
+      "decimals": {
+        "6": "6",
+        "7": "7",
+        "8": "8",
+        "9": "9"
+      },
+      "dynamicFee": {
+        "0": "Off",
+        "1": "On — rises after sharp price moves"
+      },
+      "feeCollection": {
+        "0": "The quote token",
+        "1": "The token bought (quote token on sells)"
+      },
+      "feeCurve": {
+        "0": "Flat",
+        "1": "Falls linearly",
+        "2": "Falls exponentially"
+      },
+      "curveShape": {
+        "standard": "Standard",
+        "market-cap": "Market cap",
+        "two-segments": "Two segments",
+        "liquidity-weights": "Liquidity weights"
+      },
+      "quoteToken": {
+        "sol": "SOL",
+        "usdc": "USDC"
+      },
+      "migratedFeeCollection": {
+        "0": "Paid to LPs in the quote token",
+        "1": "Paid to LPs in the token bought",
+        "2": "Partly compounded into the pool"
+      }
+    }
+  },
   "views": {
     "compare": {
       "title": "DBC Config Lab",
@@ -19,6 +119,22 @@
       "onChainIntent": "Read from chain; compared as-is, not editable.",
       "onChainFromPool": "Found via pool {pool}.",
       "onChainSlots": "This config counts time in slots; scenario seconds are converted at {ms} ms per slot."
+    },
+    "launch": {
+      "loading": "Reading this launchpad from chain…",
+      "refusedTitle": "This launchpad cannot be shown",
+      "unbranded": "Launchpad {address}",
+      "noBranding": "Its operator has not published a name for it.",
+      "termsTitle": "What launching here means",
+      "fee": "Trading fee",
+      "typicalTitle": "How a typical launch plays out",
+      "typicalIntro": "A simulated launch on this config: early bots and later human buyers, as in the lab's default launch situation. It is an illustration, not a forecast.",
+      "typicalName": "A typical launch",
+      "launchTitle": "Launch your token here",
+      "unverified": "This name, website and logo were published by the fee wallet below and are not verified by this site — check the addresses before you launch.",
+      "feeWallet": "Fee wallet",
+      "config": "Config",
+      "network": "Network"
     }
   },
   "components": {
@@ -36,6 +152,7 @@
       "explanation": "Each launch was rebuilt from a fresh pool by replaying its own on-chain swap history through this simulator; every swap's fees, output and resulting price, each graduation pool's opening liquidity and the liquidity its creator later withdrew, matched what the programs recorded. Run the command to check it yourself — read-only, over the public RPC.",
       "curveSwaps": "{n} curve swap | {n} curve swaps",
       "migratedSwaps": "{n} swap after graduation | {n} swaps after graduation",
+      "compounding": "(compounding pool)",
       "feeSetup": {
         "volatility-fee": "Volatility fee",
         "fees-in-token": "Fees taken in the token",
@@ -87,33 +204,21 @@
       "partnerCreatorFees": "Fees to partner + creator",
       "graduated": "Graduated",
       "no": "No",
-      "refused": "Not simulated: {reason}",
       "adaptiveSniperProfit": "Patient-bot profit",
       "afterGraduation": "{sol} after graduation",
       "liquidityPulled": "{sol} SOL of liquidity pulled",
-      "pullable": "{percent}% of graduation liquidity can be pulled",
       "graduatedAfter": "Yes, after {seconds}s",
       "pricedIn": "Priced in {symbol}: budgets and results converted at 1 SOL = {rate} {symbol}.",
       "keepersWontMigrate": "Threshold below the {minimum} {symbol} Meteora’s migration keepers act on: real pools on it would not graduate automatically.",
-      "fairValue": "ends {gap} from the outside price · arbitrage traders {arbitrage} SOL"
+      "fairValue": "ends {gap} from the outside price · arbitrage traders {arbitrage} SOL",
+      "compounded": "{sol} compounded into the pool"
     },
     "deployPanel": {
       "title": "Deploy a config",
       "preset": "Config",
-      "network": "Network",
-      "devnet": "Devnet (test SOL)",
-      "mainnet": "Mainnet (real SOL)",
-      "mainnetAcknowledge": "I understand this creates a real config on Solana mainnet and the transaction fee is paid in real SOL.",
-      "connect": "Connect {wallet}",
-      "connectedAs": "Connected: {wallet} · {address}",
-      "noWallet": "No Solana wallet found. Install Phantom, Solflare or Backpack to deploy.",
       "prepare": "Prepare transaction",
-      "preparing": "Checking with a dry run…",
-      "sign": "Sign and send in wallet",
-      "signing": "Waiting for wallet…",
       "done": "Config deployed.",
       "viewConfig": "View config",
-      "viewTransaction": "View transaction",
       "summary": {
         "network": "Network",
         "configAddress": "Config address",
@@ -122,71 +227,101 @@
         "leftoverReceiver": "Leftover tokens go to",
         "quoteMint": "Quote token",
         "quoteMintValue": "{symbol} · {mint}",
-        "fee": "Trading fee",
-        "feeValue": "{start}% falling to {end}% over {seconds}s",
-        "threshold": "Graduates at",
-        "thresholdValue": "{amount} {symbol}",
-        "keepers": "Graduates automatically",
-        "keepersYes": "Yes — Meteora’s migration keepers act on this threshold",
-        "keepersNo": "No — below the keepers’ {minimum} {symbol} minimum, so someone must run the migration by hand",
-        "dynamicFee": "Volatility fee",
-        "dynamicFeeOn": "On — rises after sharp price moves",
-        "dynamicFeeOff": "Off",
-        "tokenAuthority": "Token authority",
-        "tokenAuthorityOptions": {
-          "0": "Creator can update metadata",
-          "1": "Nobody — metadata and supply are fixed",
-          "2": "The config’s partner can update metadata",
-          "3": "Creator can update metadata and mint more tokens",
-          "4": "The config’s partner can update metadata and mint more tokens"
-        },
-        "creatorShare": "Creator’s share of trading fees",
-        "percentValue": "{value}%",
-        "liquidity": "Graduation liquidity",
-        "liquidityValue": "You {partner}% + {partnerLocked}% locked · creator {creator}% + {creatorLocked}% locked",
-        "lockedVesting": "Tokens vesting to the creator",
-        "lockedVestingValue": "{tokens}",
-        "migrationPoolFee": "Graduation pool fee",
-        "migrationFee": "Migration fee",
-        "migrationFeeValue": "{fee}% of graduation liquidity, {creator}% of it to the creator",
-        "poolCreationFee": "Pool creation fee",
-        "poolCreationFeeValue": "{sol} SOL"
+        "fee": "Trading fee"
       },
-      "launch": {
-        "title": "Launch a token on a config",
-        "intro": "Creates a new token and its bonding-curve pool on a config — the one deployed above, or any config address — with your wallet as the pool creator. An optional first buy runs in the same transaction, so nobody can buy before it.",
-        "config": "Config address",
-        "name": "Token name",
-        "symbol": "Symbol",
-        "uri": "Metadata URI (optional)",
-        "firstBuy": "First buy (in the config’s quote token, optional)",
-        "prepare": "Prepare launch",
-        "done": "Token launched.",
-        "viewToken": "View token",
-        "viewPool": "View pool",
-        "highFee": "This first buy pays a {fee}% fee: the config’s opening fee applies to it. Turn on “first buy at the minimum fee” in the config, or buy later.",
+      "earnings": {
+        "title": "Your earnings",
+        "intro": "Trading fees you can claim: as the fee claimer of configs you deployed (partner), and on pools you created (creator). Read from chain for the connected wallet.",
+        "find": "Find my earnings",
+        "finding": "Reading your configs and pools…",
+        "none": "Nothing to claim on this network.",
+        "limited": "Showing the {shown} largest of {total} pools with fees to claim.",
+        "failed": "Could not read your pools ({detail}).",
+        "claim": "Claim",
+        "claimed": "Fees claimed.",
+        "pool": "Pool",
+        "as": "Claiming as",
+        "receive": "You receive",
+        "receiver": "Paid to",
+        "roles": {
+          "partner": "partner (config fee claimer)",
+          "creator": "creator"
+        },
+        "quoteAmount": "{amount} {symbol}",
+        "rawAmount": "{amount} base units of {mint}",
+        "baseAmount": " + {amount} base units of the token",
+        "value": " (≈ {sol} SOL)"
+      },
+      "branding": {
+        "title": "Publish your launchpad",
+        "intro": "Give the wallet that collects your launchpad's fees a public name, so creators recognise whose launchpad they launch on. It is written on chain by this wallet and shown on every launch page of configs it owns.",
+        "launchPage": "Open the launch page for the config you just deployed — share it with creators",
+        "connectFirst": "Connect the wallet that claims your fees to publish its name.",
+        "reading": "Checking whether this wallet has published a name…",
+        "published": "This wallet is published as “{name}”. The program keeps one name per wallet; it cannot be changed here.",
+        "name": "Launchpad name",
+        "website": "Website (https, optional)",
+        "logo": "Logo image URL (https, optional)",
+        "once": "A wallet's name can be published once.",
+        "prepare": "Check and prepare",
         "rejections": {
-          "name-missing": "Give the token a name.",
-          "name-too-long": "Names are at most 32 characters.",
-          "symbol-missing": "Give the token a symbol.",
-          "symbol-too-long": "Symbols are at most 10 characters.",
-          "uri-too-long": "The metadata URI is at most 200 characters.",
-          "uri-scheme": "The metadata URI must start with https://, ipfs:// or ar://."
-        },
-        "summary": {
-          "token": "Token",
-          "tokenValue": "{name} ({symbol})",
-          "mint": "Token mint",
-          "pool": "Pool",
-          "creator": "Pool creator",
-          "noUri": "None — wallets will show no image",
-          "firstBuyValue": "{amount} {symbol} for about {tokens} tokens (at least {minimum}), {fee}% fee",
-          "atMinimumFee": "— at the config’s minimum fee",
-          "noFirstBuy": "None"
-        },
-        "creationFee": "This config charges whoever launches on it a {sol} SOL pool creation fee, on top of the network fee.",
-        "partnerAuthority": "This config gives its partner — not you — authority over your token’s metadata, or over minting more of it."
+          "name-missing": "Give the launchpad a name.",
+          "name-too-long": "The name is too long.",
+          "website-too-long": "The website address is too long.",
+          "website-scheme": "The website must be an https:// address.",
+          "logo-too-long": "The logo address is too long.",
+          "logo-scheme": "The logo must be an https:// image address.",
+          "name-characters": "The name contains hidden or control characters."
+        }
       }
+    },
+    "poolLaunch": {
+      "title": "Launch a token on a config",
+      "intro": "Creates a new token and its bonding-curve pool on a config — the one deployed above, or any config address — with your wallet as the pool creator. An optional first buy runs in the same transaction, so nobody can buy before it.",
+      "config": "Config address",
+      "name": "Token name",
+      "symbol": "Symbol",
+      "uri": "Metadata URI (optional)",
+      "firstBuy": "First buy (in the config’s quote token, optional)",
+      "prepare": "Prepare launch",
+      "done": "Token launched.",
+      "viewToken": "View token",
+      "viewPool": "View pool",
+      "highFee": "This first buy pays a {fee}% fee: the config’s opening fee applies to it. Turn on “first buy at the minimum fee” in the config, or buy later.",
+      "rejections": {
+        "name-missing": "Give the token a name.",
+        "name-too-long": "Names are at most 32 characters.",
+        "symbol-missing": "Give the token a symbol.",
+        "symbol-too-long": "Symbols are at most 10 characters.",
+        "uri-too-long": "The metadata URI is at most 200 characters.",
+        "uri-scheme": "The metadata URI must start with https://, ipfs:// or ar://."
+      },
+      "summary": {
+        "token": "Token",
+        "tokenValue": "{name} ({symbol})",
+        "mint": "Token mint",
+        "pool": "Pool",
+        "creator": "Pool creator",
+        "noUri": "None — wallets will show no image",
+        "firstBuyValue": "{amount} {symbol} for about {tokens} tokens (at least {minimum}), {fee}% fee",
+        "atMinimumFee": "— at the config’s minimum fee",
+        "noFirstBuy": "None"
+      },
+      "creationFee": "This config charges whoever launches on it a {sol} SOL pool creation fee, on top of the network fee.",
+      "partnerAuthority": "This config gives its partner — not you — authority over your token’s metadata, or over minting more of it.",
+      "introLocked": "Creates your token and its bonding-curve pool on this launchpad's config, with your wallet as the pool creator. An optional first buy runs in the same transaction, so nobody can buy before it."
+    },
+    "walletBar": {
+      "network": "Network",
+      "devnet": "Devnet (test SOL)",
+      "mainnet": "Mainnet (real SOL)",
+      "mainnetAcknowledge": {
+        "deploy": "I understand that on Solana mainnet everything signed here is real: configs, token launches with their first buys, branding and fee claims are paid in real SOL.",
+        "launch": "I understand this creates a real token and pool on Solana mainnet, and that I pay the network fee, any pool creation fee this config charges, and my first buy in real SOL."
+      },
+      "connectedAs": "Connected: {wallet} · {address}",
+      "connect": "Connect {wallet}",
+      "noWallet": "No Solana wallet found. Install Phantom, Solflare or Backpack to deploy."
     },
     "recommenderPanel": {
       "title": "Find a config for your goal",
@@ -212,10 +347,6 @@
       "run": "Find best configs",
       "searching": "Simulating every candidate…",
       "noResult": "No candidate could be simulated for this setup.",
-      "flat": "Flat {fee}%",
-      "schedule": "{start}% → {end}% over {seconds}s ({curve})",
-      "linear": "linear",
-      "exponential": "exponential",
       "rationale": "Humans {human} SOL vs flat fee · bots {bots} SOL · {fees} SOL fees to partner + creator · average of {seeds} simulated launches",
       "flatBaseline": "Flat 1% under the same launches: humans {human} SOL, bots {bots} SOL · {measures}.",
       "use": "Use this config",
@@ -272,6 +403,8 @@
         "fee-collection": "Fees taken in",
         "migrated-pool-fee-option": "Graduation pool fee",
         "migrated-pool-fee": "Custom pool fee",
+        "migrated-fee-collection": "Graduation pool fees",
+        "compounding-share": "Share of LP fees compounded",
         "migration-fee": "Migration fee taken at graduation",
         "partner-liquidity": "Partner LP",
         "partner-locked-liquidity": "Partner LP, locked",
@@ -287,50 +420,6 @@
         "tokens": "tokens",
         "percent": "%",
         "seconds": "s"
-      },
-      "options": {
-        "decimals": {
-          "6": "6",
-          "7": "7",
-          "8": "8",
-          "9": "9"
-        },
-        "dynamicFee": {
-          "0": "Off",
-          "1": "On — rises after sharp price moves"
-        },
-        "feeCollection": {
-          "0": "The quote token",
-          "1": "The token bought (quote token on sells)"
-        },
-        "feeCurve": {
-          "0": "Flat",
-          "1": "Falls linearly",
-          "2": "Falls exponentially"
-        },
-        "migratedPoolFeeOption": {
-          "0": "0.25%",
-          "1": "0.3%",
-          "2": "1%",
-          "3": "2%",
-          "4": "4%",
-          "5": "6%",
-          "6": "Custom"
-        },
-        "curveShape": {
-          "standard": "Standard",
-          "market-cap": "Market cap",
-          "two-segments": "Two segments",
-          "liquidity-weights": "Liquidity weights"
-        },
-        "quoteToken": {
-          "sol": "SOL",
-          "usdc": "USDC"
-        },
-        "firstBuyFee": {
-          "0": "Pays the fee schedule",
-          "1": "Pays only the minimum fee"
-        }
       },
       "rejections": {
         "not-a-number": "Enter a number.",
@@ -362,14 +451,6 @@
       "load": "Load",
       "loading": "Reading from chain…",
       "loaded": "Loaded. It is now in the comparison below.",
-      "rejections": {
-        "not-an-address": "That is not a Solana address.",
-        "not-found": "No account exists at that address on this network.",
-        "not-dbc-account": "That account does not belong to Meteora’s DBC program.",
-        "not-a-config-or-pool": "That DBC account is neither a config nor a pool.",
-        "network-error": "Could not reach the network ({detail}). Try again.",
-        "unsupported-quote-token": "This config is priced in a token the lab cannot simulate yet ({detail}); SOL and USDC configs are supported."
-      },
       "real": {
         "title": "How real launches on this config went",
         "loading": "Reading the pools launched with this config…",
@@ -379,7 +460,7 @@
         "traction": "Reached 10% of the threshold",
         "neverTraded": "Never traded",
         "raised": "Median raised",
-        "fees": "Partner + creator fees per launch (bonding curve)",
+        "fees": "Partner + creator fees per launch (bonding curve; fees taken in the launched token valued at the curve's average price)",
         "time": "Median time to complete the curve",
         "seconds": "{seconds}s",
         "timeUnknown": "Not available (pools on this config count time in slots)",
@@ -390,6 +471,152 @@
           "no-pools": "No pools have been launched with this config yet."
         }
       }
+    },
+    "presetCatalog": {
+      "title": "Preset catalogue — built-in configs and the most-graduated real launchpads",
+      "intro": "Each entry is simulated under the launch situation above. Launchpad configs are the mainnet configs with the most graduated launches, read from chain on {date}; open one in the comparison to test it further.",
+      "editCopy": "Edit a copy",
+      "compare": "Compare",
+      "view": "view",
+      "launchpadName": "Launchpad config {address}",
+      "record": "{graduated} of {launches} real launches graduated (read {date})",
+      "terms": "Graduates at {threshold} {symbol} · creator takes {creator}% of trading fees",
+      "outcome": "Here: bots {snipers} SOL · humans {humans} SOL · {graduation}",
+      "graduatedAfter": "graduates after {seconds}s",
+      "notGraduated": "does not graduate"
+    },
+    "launchpadEconomics": {
+      "title": "Launchpad economics — what real launchpads earn",
+      "intro": "Every top mainnet launchpad config, with what its launches actually produced. Partner income is the trading fees the launchpad keeps from one launch's bonding curve — median and top quarter across its sampled launches.",
+      "loading": "Loading the launchpad record…",
+      "sortBy": "Sort by",
+      "sorts": {
+        "partner-income": "Partner income per launch",
+        "graduation-rate": "Share graduated",
+        "launches": "Launches"
+      },
+      "filters": {
+        "quoteToken": "Priced in",
+        "thresholdBand": "Graduates at",
+        "feeShape": "Trading fee",
+        "creatorShare": "Creator's fee share"
+      },
+      "any": "Any",
+      "matching": "Showing {shown} of {total} matching launchpads (read from mainnet on {date}).",
+      "columns": {
+        "launchpad": "Launchpad config",
+        "partnerIncome": "Partner income per launch",
+        "launches": "Launches",
+        "graduated": "Graduated",
+        "terms": "Terms",
+        "actions": "Actions"
+      },
+      "income": "{median} SOL median · {p75} SOL top quarter",
+      "terms": "Graduates at {threshold} {symbol} · fee {fee} · creator takes {creator}%",
+      "compare": "Compare",
+      "curveOnly": "Income counts bonding-curve fees only — fees after graduation are not included. Fees taken in the launched token are valued at the curve's average price (what it raises ÷ the tokens it sells). USDC launchpads are converted at 1 SOL = 150 USDC."
+    },
+    "clonePanel": {
+      "title": "Clone a launchpad config",
+      "intro": "Copy a real config's terms into one you own: your wallet receives its fees and leftovers. Terms that do not reshape the curve can be adjusted; the clone joins the comparison next to the original and can then be deployed below.",
+      "empty": "Add a real config to the comparison first — from launchpad economics or by loading one from chain.",
+      "original": "Original",
+      "originalName": "{address} ({network})",
+      "refused": "This config cannot be cloned exactly: {reason}",
+      "fee": "Trading fee",
+      "startingFee": "Starting fee (%)",
+      "endingFee": "Settled fee (%)",
+      "window": "Falls over (seconds)",
+      "split": "Who gets what",
+      "creatorShare": "Creator's share of trading fees (%)",
+      "liquidity": {
+        "partnerPercentage": "Your liquidity, unlocked (%)",
+        "partnerLockedPercentage": "Your liquidity, locked (%)",
+        "creatorPercentage": "Creator liquidity, unlocked (%)",
+        "creatorLockedPercentage": "Creator liquidity, locked (%)"
+      },
+      "firstBuy": "The creator's bundled first buy pays only the minimum fee",
+      "exact": "An exact copy: every term matches the original.",
+      "adjusted": "Adjusted terms pass the DBC program's checks.",
+      "add": "Add clone to comparison",
+      "name": "Clone of {address}",
+      "intentExact": "The terms of {address}, with your wallet receiving its fees.",
+      "intentAdjusted": "The terms of {address} as adjusted, with your wallet receiving its fees.",
+      "rejectedAsIs": "The DBC program would reject an exact copy today — adjust the terms above: {reason}",
+      "vesting": "This config also vests {partner}% (yours) and {creator}% (the creator's) of graduation liquidity over time. A clone keeps those, so the four shares above must add up to {remaining}%."
+    },
+    "incomeForecast": {
+      "title": "Income forecast — what comparable launchpads earned",
+      "intro": "Pick a config in the comparison and a number of launches. The range is what real launchpads with the same terms earned per launch, scaled to that number.",
+      "loading": "Loading the launchpad record…",
+      "config": "Config",
+      "launches": "Launches",
+      "terms": "Comparable terms: priced in {quote} · graduates at {threshold} · fee {fee} · creator's share {creator}.",
+      "range": "{low}–{high} SOL from {launches} launches",
+      "basis": "The middle half of {launchpads} real launchpads with these terms ({launches} launches between them), read from mainnet on {date}.",
+      "tooFew": "Only {found} real launchpads share these terms; a range needs at least {minimum}, so none is given.",
+      "caveat": "What comparable launchpads earned, not a promise of what yours will. Bonding-curve fees only — income after graduation is not counted."
+    },
+    "configTermsRows": {
+      "creatorShare": "Creator’s share of trading fees",
+      "duration": {
+        "days": "{value} d",
+        "hours": "{value} h",
+        "minutes": "{value} min",
+        "seconds": "{value} s"
+      },
+      "dynamicFee": "Volatility fee",
+      "dynamicFeeOff": "Off",
+      "dynamicFeeOn": "On — rises after sharp price moves",
+      "feesCollectedIn": "Curve fees taken in",
+      "feesCollectedInOptions": {
+        "0": "The quote token",
+        "1": "Whichever token a trade receives"
+      },
+      "graduatedFeesCollectedIn": "Graduated pool fees",
+      "graduatedFeesCollectedInOptions": {
+        "0": "Taken in the quote token",
+        "1": "Taken in whichever token a trade receives",
+        "2": "Compounding: {compounding}% of LP fees stay in the pool's reserves"
+      },
+      "keepers": "Graduates automatically",
+      "keepersNo": "No — below the keepers’ {minimum} {symbol} minimum, so someone must run the migration by hand",
+      "keepersYes": "Yes — Meteora’s migration keepers act on this threshold",
+      "liquidity": "Graduation liquidity",
+      "liquidityValue": "Launchpad {partner}% + {partnerLocked}% locked + {partnerVesting}% vesting · creator {creator}% + {creatorLocked}% locked + {creatorVesting}% vesting",
+      "liquidityVesting": {
+        "partner": "Launchpad’s vesting liquidity",
+        "creator": "Creator’s vesting liquidity"
+      },
+      "liquidityVestingValue": "{percentage}% — locked for {cliff} after graduation, then unlocks over {periods} periods of {period}",
+      "lockedVesting": "Tokens vesting to the creator",
+      "lockedVestingNone": "None",
+      "lockedVestingValue": "{total} tokens — {cliffTokens} after {cliff}, then {perPeriod} per {period} for {periods} periods",
+      "migrationFee": "Migration fee",
+      "migrationFeeValue": "{fee}% of graduation liquidity, {creator}% of it to the creator",
+      "migrationPoolFee": "Graduation pool fee",
+      "percentValue": "{value}%",
+      "poolCreationFee": "Pool creation fee",
+      "poolCreationFeeValue": "{sol} SOL",
+      "supply": "Token supply",
+      "supplyFixed": "Fixed: {before} before graduation, {after} after",
+      "supplyNotFixed": "Not fixed — set by the curve",
+      "threshold": "Graduates at",
+      "thresholdValue": "{amount} {symbol}",
+      "tokenAuthority": "Token authority",
+      "tokenAuthorityOptions": {
+        "0": "Creator can update metadata",
+        "1": "Nobody — metadata and supply are fixed",
+        "2": "The config’s partner can update metadata",
+        "3": "Creator can update metadata and mint more tokens",
+        "4": "The config’s partner can update metadata and mint more tokens"
+      },
+      "tokenType": "Token program",
+      "tokenTypeOptions": {
+        "0": "SPL Token",
+        "1": "Token-2022"
+      },
+      "firstBuy": "Creator’s first buy"
     }
   }
 }

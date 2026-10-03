@@ -1,4 +1,4 @@
-export { MAX_SHARE_LENGTH, SHARE_PARAM, ShareRejection } from './constants'
+export { MAX_SHARE_LENGTH, ShareRejection } from './constants'
 export type { DecodeResult, SharedConfig } from './types'
 export {
   decodeSharedConfig,

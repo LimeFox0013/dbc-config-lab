@@ -1,5 +1,8 @@
 <template>
-  <section class="config-editor">
+  <section
+    ref="root"
+    class="config-editor"
+  >
     <h2 class="config-editor__title">
       {{ t('components.configEditor.title') }}
     </h2>
@@ -64,7 +67,7 @@
               :key="option.value"
               :value="option.value"
             >
-              {{ t(`components.configEditor.options.${option.labelKey}`) }}
+              {{ t(`common.configOptions.${option.labelKey}`) }}
             </option>
           </select>
           <input
@@ -163,9 +166,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { DEFAULT_LAUNCH_CONFIG, parseLaunchConfig, serializeLaunchConfig } from '../../core/launch-config'
+import { DEFAULT_LAUNCH_CONFIG, parseLaunchConfig, serializeLaunchConfig, UserPresetId } from '../../core/launch-config'
 import type { LaunchConfig, LaunchPreset } from '../../core/launch-config'
 import { QUOTE_TOKENS } from '../../core/quote-token'
 import {
@@ -177,7 +180,7 @@ import {
   FieldUnit,
 } from '../../features/config-editor'
 import type { EditorField } from '../../features/config-editor'
-import { CUSTOM_PRESET_ID, NAME_MAX_LENGTH } from './constants'
+import { NAME_MAX_LENGTH } from './constants'
 import { shareLink, toTypeScript } from '../../features/config-sharing'
 import type { ConfigEditorProps } from './types'
 
@@ -190,7 +193,7 @@ const groups = Object.values(FieldGroup)
 /** A deep, independent copy, so edits can never reach the source preset. */
 const copyOf = (config: LaunchConfig): LaunchConfig => parseLaunchConfig(serializeLaunchConfig(config))
 
-const initial = props.presets.find((p) => p.id !== CUSTOM_PRESET_ID)
+const initial = props.presets.find((p) => p.id !== UserPresetId.Custom)
 const startFromId = ref(initial?.id ?? '')
 const config = ref<LaunchConfig>(copyOf(initial?.config ?? DEFAULT_LAUNCH_CONFIG))
 const name = ref(t('components.configEditor.defaultName'))
@@ -226,15 +229,28 @@ const onEdit = (field: EditorField, event: Event): void => {
   }
 }
 
-const startFrom = (event: Event): void => {
-  const target = event.target
-  if (!(target instanceof HTMLSelectElement)) return
-  const preset = props.presets.find((p) => p.id === target.value)
+/** Starts editing a fresh copy of the preset with this id; unknown ids are ignored. */
+const root = useTemplateRef<HTMLElement>('root')
+
+const startWith = (id: LaunchPreset['id']): void => {
+  const preset = props.presets.find((p) => p.id === id)
   if (!preset) return
   startFromId.value = preset.id
   config.value = copyOf(preset.config)
   lastRejection.value = null
 }
+
+const startFrom = (event: Event): void => {
+  if (event.target instanceof HTMLSelectElement) startWith(event.target.value)
+}
+
+/** Opens a copy of a preset, as `startWith`, and brings the editor into view. */
+const editCopyOf = (id: LaunchPreset['id']): void => {
+  startWith(id)
+  root.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+defineExpose({ editCopyOf })
 
 const status = computed(() => editorStatus(config.value))
 const canAdd = computed(() => status.value.valid && status.value.simulatable && name.value.length > 0)
@@ -280,7 +296,7 @@ const selectAll = (event: Event): void => {
 const add = (): void => {
   if (!canAdd.value) return
   emit('add', {
-    id: CUSTOM_PRESET_ID,
+    id: UserPresetId.Custom,
     name: name.value,
     intent: t('components.configEditor.intent'),
     config: copyOf(config.value),
@@ -289,15 +305,13 @@ const add = (): void => {
 </script>
 
 <style lang="scss">
+@use '../../styles/mixins';
+
 .config-editor {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-4);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-surface);
-  color: var(--color-surface-foreground);
+  @include mixins.surface;
 }
 
 .config-editor__title {
@@ -322,7 +336,7 @@ const add = (): void => {
 .config-editor__legend {
   padding: 0 var(--space-2);
   font-size: var(--font-size-2);
-  font-weight: 600;
+  font-weight: var(--font-weight-strong);
 }
 
 .config-editor__field {
@@ -376,19 +390,8 @@ const add = (): void => {
 }
 
 .config-editor__secondary {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-background);
-  color: var(--color-background-foreground);
-  font-family: var(--font-family);
-  font-size: var(--font-size-2);
-  cursor: pointer;
-
-  &:disabled {
-    cursor: not-allowed;
-    color: var(--color-muted-foreground);
-  }
+  @include mixins.control;
+  @include mixins.clickable;
 }
 
 .config-editor__notice {
@@ -423,13 +426,7 @@ const add = (): void => {
 
 .config-editor__add {
   align-self: flex-start;
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-background);
-  color: var(--color-background-foreground);
-  font-family: var(--font-family);
-  font-size: var(--font-size-2);
+  @include mixins.control;
   cursor: pointer;
 
   &:enabled {

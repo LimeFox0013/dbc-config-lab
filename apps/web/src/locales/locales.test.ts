@@ -29,7 +29,7 @@ const generatedKeys = (): string[] => [
   ...EDITOR_FIELDS.map((f) => `components.configEditor.fields.${f.id}`),
   ...EDITOR_FIELDS.flatMap((f) =>
     f.kind === FieldKind.Select
-      ? f.options.map((o) => `components.configEditor.options.${o.labelKey}`)
+      ? f.options.map((o) => `common.configOptions.${o.labelKey}`)
       : [],
   ),
   // Quote amounts are labelled with the token's own symbol, not a message.
@@ -43,9 +43,7 @@ const generatedKeys = (): string[] => [
   ...Object.values(LaunchGoal).map(
     (g) => `components.recommenderPanel.goals.${g}`,
   ),
-  ...Object.values(LoadRejection).map(
-    (r) => `components.onChainLoader.rejections.${r}`,
-  ),
+  ...Object.values(LoadRejection).map((r) => `common.loadRejections.${r}`),
   ...Object.values(Criterion).map(
     (c) => `components.recommenderPanel.weights.${c}`,
   ),

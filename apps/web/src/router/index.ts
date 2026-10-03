@@ -1,5 +1,8 @@
 import type { App } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
+import { LAUNCH_PAGE_PATH } from './constants'
+
+export { LAUNCH_PAGE_PATH, NETWORK_QUERY_KEY } from './constants'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -8,6 +11,11 @@ const router = createRouter({
       path: '/',
       name: 'compare',
       component: () => import('../views/CompareView.vue'),
+    },
+    {
+      path: `${LAUNCH_PAGE_PATH}/:config`,
+      name: 'launch',
+      component: () => import('../views/LaunchView.vue'),
     },
   ],
 })

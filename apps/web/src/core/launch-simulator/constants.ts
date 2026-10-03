@@ -9,11 +9,6 @@ export enum TradeSide {
   TowardFairPrice = 'toward-fair-price',
 }
 
-export const BPS_SCALE = 10_000
-
-/** sqrtPrice is Q64, so a price compared with sqrtPrice² carries this many fractional bits. */
-export const PRICE_X128_SHIFT = 128
-
 export enum TradeStatus {
   Filled = 'filled',
   PartiallyFilled = 'partially-filled',
@@ -38,6 +33,8 @@ export enum Venue {
  */
 export const SIMULATED_ACTIVATION_TIMESTAMP = 1_767_225_600
 
+export const MS_PER_SECOND = 1000
+
 /** Solana's target slot time, used to turn scenario seconds into slots for slot-activated configs. */
 export const SLOT_DURATION_MS = 400
 
@@ -45,3 +42,6 @@ export const SLOT_DURATION_MS = 400
 export const DEFAULT_SIMULATION_OPTIONS: SimulationOptions = {
   unlockedLiquidityPulled: false,
 }
+
+/** sqrtPrice is Q64: this many fractional bits. */
+export const Q64_SHIFT = 64

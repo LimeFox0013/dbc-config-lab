@@ -10,13 +10,14 @@ export enum FeeSetup {
 /**
  * Results of `scripts/mainnet-replay-verify.ts` (latest runs 2026-10-02/03): every swap of
  * these mainnet launches, replayed from a fresh pool, matched the program's recorded fees,
- * output and price exactly, as did each migrated pool's opening liquidity and the
- * liquidity its creator later withdrew.
+ * output and price exactly, as did each migrated pool's opening liquidity (and, for
+ * compounding pools, its reserves before and after every swap) and the liquidity its
+ * creator later withdrew.
  */
 export const REPLAYED_LAUNCHES: readonly ReplayedLaunch[] = [
   {
     curvePool: '8EeVgd9m2fvNRQ9DSqpKonfubzkkwFkPcAJQPWCvuR37',
-    curveSwaps: 44,
+    curveSwaps: 45,
     feeSetup: FeeSetup.VolatilityFee,
   },
   {
@@ -35,6 +36,26 @@ export const REPLAYED_LAUNCHES: readonly ReplayedLaunch[] = [
     migrated: {
       pool: 'BrL83GbzF6BdCkqNkarH2ghX2ZzhDAjWgFDm4jztWeEp',
       swaps: 11,
+    },
+  },
+  {
+    curvePool: 'mLGAioB6nGn832SCdMn1aVTkKCPkxP3k3ZN6xJcDrvs',
+    curveSwaps: 10,
+    feeSetup: FeeSetup.VolatilityFee,
+    migrated: {
+      pool: 'F8Zd3TEBZtDHL7YoQAznWL3AyAbuhNaEybZELh1fuVZj',
+      swaps: 26,
+      compounding: true,
+    },
+  },
+  {
+    curvePool: '2Sko3PeDw6WM2cg9zugRpbjrEBGdEYdpz1Mp7XgzgWhr',
+    curveSwaps: 2,
+    feeSetup: FeeSetup.FeesInSol,
+    migrated: {
+      pool: 'Esab82WjLvX58JrtEwASdppVcfB3fWF9rN3J6D2kmUxm',
+      swaps: 4,
+      compounding: true,
     },
   },
 ]

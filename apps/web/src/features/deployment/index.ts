@@ -1,3 +1,5 @@
 export { DeployStep } from './constants'
+export type { DeployTarget, PreparationOutcome } from './types'
 export { useDeployment } from './useDeployment'
+export { useSignedTransaction } from './useSignedTransaction'
 export { canPrepare, isSafeWalletIcon } from './utils'

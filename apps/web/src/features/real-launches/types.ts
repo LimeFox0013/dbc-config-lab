@@ -27,8 +27,10 @@ export interface RealLaunches {
   tractionShare: number
   medianRaised: number
   meanRaised: number
-  /** Partner + creator trading fees on the bonding curve, per pool. */
+  /** Partner + creator trading fees on the bonding curve, per pool: mean, median and 75th percentile. */
   meanCurveFees: number
+  medianCurveFees: number
+  p75CurveFees: number
   /** Over the pools that completed; null when none did or the config counts slots. */
   medianSecondsToComplete: number | null
 }

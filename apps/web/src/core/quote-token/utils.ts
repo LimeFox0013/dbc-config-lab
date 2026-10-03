@@ -2,6 +2,7 @@ import BN from 'bn.js'
 import { QUOTE_TOKEN_ORDER, QUOTE_TOKENS } from './constants'
 import type { QuoteToken } from './constants'
 import type { SolanaNetwork } from '../shared'
+import { wholeTokens } from '../shared'
 
 /** A SOL amount as the quote token's base units, at the reference rate. */
 export const quoteUnitsFromSol = (sol: number, quote: QuoteToken): BN => {
@@ -17,7 +18,7 @@ export const solFromQuoteUnits = (units: BN, quote: QuoteToken): number => {
 
 /** Quote base units as whole tokens. */
 export const wholeQuoteTokens = (units: BN, quote: QuoteToken): number =>
-  Number(units.toString()) / 10 ** QUOTE_TOKENS[quote].decimals
+  wholeTokens(units, QUOTE_TOKENS[quote].decimals)
 
 /** The quote token a mint address is on `network`; null when unsupported there. */
 export const quoteTokenOfMint = (

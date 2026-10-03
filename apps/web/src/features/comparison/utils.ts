@@ -9,6 +9,7 @@ import type { ScenarioSpec } from '../../core/sniper-scenario'
 import { clamp } from '../../core/shared'
 import { MULTIPLE_PRECISION, SCENARIO_LIMITS } from './constants'
 import type { ComparisonEntry, ComparisonRow, PricePoint } from './types'
+import type { QuoteToken } from '../../core/quote-token'
 
 const clampInteger = (value: number, min: number, max: number): number =>
   clamp(Math.trunc(value), min, max)
@@ -98,6 +99,16 @@ export const sanitizeScenario = (spec: ScenarioSpec): ScenarioSpec => ({
 })
 
 /** A preset as a comparison entry, compiled once. */
+/** An entry for parameters already compiled — a config read from chain, or a clone of one. */
+export const parametersEntry = (
+  label: Pick<ComparisonEntry, 'id' | 'name' | 'intent'>,
+  parameters: ConfigParameters,
+  quoteToken: QuoteToken,
+): ComparisonEntry => ({
+  ...label,
+  compiled: { ok: true, parameters, quoteToken },
+})
+
 export const presetEntry = (preset: LaunchPreset): ComparisonEntry => ({
   id: preset.id,
   name: preset.name,
@@ -154,37 +165,3 @@ export const compareConfigs = (
   const safeSpec = sanitizeScenario(spec)
   return entries.map((entry) => compareRow(entry, safeSpec))
 }
-
-const solFormat = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
-const signedSolFormat = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-  signDisplay: 'exceptZero',
-})
-
-/** SOL amount with two decimals, e.g. "0.61". */
-export const formatSol = (sol: number): string => solFormat.format(sol)
-
-/** Signed SOL change with two decimals, e.g. "+1.04" or "-4.76". */
-export const formatSolChange = (sol: number): string =>
-  signedSolFormat.format(sol)
-
-const shareFormat = new Intl.NumberFormat('en-US', {
-  style: 'percent',
-  maximumFractionDigits: 0,
-})
-
-/** A 0–1 share as a whole percent, e.g. "35%". */
-export const formatShare = (share: number): string => shareFormat.format(share)
-
-const percentChangeFormat = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 0,
-  signDisplay: 'exceptZero',
-})
-
-/** A signed percent change, rounded, e.g. "+12%" or "-3%". */
-export const formatPercentChange = (percent: number): string =>
-  `${percentChangeFormat.format(percent)}%`

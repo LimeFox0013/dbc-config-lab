@@ -1,11 +1,8 @@
 import type { PublicKey } from '@solana/web3.js'
 import type { ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import type {
-  ConfigTerms,
-  PreparedTransaction,
-  SolanaNetwork,
-} from '../config-deploy'
+import type { ConfigTerms, PreparedTransaction } from '../config-deploy'
 import type { QuoteToken } from '../quote-token'
+import type { SolanaNetwork } from '../shared'
 
 export interface TokenMetadata {
   name: string

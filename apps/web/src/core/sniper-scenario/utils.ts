@@ -1,10 +1,5 @@
 import BN from 'bn.js'
-import {
-  feeTotal,
-  PRICE_X128_SHIFT,
-  TradeSide,
-  TradeStatus,
-} from '../launch-simulator'
+import { feeTotal, TradeSide, TradeStatus } from '../launch-simulator'
 import type { ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { Trade, TradeOutcome } from '../launch-simulator'
 import { quoteUnitsFromSol } from '../quote-token'
@@ -21,6 +16,7 @@ import type {
   ScenarioSpec,
   TradeContext,
 } from './types'
+import { BPS_SCALE, PRICE_X128_SHIFT } from '../shared'
 
 /** mulberry32 — small seeded PRNG, so a scenario reruns identically from its seed. */
 export const seededRandom = (seed: number): (() => number) => {
@@ -236,5 +232,5 @@ export const botShareOfEarlyBuys = (
   const bots = early
     .filter((o) => groupOf(o.trade.trader) !== TraderGroup.Human)
     .reduce((sum, o) => sum.add(o.amountOut), new BN(0))
-  return Number(bots.muln(10_000).div(total).toString()) / 10_000
+  return Number(bots.muln(BPS_SCALE).div(total).toString()) / BPS_SCALE
 }

@@ -65,7 +65,7 @@
             <span
               v-if="pullable(row) > 0"
               class="comparison-table__intent comparison-table__intent--risk"
-            >{{ t('components.comparisonTable.pullable', { percent: pullable(row) }) }}</span>
+            >{{ t('common.pullable', { percent: pullable(row) }) }}</span>
             <span
               v-if="quoteOf(row) !== null && quoteOf(row) !== QuoteToken.Sol"
               class="comparison-table__intent"
@@ -93,7 +93,10 @@
               <span
                 v-if="row.metrics.postGraduationFees > 0"
                 class="comparison-table__detail"
-              >{{ t('components.comparisonTable.afterGraduation', { sol: formatSol(row.metrics.postGraduationFees) }) }}</span>
+              >{{ t('components.comparisonTable.afterGraduation', { sol: formatSol(row.metrics.postGraduationFees) }) }}</span><span
+                v-if="row.metrics.compoundedFees > 0"
+                class="comparison-table__detail"
+              >{{ t('components.comparisonTable.compounded', { sol: formatSol(row.metrics.compoundedFees) }) }}</span>
             </td>
             <td class="comparison-table__cell">
               {{ graduationText(row.metrics) }}<span
@@ -115,7 +118,7 @@
             colspan="6"
             class="comparison-table__refused"
           >
-            {{ t('components.comparisonTable.refused', { reason: row.reason }) }}
+            {{ t('common.refused', { reason: row.reason }) }}
           </td>
         </tr>
       </tbody>
@@ -124,8 +127,8 @@
 </template>
 
 <script setup lang="ts">
+import { formatPercentChange, formatSol, formatSolChange } from '../../core/shared'
 import { useI18n } from 'vue-i18n'
-import { formatPercentChange, formatSol, formatSolChange } from '../../features/comparison'
 import type { ComparisonMetrics, ComparisonRow } from '../../features/comparison'
 import { pullableLiquidityPercent } from '../../core/migrated-pool'
 import { keepersMigrate, QUOTE_TOKENS, QuoteToken, REFERENCE_USD_PER_SOL } from '../../core/quote-token'
@@ -184,7 +187,7 @@ const keepersMigrateFor = (row: ComparisonRow): boolean =>
   border-bottom: var(--border-width-1) solid var(--color-border);
   text-align: left;
   font-size: var(--font-size-2);
-  font-weight: 600;
+  font-weight: var(--font-weight-strong);
   color: var(--color-muted-foreground);
 }
 
@@ -199,13 +202,13 @@ const keepersMigrateFor = (row: ComparisonRow): boolean =>
 .comparison-table__config {
   padding: var(--space-3);
   text-align: left;
-  font-weight: normal;
+  font-weight: var(--font-weight-regular);
   vertical-align: top;
 }
 
 .comparison-table__name {
   display: block;
-  font-weight: 600;
+  font-weight: var(--font-weight-strong);
 }
 
 .comparison-table__intent {

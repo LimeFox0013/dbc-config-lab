@@ -28,6 +28,9 @@
               rel="noopener noreferrer"
               class="replay-check__link"
             >{{ t('components.replayCheck.migratedSwaps', launch.migrated.swaps) }}</a>
+            <template v-if="launch.migrated.compounding">
+              {{ t('components.replayCheck.compounding') }}
+            </template>
           </template>
         </span>
         <code class="replay-check__command">{{ replayCommand(REPLAY_COMMAND, launch) }}</code>
@@ -37,8 +40,9 @@
 </template>
 
 <script setup lang="ts">
+import { SolanaNetwork } from '../../core/shared'
 import { useI18n } from 'vue-i18n'
-import { explorerAddressUrl, SolanaNetwork } from '../../core/config-deploy'
+import { explorerAddressUrl } from '../../core/config-deploy'
 import {
   REPLAY_COMMAND,
   REPLAYED_LAUNCHES,

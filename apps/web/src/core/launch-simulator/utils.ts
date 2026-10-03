@@ -16,10 +16,13 @@ import type {
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   FeeToken,
+  MS_PER_SECOND,
+  Q64_SHIFT,
   SIMULATED_ACTIVATION_TIMESTAMP,
   SLOT_DURATION_MS,
 } from './constants'
 import type { FeeShares } from './types'
+import { PERCENT } from '../shared'
 
 const zero = (): BN => new BN(0)
 
@@ -100,7 +103,7 @@ export const splitTradingFee = (
   referralFee: BN,
   creatorTradingFeePercentage: number,
 ): FeeShares => {
-  const creator = tradingFee.muln(creatorTradingFeePercentage).divn(100)
+  const creator = tradingFee.muln(creatorTradingFeePercentage).divn(PERCENT)
   return {
     partner: tradingFee.sub(creator),
     creator,
@@ -254,7 +257,7 @@ export const toInitialPool = (parameters: ConfigParameters): VirtualPool => ({
 export const pointAt = (seconds: number, activationType: number): BN =>
   new BN(
     activationType === ActivationType.Slot
-      ? Math.floor((seconds * 1000) / SLOT_DURATION_MS)
+      ? Math.floor((seconds * MS_PER_SECOND) / SLOT_DURATION_MS)
       : seconds,
   )
 
@@ -267,8 +270,6 @@ export const timestampAt = (seconds: number): BN =>
  * update_pre_swap / update_post_swap), ported so the dynamic fee can be replayed: the SDK
  * quotes from the stored tracker but does not advance it between swaps.
  */
-
-const Q64_SHIFT = 64
 
 /** Bins crossed between two sqrt prices, as the program counts them (times two, rounded down). */
 export const deltaBinId = (

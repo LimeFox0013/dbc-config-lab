@@ -4,6 +4,8 @@
  * field by typed readers (see document.ts) and rebuilt from those fields only, so unknown
  * keys never survive.
  */
+import type { Reader } from './types'
+import { isRecord } from '../../core/shared'
 export class ReadError extends Error {
   constructor(
     readonly path: string,
@@ -12,11 +14,6 @@ export class ReadError extends Error {
     super(`${path}: ${message}`)
   }
 }
-
-export type Reader<T> = (value: unknown, path: string) => T
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 export const finiteNumber: Reader<number> = (value, path) => {
   if (typeof value !== 'number' || !Number.isFinite(value))

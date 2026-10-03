@@ -9,12 +9,13 @@ import {
 import type { Connection } from '@solana/web3.js'
 import { CreatorService } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { CreatePoolWithFirstBuyParams } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { connectionFor, SolanaNetwork } from '../config-deploy'
+import { connectionFor } from '../config-deploy'
 import { compileLaunchConfig, LAUNCH_PRESETS } from '../launch-config'
 import type { LaunchConfig } from '../launch-config'
 import { quoteFirstBuy } from '../launch-simulator'
 import { QuoteToken, quoteUnitsFromSol } from '../quote-token'
 import { MetadataRejection, metadataRejection, preparePoolLaunch } from '.'
+import { SolanaNetwork } from '../shared'
 
 const preset = (id: string): LaunchConfig => {
   const found = LAUNCH_PRESETS.find((p) => p.id === id)

@@ -3,6 +3,7 @@ import type {
   RecommendRequest,
   RecommendResponse,
 } from '../features/recommendation'
+import { errorMessage } from '../core/shared'
 
 // The Solana SDKs read the Buffer global while their modules load, and static imports are
 // evaluated before this module's body — so the global is installed first and the
@@ -26,7 +27,7 @@ self.addEventListener(
       response = {
         id,
         ok: false,
-        reason: error instanceof Error ? error.message : String(error),
+        reason: errorMessage(error),
       }
     }
     self.postMessage(response)

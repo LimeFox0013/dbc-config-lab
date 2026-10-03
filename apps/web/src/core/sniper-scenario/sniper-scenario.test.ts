@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   BaseFeeMode,
   CollectFeeMode,
+  DammV2DynamicFeeMode,
+  MigratedCollectFeeMode,
+  MigrationFeeOption,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   compileLaunchConfig,
@@ -366,5 +369,46 @@ describe('arbitrage traders with an outside price', () => {
     expect(arbitrage.filter((o) => o.status === TradeStatus.Rejected)).toEqual(
       [],
     )
+  })
+})
+
+describe('compounding graduation pool', () => {
+  const compounding = (share: number) =>
+    compile({
+      ...DEFAULT_LAUNCH_CONFIG,
+      migration: {
+        ...DEFAULT_LAUNCH_CONFIG.migration,
+        migrationFeeOption: MigrationFeeOption.Customizable,
+        migratedPoolFee: {
+          collectFeeMode: MigratedCollectFeeMode.Compounding,
+          dynamicFee: DammV2DynamicFeeMode.Disabled,
+          poolFeeBps: 100,
+          compoundingFeeBps: share,
+        },
+      },
+    })
+  const hype = SCENARIO_PRESETS[ScenarioPresetId.Hype]
+
+  it('splits the graduated pool’s LP fees between payouts and compounding by the share', () => {
+    const half = scenarioMetrics(compounding(5000), hype, QuoteToken.Sol)
+    const all = scenarioMetrics(compounding(10_000), hype, QuoteToken.Sol)
+    expect(half.graduated).toBe(true)
+    expect(half.compoundedFees).toBeGreaterThan(0)
+    expect(half.compoundedFees).toBeCloseTo(half.postGraduationFees, 2)
+    expect(all.postGraduationFees).toBe(0)
+  })
+
+  it('leaves buyers a deeper pool to sell into than paying the fees out', () => {
+    const paidOut = scenarioMetrics(
+      compile(DEFAULT_LAUNCH_CONFIG),
+      hype,
+      QuoteToken.Sol,
+    )
+    const compounded = scenarioMetrics(
+      compounding(10_000),
+      hype,
+      QuoteToken.Sol,
+    )
+    expect(compounded.humanProfit).toBeGreaterThan(paidOut.humanProfit)
   })
 })

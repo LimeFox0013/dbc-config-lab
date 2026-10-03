@@ -80,6 +80,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatMultiple } from '../../core/shared'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -124,9 +125,6 @@ const layout = computed(() =>
   ),
 )
 
-const multipleFormat = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 3 })
-const formatMultiple = (value: number): string => multipleFormat.format(value)
-
 const lineClass = (line: ChartLine): string[] => [
   'price-chart__line',
   `price-chart__line--series-${line.color}`,
@@ -146,21 +144,19 @@ const legendText = (line: ChartLine): string =>
 </script>
 
 <style lang="scss">
+@use '../../styles/mixins';
+
 .price-chart {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   margin: 0;
-  padding: var(--space-4);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-surface);
-  color: var(--color-surface-foreground);
+  @include mixins.surface;
 }
 
 .price-chart__title {
   font-size: var(--font-size-3);
-  font-weight: 600;
+  font-weight: var(--font-weight-strong);
 }
 
 .price-chart__plot {

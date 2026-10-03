@@ -9,7 +9,7 @@ import type {
 
 export interface SelectOption {
   value: number
-  /** Locale key under `components.configEditor.options`. */
+  /** Locale key under `common.configOptions`. */
   labelKey: string
 }
 

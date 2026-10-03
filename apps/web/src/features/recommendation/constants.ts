@@ -48,5 +48,3 @@ export const GOAL_OBJECTIVES: Record<LaunchGoal, Objective> = {
 
 /** How many ranked proposals to show. */
 export const PROPOSAL_COUNT = 3
-
-export const RECOMMENDED_PRESET_ID = 'recommended'

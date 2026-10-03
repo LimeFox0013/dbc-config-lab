@@ -43,6 +43,8 @@ export enum EditorFieldId {
   FeeCollection = 'fee-collection',
   MigratedPoolFeeOption = 'migrated-pool-fee-option',
   MigratedPoolFee = 'migrated-pool-fee',
+  MigratedFeeCollection = 'migrated-fee-collection',
+  CompoundingShare = 'compounding-share',
   MigrationFee = 'migration-fee',
   PartnerLiquidity = 'partner-liquidity',
   PartnerLockedLiquidity = 'partner-locked-liquidity',
@@ -55,6 +57,9 @@ export enum DynamicFeeChoice {
   Off = 0,
   On = 1,
 }
+
+/** Share of the graduated pool's LP fees compounded when compounding is first chosen. */
+export const DEFAULT_COMPOUNDING_FEE_BPS = 5000
 
 /** Whether the pool creator's bundled first buy pays only the minimum base fee. */
 export enum FirstBuyFeeChoice {
@@ -81,8 +86,6 @@ export const LIMITS = {
 /** Applied to a customizable migrated pool when the user first picks that option. */
 export const DEFAULT_CUSTOM_MIGRATED_POOL_FEE_BPS = 100
 
-export const BPS_PER_PERCENT = 100
-
 /** Why an edit was not applied. */
 export enum EditRejection {
   NotANumber = 'not-a-number',
@@ -99,3 +102,6 @@ export const CURVE_SHAPE_ORDER = [
 ] as const
 
 export const WEIGHT_GROWTH_LIMITS = { min: 0.5, max: 2, step: 0.05 } as const
+
+/** Opening fee and window given to a flat fee when the user switches it to a falling one. */
+export const FALLING_FEE_DEFAULTS = { startingFeeBps: 5000, windowSeconds: 10 }

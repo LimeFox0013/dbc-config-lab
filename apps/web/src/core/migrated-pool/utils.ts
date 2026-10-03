@@ -7,12 +7,19 @@ import {
   CollectFeeMode as DammCollectFeeMode,
   cpAmmCoder,
   CURRENT_POOL_VERSION,
+  DEAD_LIQUIDITY,
+  getAmountsForModifyForCompoundingLiquidity,
+  getPoolCreationAmountAFromLiquidityDeltaForCompoundingLiquidity,
+  getPoolCreationAmountBFromLiquidityDeltaForCompoundingLiquidity,
+  getSqrtPriceFromAmountsForCompoundingLiquidity,
   MAX_SQRT_PRICE,
   getAmountAFromLiquidityDelta,
   getAmountBFromLiquidityDelta,
   MIN_SQRT_PRICE,
   PoolStatus,
   Rounding,
+  sqrt,
+  U128_MAX,
 } from '@meteora-ag/cp-amm-sdk'
 import {
   ActivationType,
@@ -35,7 +42,12 @@ import {
   MIGRATED_REFERRAL_FEE_PERCENT,
   PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS,
 } from './constants'
-import { isEnumValue } from '../shared'
+import {
+  isEnumValue,
+  PERCENT,
+  PRICE_X128_SHIFT,
+  quoteValueAtSqrtPrice,
+} from '../shared'
 import type { MigratedPool, PulledLiquidity } from './types'
 
 const zero = (): BN => new BN(0)
@@ -74,6 +86,135 @@ const flatBaseFeeData = (feeBps: number): number[] => [
   }),
 ]
 
+const ceilDiv = (numerator: BN, denominator: BN): BN => {
+  const { div, mod } = numerator.divmod(denominator)
+  return mod.isZero() ? div : div.addn(1)
+}
+
+/** The quote the curve hands over at graduation: the threshold less the migration fee. */
+const migratedQuoteOf = (
+  parameters: ConfigParameters,
+  config: PoolConfig,
+): BN =>
+  new BN(
+    getMigrationQuoteAmountFromMigrationQuoteThreshold(
+      new Decimal(config.migrationQuoteThreshold.toString()),
+      parameters.migrationFee.feePercentage,
+    )
+      .floor()
+      .toFixed(),
+  )
+
+/** The program's protocol share of a migrated amount, rounded down. */
+const protocolShare = (amount: BN): BN =>
+  amount.muln(PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS).divn(MAX_BASIS_POINT)
+
+/** Partner's and creator's shares of `liquidity`, split and rounded as the program splits them. */
+const liquidityShares = (
+  parameters: ConfigParameters,
+  liquidity: BN,
+): { partner: BN; creator: BN } => {
+  const share = (percentage: number): BN =>
+    liquidity.muln(percentage).divn(PERCENT)
+  const partner = share(parameters.partnerLiquidityPercentage)
+    .add(share(parameters.partnerPermanentLockedLiquidityPercentage))
+    .add(share(parameters.partnerLiquidityVestingInfo.vestingPercentage))
+  return { partner, creator: liquidity.sub(partner) }
+}
+
+/** The reserves, liquidity and price of a compounding pool. */
+interface CompoundingState {
+  tokenAAmount: BN
+  tokenBAmount: BN
+  liquidity: BN
+  sqrtPrice: BN
+}
+
+/**
+ * The compounding (constant-product) DAMM v2 pool the DBC program opens at graduation
+ * (migration_handler/compounding_liquidity.rs and migrate_damm_v2_initialize_pool.rs):
+ * the base for the migrated quote at the migration price, both less the program's protocol
+ * share; a pool opened with the larger of partner's and creator's liquidity plus the locked
+ * dead liquidity; then the other share added from what is left.
+ */
+const compoundingMigratedState = (
+  parameters: ConfigParameters,
+  config: PoolConfig,
+): CompoundingState => {
+  const quoteThreshold = migratedQuoteOf(parameters, config)
+  const migrationPriceX128 = config.migrationSqrtPrice.mul(
+    config.migrationSqrtPrice,
+  )
+  const baseThreshold = ceilDiv(
+    quoteThreshold.shln(PRICE_X128_SHIFT),
+    migrationPriceX128,
+  )
+  const base = baseThreshold.sub(protocolShare(baseThreshold))
+  const quote = quoteThreshold.sub(protocolShare(quoteThreshold))
+
+  const sqrtPrice = sqrt(ceilDiv(quote.shln(PRICE_X128_SHIFT), base))
+  const totalLiquidity = sqrt(quote.shln(PRICE_X128_SHIFT).div(base)).mul(base)
+  const { partner, creator } = liquidityShares(
+    parameters,
+    totalLiquidity.sub(DEAD_LIQUIDITY),
+  )
+  const first = (partner.gt(creator) ? partner : creator).add(DEAD_LIQUIDITY)
+  const tokenA =
+    getPoolCreationAmountAFromLiquidityDeltaForCompoundingLiquidity(
+      sqrtPrice,
+      first,
+    )
+  const tokenB =
+    getPoolCreationAmountBFromLiquidityDeltaForCompoundingLiquidity(
+      sqrtPrice,
+      first,
+    )
+  const second = BN.min(
+    base.sub(tokenA).mul(first).div(tokenA),
+    quote.sub(tokenB).mul(first).div(tokenB),
+  )
+  const [addedA, addedB] = getAmountsForModifyForCompoundingLiquidity(
+    tokenA,
+    tokenB,
+    first,
+    second,
+    Rounding.Up,
+  )
+  return {
+    tokenAAmount: tokenA.add(addedA),
+    tokenBAmount: tokenB.add(addedB),
+    liquidity: first.add(second),
+    sqrtPrice: getSqrtPriceFromAmountsForCompoundingLiquidity(
+      tokenA.add(addedA),
+      tokenB.add(addedB),
+    ),
+  }
+}
+
+/** The full-range concentrated pool the DBC program opens for the other fee modes. */
+const concentratedMigratedState = (
+  parameters: ConfigParameters,
+  config: PoolConfig,
+): CompoundingState => {
+  const migratedQuote = migratedQuoteOf(parameters, config)
+  const quoteAmount = migratedQuote.sub(protocolShare(migratedQuote))
+  const sqrtPrice = config.migrationSqrtPrice
+  return {
+    liquidity: getInitialLiquidityFromDeltaQuote(
+      quoteAmount,
+      MIN_SQRT_PRICE,
+      sqrtPrice,
+    ),
+    sqrtPrice,
+    tokenAAmount: getMigrationBaseToken(
+      quoteAmount,
+      sqrtPrice,
+      MigrationOption.MET_DAMM_V2,
+    ),
+    tokenBAmount: quoteAmount,
+  }
+}
+
 /**
  * The DAMM v2 pool the DBC program opens at graduation: full price range, priced at the
  * migration price, with liquidity from the migrated quote — the threshold minus the
@@ -83,35 +224,15 @@ export const toMigratedPool = (
   parameters: ConfigParameters,
   config: PoolConfig,
 ): MigratedPool => {
-  const migratedQuote = new BN(
-    getMigrationQuoteAmountFromMigrationQuoteThreshold(
-      new Decimal(config.migrationQuoteThreshold.toString()),
-      parameters.migrationFee.feePercentage,
-    )
-      .floor()
-      .toFixed(),
-  )
-  const quoteAmount = migratedQuote.sub(
-    migratedQuote
-      .muln(PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS)
-      .divn(MAX_BASIS_POINT),
-  )
-  const sqrtPrice = config.migrationSqrtPrice
-  const liquidity = getInitialLiquidityFromDeltaQuote(
-    quoteAmount,
-    MIN_SQRT_PRICE,
-    sqrtPrice,
-  )
-  const baseAmount = getMigrationBaseToken(
-    quoteAmount,
-    sqrtPrice,
-    MigrationOption.MET_DAMM_V2,
-  )
   const mode = parameters.migratedPoolFee.collectFeeMode
   const feeBps = migratedFeeBps(parameters)
   if (!isMigratedCollectFeeMode(mode) || feeBps === null)
     throw new Error('Unsupported migrated pool fee settings')
   const collectFeeMode = COLLECT_FEE_MODE[mode]
+  const compounding = mode === MigratedCollectFeeMode.Compounding
+  const opened = compounding
+    ? compoundingMigratedState(parameters, config)
+    : concentratedMigratedState(parameters, config)
 
   return {
     poolFees: {
@@ -123,7 +244,7 @@ export const toMigratedPool = (
       padding0: 0,
       referralFeePercent: MIGRATED_REFERRAL_FEE_PERCENT,
       padding1: [0, 0, 0],
-      compoundingFeeBps: 0,
+      compoundingFeeBps: compounding ? parameters.compoundingFeeBps : 0,
       dynamicFee: {
         initialized: 0,
         padding: [0, 0, 0, 0, 0, 0, 0],
@@ -139,7 +260,7 @@ export const toMigratedPool = (
         volatilityAccumulator: zero(),
         volatilityReference: zero(),
       },
-      initSqrtPrice: sqrtPrice,
+      initSqrtPrice: opened.sqrtPrice,
     },
     tokenAMint: PublicKey.default,
     tokenBMint: PublicKey.default,
@@ -147,15 +268,16 @@ export const toMigratedPool = (
     tokenBVault: PublicKey.default,
     whitelistedVault: PublicKey.default,
     padding0: new Array(32).fill(0),
-    liquidity,
+    liquidity: opened.liquidity,
     padding1: zero(),
     protocolAFee: zero(),
     protocolBFee: zero(),
     deadLiquidityFeeCheckpoint: zero(),
     padding2: new Array(8).fill(0),
-    sqrtMinPrice: MIN_SQRT_PRICE,
-    sqrtMaxPrice: MAX_SQRT_PRICE,
-    sqrtPrice,
+    // A compounding pool has no price range: the SDK's own initial pool uses 0..U128_MAX.
+    sqrtMinPrice: compounding ? zero() : MIN_SQRT_PRICE,
+    sqrtMaxPrice: compounding ? U128_MAX : MAX_SQRT_PRICE,
+    sqrtPrice: opened.sqrtPrice,
     activationPoint: zero(),
     activationType: ActivationType.Timestamp,
     poolStatus: PoolStatus.Enable,
@@ -178,8 +300,8 @@ export const toMigratedPool = (
       padding: zero(),
     },
     creator: PublicKey.default,
-    tokenAAmount: baseAmount,
-    tokenBAmount: quoteAmount,
+    tokenAAmount: opened.tokenAAmount,
+    tokenBAmount: opened.tokenBAmount,
     layoutVersion: 0,
     padding4: new Array(7).fill(0),
     padding5: [zero(), zero(), zero()],
@@ -187,35 +309,36 @@ export const toMigratedPool = (
   }
 }
 
-const PERCENT = 100
-
 /**
  * The part of the migrated pool's liquidity nobody can withdraw at graduation: the
  * permanently locked and vesting shares of partner and creator, each rounded down as the
- * program splits it (config.rs, get_liquidity_distribution). Vesting liquidity unlocks
- * after its cliff, which is later than any scenario runs.
+ * program splits it (config.rs, get_liquidity_distribution), plus — in a compounding pool —
+ * the dead liquidity locked at creation. Vesting liquidity unlocks after its cliff, which
+ * is later than any scenario runs.
  */
 export const lockedLiquidity = (
   parameters: ConfigParameters,
   liquidity: BN,
-): BN =>
-  [
+  compounding = false,
+): BN => {
+  const distributable = compounding ? liquidity.sub(DEAD_LIQUIDITY) : liquidity
+  return [
     parameters.partnerPermanentLockedLiquidityPercentage,
     parameters.creatorPermanentLockedLiquidityPercentage,
     parameters.partnerLiquidityVestingInfo.vestingPercentage,
     parameters.creatorLiquidityVestingInfo.vestingPercentage,
   ].reduce(
-    (total, percentage) => total.add(liquidity.muln(percentage).divn(PERCENT)),
-    zero(),
+    (total, percentage) =>
+      total.add(distributable.muln(percentage).divn(PERCENT)),
+    compounding ? DEAD_LIQUIDITY : zero(),
   )
+}
 
 /** Percent of the graduation pool's liquidity that is neither locked nor vesting. */
 export const pullableLiquidityPercent = (
   parameters: ConfigParameters,
 ): number =>
   parameters.partnerLiquidityPercentage + parameters.creatorLiquidityPercentage
-
-const Q128_SHIFT = 128
 
 /**
  * Withdraws everything not locked or vesting: the pool left behind, and what the withdrawal
@@ -225,46 +348,59 @@ export const withUnlockedLiquidityPulled = (
   parameters: ConfigParameters,
   pool: MigratedPool,
 ): { pool: MigratedPool; pulled: PulledLiquidity } => {
-  const kept = lockedLiquidity(parameters, pool.liquidity)
+  const compounding = pool.collectFeeMode === DammCollectFeeMode.Compounding
+  const kept = lockedLiquidity(parameters, pool.liquidity, compounding)
   const delta = pool.liquidity.sub(kept)
-  const base = getAmountAFromLiquidityDelta(
-    pool.sqrtPrice,
-    pool.sqrtMaxPrice,
-    delta,
-    Rounding.Down,
-    pool.collectFeeMode,
-  )
-  const quote = getAmountBFromLiquidityDelta(
-    pool.sqrtMinPrice,
-    pool.sqrtPrice,
-    delta,
-    Rounding.Down,
-    pool.collectFeeMode,
-  )
-  const baseValue = base
-    .mul(pool.sqrtPrice)
-    .mul(pool.sqrtPrice)
-    .shrn(Q128_SHIFT)
+  // A compounding pool pays out its reserves pro rata; a concentrated one along its range.
+  const [base, quote] = compounding
+    ? getAmountsForModifyForCompoundingLiquidity(
+        pool.tokenAAmount,
+        pool.tokenBAmount,
+        pool.liquidity,
+        delta,
+        Rounding.Down,
+      )
+    : [
+        getAmountAFromLiquidityDelta(
+          pool.sqrtPrice,
+          pool.sqrtMaxPrice,
+          delta,
+          Rounding.Down,
+          pool.collectFeeMode,
+        ),
+        getAmountBFromLiquidityDelta(
+          pool.sqrtMinPrice,
+          pool.sqrtPrice,
+          delta,
+          Rounding.Down,
+          pool.collectFeeMode,
+        ),
+      ]
+  const baseValue = quoteValueAtSqrtPrice(base, pool.sqrtPrice)
   return {
-    pool: { ...pool, liquidity: kept },
+    pool: {
+      ...pool,
+      liquidity: kept,
+      ...(compounding
+        ? {
+            tokenAAmount: pool.tokenAAmount.sub(base),
+            tokenBAmount: pool.tokenBAmount.sub(quote),
+          }
+        : {}),
+    },
     pulled: { base, quote, value: quote.add(baseValue) },
   }
 }
 
 /**
- * Why the post-graduation pool cannot be simulated exactly, or null. Compounding liquidity
- * and the DAMM v2 dynamic fee change pool state in ways this model does not replay.
+ * Why the post-graduation pool cannot be simulated exactly, or null. The DAMM v2 dynamic
+ * fee changes pool state in a way this model does not replay.
  */
 export const migratedUnsupportedReason = (
   parameters: ConfigParameters,
 ): string | null => {
   if (parameters.migrationOption !== MigrationOption.MET_DAMM_V2)
     return 'Only DAMM v2 migration is simulated'
-  if (
-    parameters.migratedPoolFee.collectFeeMode ===
-    MigratedCollectFeeMode.Compounding
-  )
-    return 'Compounding fees on the migrated pool are not simulated'
   if (parameters.migratedPoolFee.dynamicFee !== DammV2DynamicFeeMode.Disabled)
     return 'Dynamic fee on the migrated pool is not simulated'
   if (migratedFeeBps(parameters) === null) return 'Unknown migration fee option'

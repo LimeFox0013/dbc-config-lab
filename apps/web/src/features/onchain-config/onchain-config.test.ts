@@ -3,7 +3,7 @@ import { Keypair, PublicKey } from '@solana/web3.js'
 import type { AccountInfo } from '@solana/web3.js'
 import { DYNAMIC_BONDING_CURVE_PROGRAM_ID } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { connectionFor, SolanaNetwork } from '../../core/config-deploy'
+import { connectionFor } from '../../core/config-deploy'
 import {
   compileLaunchConfig,
   CurveShape,
@@ -22,6 +22,7 @@ import {
 import { loadOnChainConfig, LoadRejection } from '.'
 import { QUOTE_TOKENS, QuoteToken } from '../../core/quote-token'
 import { configAccountData, poolAccountData } from '../../testing/dbc-accounts'
+import { SolanaNetwork } from '../../core/shared'
 
 const compile = (config: LaunchConfig): ConfigParameters => {
   const compiled = compileLaunchConfig(config)

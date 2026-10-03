@@ -1,4 +1,4 @@
-export { SCENARIO_LIMITS } from './constants'
+export { EntryIdPrefix, SCENARIO_LIMITS } from './constants'
 export type {
   ComparisonEntry,
   ComparisonMetrics,
@@ -7,10 +7,7 @@ export type {
 } from './types'
 export {
   compareConfigs,
-  formatPercentChange,
-  formatShare,
-  formatSol,
-  formatSolChange,
+  parametersEntry,
   presetEntry,
   pricePath,
   sanitizeScenario,

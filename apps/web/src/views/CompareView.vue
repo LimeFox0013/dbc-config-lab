@@ -21,16 +21,28 @@
       :scenario="scenario"
       @use="addUserPreset"
     />
+    <PresetCatalog
+      :scenario="scenario"
+      @adopt="editCopy"
+      @compare="addOnChain"
+    />
+    <LaunchpadEconomics @compare="addOnChain" />
     <ConfigEditor
+      ref="editor"
       :presets="presets"
       @add="addUserPreset"
     />
     <OnChainLoader @load="addOnChain" />
+    <ClonePanel
+      :originals="onChain"
+      @add="addClone"
+    />
     <ComparisonTable :rows="rows" />
+    <IncomeForecast :entries="entries" />
     <PriceChart :rows="rows" />
     <DeployPanel
-      :presets="presets"
-      :initial-preset-id="ownPresetId"
+      :targets="deployTargets"
+      :initial-target-id="ownPresetId"
     />
     <p class="compare-view__caveat">
       {{ t('views.compare.caveat') }}
@@ -39,27 +51,31 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ClonePanel } from '../components/ClonePanel'
 import { ComparisonTable } from '../components/ComparisonTable'
 import { ConfigEditor } from '../components/ConfigEditor'
 import { DeployPanel } from '../components/DeployPanel'
+import { IncomeForecast } from '../components/IncomeForecast'
+import { LaunchpadEconomics } from '../components/LaunchpadEconomics'
 import { OnChainLoader } from '../components/OnChainLoader'
+import { PresetCatalog } from '../components/PresetCatalog'
 import { PriceChart } from '../components/PriceChart'
 import { RecommenderPanel } from '../components/RecommenderPanel'
 import { ReplayCheck } from '../components/ReplayCheck'
 import { ScenarioControls } from '../components/ScenarioControls'
-import { LAUNCH_PRESETS } from '../core/launch-config'
+import { LAUNCH_PRESETS, UserPresetId } from '../core/launch-config'
 import type { LaunchPreset } from '../core/launch-config'
 import { DEFAULT_SCENARIO } from '../core/sniper-scenario'
 import type { ScenarioSpec } from '../core/sniper-scenario'
 import { ActivationType } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { SLOT_DURATION_MS } from '../core/launch-simulator'
-import { compareConfigs, presetEntry } from '../features/comparison'
+import { compareConfigs, EntryIdPrefix, parametersEntry, presetEntry } from '../features/comparison'
 import type { ComparisonEntry } from '../features/comparison'
 import type { OnChainConfig } from '../features/onchain-config'
 import { decodeSharedConfig, sharedFromHash } from '../features/config-sharing'
-import { ADDRESS_EDGE, SHARED_PRESET_ID } from './constants'
+import { shortAddress } from '../core/shared'
 
 const { t } = useI18n()
 const scenario = ref<ScenarioSpec>(DEFAULT_SCENARIO)
@@ -69,8 +85,14 @@ const addUserPreset = (preset: LaunchPreset): void => {
   userPresets.value = [preset, ...userPresets.value.filter((p) => p.id !== preset.id)]
 }
 const presets = computed(() => [...userPresets.value, ...LAUNCH_PRESETS])
+
+const editor = useTemplateRef<InstanceType<typeof ConfigEditor>>('editor')
+/** Opens a copy of a catalogue preset in the editor and brings the editor into view. */
+const editCopy = (preset: LaunchPreset): void => {
+  editor.value?.editCopyOf(preset.id)
+}
 /** The deploy panel starts on the first config that did not arrive through a shared link. */
-const ownPresetId = computed(() => presets.value.find((p) => p.id !== SHARED_PRESET_ID)?.id ?? '')
+const ownPresetId = computed(() => presets.value.find((p) => p.id !== UserPresetId.Shared)?.id ?? '')
 
 /** A config opened from a shared link joins the comparison; a refused link says why. */
 const sharedNotice = ref<string | null>(null)
@@ -83,7 +105,7 @@ const openShared = (): void => {
     return
   }
   addUserPreset({
-    id: SHARED_PRESET_ID,
+    id: UserPresetId.Shared,
     name: t('views.compare.sharedName', { name: result.shared.name ?? t('views.compare.sharedDefaultName') }),
     intent: t('views.compare.sharedIntent'),
     config: result.shared.config,
@@ -92,27 +114,36 @@ const openShared = (): void => {
 openShared()
 /** Configs read from chain: compared and simulated, never edited or redeployed. */
 const onChain = ref<OnChainConfig[]>([])
-const onChainId = (loaded: OnChainConfig): string => `on-chain:${loaded.network}:${loaded.configAddress}`
+const onChainId = (loaded: OnChainConfig): string => `${EntryIdPrefix.OnChain}:${loaded.network}:${loaded.configAddress}`
 const addOnChain = (loaded: OnChainConfig): void => {
   onChain.value = [loaded, ...onChain.value.filter((c) => onChainId(c) !== onChainId(loaded))]
 }
 
-const shortAddress = (address: string): string => `${address.slice(0, ADDRESS_EDGE)}…${address.slice(-ADDRESS_EDGE)}`
+const onChainEntry = (loaded: OnChainConfig): ComparisonEntry =>
+  parametersEntry(
+    {
+      id: onChainId(loaded),
+      name: t('views.compare.onChainName', { address: shortAddress(loaded.configAddress), network: loaded.network }),
+      intent: [
+        t('views.compare.onChainIntent'),
+        ...(loaded.poolAddress ? [t('views.compare.onChainFromPool', { pool: shortAddress(loaded.poolAddress) })] : []),
+        ...(loaded.parameters.activationType === ActivationType.Slot ?
+            [t('views.compare.onChainSlots', { ms: SLOT_DURATION_MS })] :
+            []),
+      ].join(' '),
+    },
+    loaded.parameters,
+    loaded.quoteToken,
+  )
 
-const onChainEntry = (loaded: OnChainConfig): ComparisonEntry => ({
-  id: onChainId(loaded),
-  name: t('views.compare.onChainName', { address: shortAddress(loaded.configAddress), network: loaded.network }),
-  intent: [
-    t('views.compare.onChainIntent'),
-    ...(loaded.poolAddress ? [t('views.compare.onChainFromPool', { pool: shortAddress(loaded.poolAddress) })] : []),
-    ...(loaded.parameters.activationType === ActivationType.Slot ?
-        [t('views.compare.onChainSlots', { ms: SLOT_DURATION_MS })] :
-        []),
-  ].join(' '),
-  compiled: { ok: true, parameters: loaded.parameters, quoteToken: loaded.quoteToken },
-})
+/** Clones of real configs: owned by the user, so deployable; a new clone of the same original replaces the old. */
+const clones = ref<ComparisonEntry[]>([])
+const addClone = (entry: ComparisonEntry): void => {
+  clones.value = [entry, ...clones.value.filter((c) => c.id !== entry.id)]
+}
 
-const entries = computed(() => [...presets.value.map(presetEntry), ...onChain.value.map(onChainEntry)])
+const deployTargets = computed(() => [...clones.value, ...presets.value.map(presetEntry)])
+const entries = computed(() => [...deployTargets.value, ...onChain.value.map(onChainEntry)])
 const rows = computed(() => compareConfigs(entries.value, scenario.value))
 </script>
 

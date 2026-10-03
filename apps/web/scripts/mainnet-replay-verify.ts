@@ -20,7 +20,9 @@ import {
   getSwapResultFromExactInput,
   getSwapResultFromExactOutput,
   getSwapResultFromPartialInput,
+  CollectFeeMode as MigratedCollectFeeMode,
   getAmountAFromLiquidityDelta,
+  getAmountsForModifyForCompoundingLiquidity,
   getAmountBFromLiquidityDelta,
   Rounding,
   TradeDirection as MigratedTradeDirection,
@@ -40,17 +42,19 @@ import type {
   SwapQuote2Result,
   VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { connectionFor, SolanaNetwork } from '../src/core/config-deploy'
-import { toMigratedPool } from '../src/core/migrated-pool'
+import { connectionFor } from '../src/core/config-deploy'
+import { afterMigratedSwap, toMigratedPool } from '../src/core/migrated-pool'
 import type { MigratedPool } from '../src/core/migrated-pool'
 import { readOnChainConfig } from '../src/features/onchain-config'
+import { errorMessage, isRecord, SolanaNetwork } from '../src/core/shared'
+import { sleep } from './utils'
 import {
   nextQuoteReserve,
   toInitialPool,
   toPoolConfig,
   trackerAfterSwap,
   trackerBeforeSwap,
-} from '../src/core/launch-simulator/utils'
+} from '../src/core/launch-simulator'
 
 const SIGNATURE_PAGE = 1000
 const MAX_SIGNATURES = 5000
@@ -85,11 +89,6 @@ enum SwapMode {
   PartialFill = 1,
   ExactOut = 2,
 }
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const field = (value: unknown, key: string): unknown =>
   isRecord(value) ? value[key] : undefined
@@ -379,9 +378,36 @@ const replayMigratedPool = async (
   const mismatches: string[] = []
   let state = pool
   let chainLiquidity: BN | null = null
+  /** Token A and B reserves after the latest recorded event (compounding pools). */
+  let chainReserves: [BN, BN] | null = null
+  let chainOpeningPrice: BN | null = null
+  const compounding = pool.collectFeeMode === MigratedCollectFeeMode.Compounding
   let opened = false
   let swaps = 0
   let liquidityChanges = 0
+
+  /** The pool the migration opened, checked before anything trades on it. */
+  const checkOpening = () => {
+    opened = true
+    if (!chainLiquidity || !state.liquidity.eq(chainLiquidity))
+      mismatches.push(
+        `migrated pool liquidity after migration: simulated ${state.liquidity} on-chain ${chainLiquidity ?? 'missing'}`,
+      )
+    if (compounding) {
+      const opening: Array<[string, BN, BN | null]> = [
+        ['reserveA', state.tokenAAmount, chainReserves?.[0] ?? null],
+        ['reserveB', state.tokenBAmount, chainReserves?.[1] ?? null],
+        ['sqrtPrice', state.sqrtPrice, chainOpeningPrice],
+      ]
+      opening
+        .filter(([, ours, chain]) => !chain || !ours.eq(chain))
+        .forEach(([name, ours, chain]) =>
+          mismatches.push(
+            `migrated pool ${name} after migration: simulated ${ours} on-chain ${chain ?? 'missing'}`,
+          ),
+        )
+    }
+  }
 
   for (const signature of signatures) {
     await sleep(REQUEST_GAP_MS)
@@ -394,6 +420,11 @@ const replayMigratedPool = async (
     for (const event of events) {
       if (event.name === MIGRATED_INIT_EVENT) {
         chainLiquidity = bnField(event.data, 'liquidity')
+        chainReserves = [
+          bnField(event.data, 'token_a_amount'),
+          bnField(event.data, 'token_b_amount'),
+        ]
+        chainOpeningPrice = bnField(event.data, 'sqrt_price')
         state = {
           ...state,
           activationPoint: bnField(event.data, 'activation_point'),
@@ -407,35 +438,43 @@ const replayMigratedPool = async (
             ? delta.neg()
             : delta
         chainLiquidity = (chainLiquidity ?? new BN(0)).add(signed)
+        const reservesAfter: [BN, BN] = [
+          bnField(event.data, 'reserve_a_amount'),
+          bnField(event.data, 'reserve_b_amount'),
+        ]
         // Liquidity added inside the migration itself is part of what the simulator models.
         if (opened) {
           liquidityChanges++
-          // Amounts for this change at the pool's current price, rounded as the program does:
-          // down when paying out a removal, up when collecting a deposit.
+          // Amounts for this change at the pool's current state, rounded as the program
+          // does: down when paying out a removal, up when collecting a deposit.
           const rounding = signed.isNeg() ? Rounding.Down : Rounding.Up
+          const [ourA, ourB] = compounding
+            ? getAmountsForModifyForCompoundingLiquidity(
+                state.tokenAAmount,
+                state.tokenBAmount,
+                state.liquidity,
+                delta,
+                rounding,
+              )
+            : [
+                getAmountAFromLiquidityDelta(
+                  state.sqrtPrice,
+                  state.sqrtMaxPrice,
+                  delta,
+                  rounding,
+                  state.collectFeeMode,
+                ),
+                getAmountBFromLiquidityDelta(
+                  state.sqrtMinPrice,
+                  state.sqrtPrice,
+                  delta,
+                  rounding,
+                  state.collectFeeMode,
+                ),
+              ]
           const amounts: Array<[string, BN, BN]> = [
-            [
-              'tokenA',
-              getAmountAFromLiquidityDelta(
-                state.sqrtPrice,
-                state.sqrtMaxPrice,
-                delta,
-                rounding,
-                state.collectFeeMode,
-              ),
-              bnField(event.data, 'token_a_amount'),
-            ],
-            [
-              'tokenB',
-              getAmountBFromLiquidityDelta(
-                state.sqrtMinPrice,
-                state.sqrtPrice,
-                delta,
-                rounding,
-                state.collectFeeMode,
-              ),
-              bnField(event.data, 'token_b_amount'),
-            ],
+            ['tokenA', ourA, bnField(event.data, 'token_a_amount')],
+            ['tokenB', ourB, bnField(event.data, 'token_b_amount')],
           ]
           amounts
             .filter(([, ours, chain]) => !ours.eq(chain))
@@ -444,11 +483,23 @@ const replayMigratedPool = async (
                 `liquidity change ${liquidityChanges} (${signature.slice(0, 12)}…) ${name}: simulated ${ours} on-chain ${chain}`,
               ),
             )
-          state = { ...state, liquidity: state.liquidity.add(signed) }
+          state = {
+            ...state,
+            liquidity: state.liquidity.add(signed),
+            ...(compounding
+              ? {
+                  tokenAAmount: reservesAfter[0],
+                  tokenBAmount: reservesAfter[1],
+                }
+              : {}),
+          }
         }
+        chainReserves = reservesAfter
         continue
       }
       if (event.name !== MIGRATED_SWAP_EVENT) continue
+      // A swap in the migration transaction itself trades on the pool just opened.
+      if (opensHere && !opened) checkOpening()
 
       swaps++
       const point = bnField(event.data, 'current_timestamp')
@@ -458,6 +509,11 @@ const replayMigratedPool = async (
         const pairs: Array<[string, BN, BN]> = [
           ['claimingFee', quote.claimingFee, bnField(recorded, 'claiming_fee')],
           ['protocolFee', quote.protocolFee, bnField(recorded, 'protocol_fee')],
+          [
+            'compoundingFee',
+            quote.compoundingFee,
+            bnField(recorded, 'compounding_fee'),
+          ],
           ['referralFee', quote.referralFee, bnField(recorded, 'referral_fee')],
           [
             'outputAmount',
@@ -479,20 +535,58 @@ const replayMigratedPool = async (
           )
       } catch (error) {
         mismatches.push(
-          `migrated swap ${swaps} (${signature.slice(0, 12)}…): quote failed (${error instanceof Error ? error.message : String(error)})`,
+          `migrated swap ${swaps} (${signature.slice(0, 12)}…): quote failed (${errorMessage(error)})`,
         )
       }
-      // Continue from the chain's own price so one mismatch cannot cascade.
-      state = { ...state, sqrtPrice: bnField(recorded, 'next_sqrt_price') }
+      const reservesAfter: [BN, BN] = [
+        bnField(event.data, 'reserve_a_amount'),
+        bnField(event.data, 'reserve_b_amount'),
+      ]
+      if (compounding) {
+        try {
+          const quote = migratedQuoteFor(state, event.data, point)
+          const direction =
+            numberField(event.data, 'trade_direction') ===
+            MigratedTradeDirection.AtoB
+              ? MigratedTradeDirection.AtoB
+              : MigratedTradeDirection.BtoA
+          const after = afterMigratedSwap(state, {
+            quote,
+            feesOnBaseToken: false,
+            feeMode: getMigratedFeeMode(
+              state.collectFeeMode,
+              direction,
+              field(event.data, 'has_referral') === true,
+            ),
+            direction,
+          })
+          const reserves: Array<[string, BN, BN]> = [
+            ['reserveA', after.tokenAAmount, reservesAfter[0]],
+            ['reserveB', after.tokenBAmount, reservesAfter[1]],
+          ]
+          reserves
+            .filter(([, ours, chain]) => !ours.eq(chain))
+            .forEach(([name, ours, chain]) =>
+              mismatches.push(
+                `migrated swap ${swaps} (${signature.slice(0, 12)}…) ${name}: simulated ${ours} on-chain ${chain}`,
+              ),
+            )
+        } catch {
+          // The quote failure is already recorded above.
+        }
+      }
+      // Continue from the chain's own state so one mismatch cannot cascade.
+      state = {
+        ...state,
+        sqrtPrice: bnField(recorded, 'next_sqrt_price'),
+        ...(compounding
+          ? { tokenAAmount: reservesAfter[0], tokenBAmount: reservesAfter[1] }
+          : {}),
+      }
+      chainReserves = reservesAfter
     }
 
-    if (opensHere) {
-      opened = true
-      if (!chainLiquidity || !state.liquidity.eq(chainLiquidity))
-        mismatches.push(
-          `migrated pool liquidity after migration: simulated ${state.liquidity} on-chain ${chainLiquidity ?? 'missing'}`,
-        )
-    }
+    if (opensHere && !opened) checkOpening()
   }
   if (!opened)
     mismatches.push('migration transaction not found in the pool history')
@@ -592,7 +686,7 @@ const main = async () => {
         quote = quoteFor(before, config, event, point)
       } catch (error) {
         mismatches.push(
-          `swap ${swaps} (${signature.slice(0, 12)}…) ${event.name}: quote failed (${error instanceof Error ? error.message : String(error)}) at simulated sqrt price ${state.sqrtPrice}`,
+          `swap ${swaps} (${signature.slice(0, 12)}…) ${event.name}: quote failed (${errorMessage(error)}) at simulated sqrt price ${state.sqrtPrice}`,
         )
       }
       if (quote) {
@@ -687,6 +781,6 @@ const main = async () => {
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error)
+  console.error(errorMessage(error))
   process.exitCode = 1
 })

@@ -21,6 +21,3 @@ export const PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS = 20
 /** DAMM v2 protocol and referral shares of a trading fee, in percent. */
 export const MIGRATED_PROTOCOL_FEE_PERCENT = 20
 export const MIGRATED_REFERRAL_FEE_PERCENT = 20
-
-/** Every quote here is priced in SOL. */
-export const QUOTE_DECIMALS = 9

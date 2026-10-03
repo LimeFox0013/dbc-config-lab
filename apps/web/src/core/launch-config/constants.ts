@@ -74,3 +74,32 @@ export const DEFAULT_LAUNCH_CONFIG: LaunchConfig = {
 
 /** Stand-in leftover receiver for validation; the real one is the deployer's wallet. */
 export const VALIDATION_LEFTOVER_RECEIVER = new PublicKey(1)
+
+/** Segment count and default growth for liquidity-weighted curves. */
+export const LIQUIDITY_WEIGHT_SEGMENTS = 16
+export const DEFAULT_WEIGHT_GROWTH = 1.1
+
+/** Two-segment and weighted builders need a non-zero leftover buffer; 0.1% of a 1B supply. */
+export const MIN_SHAPED_CURVE_LEFTOVER = 1_000_000
+
+/** Market caps (in the quote token; SOL here) at which every shape graduates near the 85 SOL standard baseline. */
+export const DEFAULT_MARKET_CAPS = {
+  initialMarketCap: 20,
+  migrationMarketCap: 425,
+} as const
+
+/** The built-in presets. */
+export enum LaunchPresetId {
+  Flat = 'flat',
+  SniperShield = 'sniper-shield',
+  SoftOpen = 'soft-open',
+  LongTax = 'long-tax',
+  StockListing = 'stock-listing',
+}
+
+/** Configs the user made rather than picked: edited, opened from a link, or recommended. */
+export enum UserPresetId {
+  Custom = 'custom',
+  Shared = 'shared',
+  Recommended = 'recommended',
+}

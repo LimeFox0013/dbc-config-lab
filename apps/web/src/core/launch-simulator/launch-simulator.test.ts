@@ -119,11 +119,12 @@ describe('simulateLaunch', () => {
 
   it('refuses post-graduation trades on a migrated pool it cannot reproduce, with a reason', () => {
     const parameters = compile(DEFAULT_LAUNCH_CONFIG)
-    const compounding = {
+    // The DAMM v2 dynamic fee on the migrated pool is not replayed.
+    const dynamicFee = {
       ...parameters,
-      migratedPoolFee: { ...parameters.migratedPoolFee, collectFeeMode: 2 },
+      migratedPoolFee: { ...parameters.migratedPoolFee, dynamicFee: 1 },
     }
-    const result = simulateLaunch(compounding, [
+    const result = simulateLaunch(dynamicFee, [
       buy(0, 50),
       buy(1, 50),
       buy(2, 1),

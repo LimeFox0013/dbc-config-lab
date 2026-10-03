@@ -1,7 +1,5 @@
 import { SolanaNetwork } from '../shared'
 
-export { SolanaNetwork }
-
 /** Wallet Standard chain identifiers. */
 export enum SolanaChain {
   Devnet = 'solana:devnet',

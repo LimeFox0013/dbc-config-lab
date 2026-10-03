@@ -1,7 +1,7 @@
 /**
  * Test support: DBC account bytes exactly as the program stores them, for tests that answer
- * RPC reads. Anchor's own account encoder writes into a fixed 1000-byte buffer (upstream
- * TODO), too small for a PoolConfig, so accounts are encoded with the IDL layout directly.
+ * RPC reads. Anchor's own account encoder writes into a fixed 1000-byte buffer (an upstream
+ * limitation), too small for a PoolConfig, so accounts are encoded with the IDL layout directly.
  */
 import BN from 'bn.js'
 import { PublicKey } from '@solana/web3.js'
@@ -13,10 +13,10 @@ import type {
   VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { connectionFor } from '../core/config-deploy'
-import { toInitialPool, toPoolConfig } from '../core/launch-simulator/utils'
 import { QUOTE_TOKENS, QuoteToken } from '../core/quote-token'
 import { SolanaNetwork } from '../core/shared'
 import { DbcAccount } from '../features/onchain-config'
+import { toInitialPool, toPoolConfig } from '../core/launch-simulator'
 
 /** Stored curves are fixed arrays of 20 points; unused ones are zero. */
 const STORED_CURVE_POINTS = 20

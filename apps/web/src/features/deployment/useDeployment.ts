@@ -1,138 +1,63 @@
-import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
+import { watch } from 'vue'
 import type { Ref } from 'vue'
 import {
   connectionFor,
-  prepareDeployment,
-  SolanaNetwork,
+  prepareParametersDeployment,
 } from '../../core/config-deploy'
 import type { PreparedDeployment } from '../../core/config-deploy'
-import type { LaunchPreset } from '../../core/launch-config'
-import {
-  connectWallet,
-  listDeployWallets,
-  onWalletsChanged,
-  signAndSendPrepared,
-} from '../wallet'
-import type { ConnectedWallet, DeployWallet } from '../wallet'
-import { DeployStep } from './constants'
-import { errorMessage } from '../../core/shared'
-import { canPrepare } from './utils'
+import { useWalletSession } from '../wallet'
+import type { DeployWallet, WalletSession } from '../wallet'
+import type { DeployTarget } from './types'
+import { useSignedTransaction } from './useSignedTransaction'
 
-export const useDeployment = (preset: Ref<LaunchPreset>) => {
-  const network = ref<SolanaNetwork>(SolanaNetwork.Devnet)
-  const mainnetAcknowledged = ref(false)
-  const wallets = shallowRef<DeployWallet[]>(listDeployWallets())
-  const connected = shallowRef<ConnectedWallet | null>(null)
-  const prepared = shallowRef<PreparedDeployment | null>(null)
-  const step = ref<DeployStep>(DeployStep.Idle)
-  const error = ref<string | null>(null)
-  const signature = ref<string | null>(null)
-  /** Bumped whenever a preparation stops being valid, so a late result is dropped. */
-  let preparation = 0
+/** Deploys the chosen config — a preset, an edit or a clone — from the connected wallet. */
+export const useDeployment = (
+  target: Ref<DeployTarget>,
+  session: WalletSession = useWalletSession(),
+) => {
+  const { network, mainnetAcknowledged, wallets, connected } = session
+  const transaction = useSignedTransaction<PreparedDeployment>(session)
+  // A replaced config (a re-added clone, an edit) drops what was prepared for the old one.
+  watch(target, transaction.discard)
 
-  const stopWatchingWallets = onWalletsChanged(() => {
-    wallets.value = listDeployWallets()
-  })
-  onScopeDispose(stopWatchingWallets)
-
-  /** A prepared transaction is only valid for the exact preset, network and wallet it was built for. */
-  const discardPreparation = () => {
-    preparation += 1
-    prepared.value = null
-    signature.value = null
-    error.value = null
-    step.value = DeployStep.Idle
-  }
-  watch([preset, network, connected], discardPreparation)
-  watch(mainnetAcknowledged, (acknowledged) => {
-    if (!acknowledged && network.value === SolanaNetwork.Mainnet)
-      discardPreparation()
-  })
-  watch(network, () => {
-    mainnetAcknowledged.value = false
-    connected.value = null
-  })
-
-  const fail = (cause: unknown) => {
-    error.value = errorMessage(cause)
-    step.value = DeployStep.Failed
+  const connect = async (wallet: DeployWallet): Promise<void> => {
+    const reason = await session.connect(wallet)
+    if (reason) transaction.fail(reason)
   }
 
-  const connect = async (wallet: DeployWallet) => {
-    try {
-      connected.value = await connectWallet(wallet, network.value)
-    } catch (cause) {
-      fail(cause)
-    }
-  }
-
-  const prepare = async () => {
-    if (
-      !connected.value ||
-      !canPrepare(network.value, mainnetAcknowledged.value)
-    )
-      return
-    step.value = DeployStep.Preparing
-    error.value = null
-    const attempt = ++preparation
-    const result = await prepareDeployment(connectionFor(network.value), {
-      config: preset.value.config,
-      network: network.value,
-      owner: connected.value.owner,
-    })
-    // The preset, network or wallet changed while this was running: it no longer applies.
-    if (attempt !== preparation) return
-    if (!result.ok) return fail(new Error(result.reason))
-    prepared.value = result.deployment
-    step.value = DeployStep.Ready
-  }
-
-  const signAndSend = async () => {
-    if (
-      !connected.value ||
-      !prepared.value ||
-      !canPrepare(network.value, mainnetAcknowledged.value)
-    )
-      return
-    step.value = DeployStep.Signing
-    try {
-      signature.value = await signAndSendPrepared(
+  const prepare = (): Promise<boolean> =>
+    transaction.runPreparation(async () => {
+      const { compiled } = target.value
+      const owner = connected.value?.owner
+      if (!compiled.ok) return { ok: false, reason: compiled.reason }
+      if (!owner) return { ok: false, reason: null }
+      const result = await prepareParametersDeployment(
         connectionFor(network.value),
-        connected.value,
-        prepared.value,
-        network.value,
+        {
+          parameters: compiled.parameters,
+          quoteToken: compiled.quoteToken,
+          network: network.value,
+          owner,
+        },
       )
-      step.value = DeployStep.Done
-    } catch (cause) {
-      fail(cause)
-    }
-  }
-
-  const prepareAllowed = computed(
-    () =>
-      connected.value !== null &&
-      canPrepare(network.value, mainnetAcknowledged.value),
-  )
-
-  /** Inputs that the prepared transaction depends on stay fixed until it is sent or dropped. */
-  const inputsLocked = computed(
-    () =>
-      step.value === DeployStep.Preparing || step.value === DeployStep.Signing,
-  )
+      return result.ok
+        ? { ok: true, prepared: result.deployment }
+        : { ok: false, reason: result.reason }
+    })
 
   return {
-    inputsLocked,
+    busy: transaction.busy,
     network,
     mainnetAcknowledged,
     wallets,
     connected,
-    prepared,
-    step,
-    error,
-    signature,
-    prepareAllowed,
+    prepared: transaction.prepared,
+    step: transaction.step,
+    error: transaction.error,
+    signature: transaction.signature,
+    prepareAllowed: transaction.canSign,
     connect,
     prepare,
-    signAndSend,
+    signAndSend: transaction.signAndSend,
   }
 }

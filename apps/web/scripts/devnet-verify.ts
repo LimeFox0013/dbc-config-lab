@@ -2,10 +2,12 @@
  * Opt-in live check against Solana devnet (no real funds): deploys a flat-fee config with
  * the same code the UI uses, then verifies the simulator against the chain —
  * the stored config account, and pool reserve, price and fee totals after real swaps.
- * The throwaway keypair lives in memory only.
+ * The devnet keypair is a throwaway: in memory only, or — given a file path — kept in that
+ * file (created on first use) so it can be funded before a later run. Devnet only.
  *
- *   npx tsx apps/web/scripts/devnet-verify.ts
+ *   npx tsx apps/web/scripts/devnet-verify.ts [keypair.json]
  */
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import BN from 'bn.js'
 import {
   Keypair,
@@ -19,16 +21,17 @@ import {
   compileLaunchConfig,
   DEFAULT_LAUNCH_CONFIG,
 } from '../src/core/launch-config'
+import { connectionFor, prepareDeployment } from '../src/core/config-deploy'
 import {
-  connectionFor,
-  prepareDeployment,
-  SolanaNetwork,
-} from '../src/core/config-deploy'
-import { simulateLaunch, TradeSide } from '../src/core/launch-simulator'
+  simulateLaunch,
+  toPoolConfig,
+  TradeSide,
+} from '../src/core/launch-simulator'
 import type { Trade } from '../src/core/launch-simulator'
-import { toPoolConfig } from '../src/core/launch-simulator/utils'
 import { preparePoolLaunch } from '../src/core/pool-launch'
 import { QuoteToken, quoteUnitsFromSol } from '../src/core/quote-token'
+import { SolanaNetwork } from '../src/core/shared'
+import { sleep } from './utils'
 
 const AIRDROP_SOL = 1
 const FUNDING_WAIT_MS = 15 * 60 * 1000
@@ -61,8 +64,6 @@ const send = (
     commitment: 'confirmed',
   })
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
 /** Faucet airdrop when available; otherwise wait for the address to be funded by hand. */
 const fund = async (connection: Connection, address: PublicKey) => {
   try {
@@ -85,10 +86,24 @@ const fund = async (connection: Connection, address: PublicKey) => {
   throw new Error('address was not funded in time')
 }
 
+/** The devnet wallet: kept in `path` when one is given (Solana CLI format), else in memory. */
+const devnetKeypair = (path: string | undefined): Keypair => {
+  if (!path) return Keypair.generate()
+  if (existsSync(path))
+    return Keypair.fromSecretKey(
+      Uint8Array.from(JSON.parse(readFileSync(path, 'utf8'))),
+    )
+  const created = Keypair.generate()
+  writeFileSync(path, JSON.stringify(Array.from(created.secretKey)), {
+    mode: 0o600,
+  })
+  return created
+}
+
 const main = async () => {
   const connection = connectionFor(SolanaNetwork.Devnet)
   const client = new DynamicBondingCurveClient(connection, 'confirmed')
-  const owner = Keypair.generate()
+  const owner = devnetKeypair(process.argv[2])
 
   await fund(connection, owner.publicKey)
   console.log('funded', owner.publicKey.toBase58())

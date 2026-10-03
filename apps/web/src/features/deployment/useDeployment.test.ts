@@ -4,18 +4,20 @@ import { Keypair } from '@solana/web3.js'
 import type { WalletAccount } from '@wallet-standard/base'
 import {
   connectionFor,
-  prepareDeployment,
+  prepareParametersDeployment,
   SolanaChain,
-  SolanaNetwork,
 } from '../../core/config-deploy'
 import type { PrepareResult } from '../../core/config-deploy'
 import { LAUNCH_PRESETS } from '../../core/launch-config'
-import type { LaunchPreset } from '../../core/launch-config'
+import { presetEntry } from '../comparison'
 import type * as ConfigDeploy from '../../core/config-deploy'
 import type * as Wallet from '../wallet'
+import { signAndSendPrepared } from '../wallet'
 import type { DeployWallet } from '../wallet'
 import { DeployStep } from './constants'
+import type { DeployTarget } from './types'
 import { useDeployment } from './useDeployment'
+import { SolanaNetwork } from '../../core/shared'
 
 const owner = Keypair.generate().publicKey
 
@@ -54,7 +56,7 @@ vi.mock('../wallet', async (importOriginal) => ({
 
 vi.mock('../../core/config-deploy', async (importOriginal) => ({
   ...(await importOriginal<typeof ConfigDeploy>()),
-  prepareDeployment: vi.fn(),
+  prepareParametersDeployment: vi.fn(),
 }))
 
 /** A real preparation against a dry run that passes, released only when the test says so. */
@@ -81,21 +83,21 @@ const heldPreparation = async () => {
   const released = new Promise<void>((resolve) => {
     release = resolve
   })
-  vi.mocked(prepareDeployment).mockImplementation(
+  vi.mocked(prepareParametersDeployment).mockImplementation(
     async (_connection, request): Promise<PrepareResult> => {
       await released
-      return actual.prepareDeployment(connection, request)
+      return actual.prepareParametersDeployment(connection, request)
     },
   )
   return release
 }
 
-const [first, second] = LAUNCH_PRESETS
+const [first, second] = LAUNCH_PRESETS.map(presetEntry)
 if (!first || !second) throw new Error('needs two built-in presets')
 
 const setUp = async (network: SolanaNetwork) => {
   const scope = effectScope()
-  const preset = ref<LaunchPreset>(first)
+  const preset = ref<DeployTarget>(first)
   const deployment = scope.run(() => useDeployment(preset))
   if (!deployment) throw new Error('scope did not run')
   deployment.network.value = network
@@ -107,7 +109,7 @@ const setUp = async (network: SolanaNetwork) => {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 afterEach(() => {
-  vi.mocked(prepareDeployment).mockReset()
+  vi.mocked(prepareParametersDeployment).mockReset()
 })
 
 describe('useDeployment', () => {
@@ -117,7 +119,7 @@ describe('useDeployment', () => {
 
     const preparing = deployment.prepare()
     expect(deployment.step.value).toBe(DeployStep.Preparing)
-    expect(deployment.inputsLocked.value).toBe(true)
+    expect(deployment.busy.value).toBe(true)
     preset.value = second
     await nextTick()
     release()
@@ -159,6 +161,34 @@ describe('useDeployment', () => {
 
     expect(deployment.prepared.value).toBeNull()
     expect(deployment.signature.value).toBeNull()
+    scope.stop()
+  })
+
+  it('keeps the transaction being signed when the config is replaced meanwhile', async () => {
+    const release = await heldPreparation()
+    const { scope, preset, deployment } = await setUp(SolanaNetwork.Devnet)
+    const preparing = deployment.prepare()
+    release()
+    await preparing
+
+    let sign: (signature: string) => void = () => undefined
+    vi.mocked(signAndSendPrepared).mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          sign = resolve
+        }),
+    )
+    const signing = deployment.signAndSend()
+    expect(deployment.step.value).toBe(DeployStep.Signing)
+    // The same config re-added (a clone, an edit) arrives as a new object.
+    preset.value = { ...first }
+    await nextTick()
+    sign('signature')
+    await signing
+
+    expect(deployment.step.value).toBe(DeployStep.Done)
+    expect(deployment.prepared.value).not.toBeNull()
+    expect(deployment.signature.value).toBe('signature')
     scope.stop()
   })
 })

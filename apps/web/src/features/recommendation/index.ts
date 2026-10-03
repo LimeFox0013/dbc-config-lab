@@ -1,9 +1,4 @@
-export {
-  GOAL_OBJECTIVES,
-  LaunchGoal,
-  PROPOSAL_COUNT,
-  RECOMMENDED_PRESET_ID,
-} from './constants'
+export { GOAL_OBJECTIVES, LaunchGoal, PROPOSAL_COUNT } from './constants'
 export type {
   Proposal,
   Recommendation,

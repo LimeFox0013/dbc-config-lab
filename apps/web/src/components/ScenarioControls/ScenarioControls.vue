@@ -120,7 +120,7 @@
           from: modelValue.humans.arriveFromSeconds,
           until: modelValue.humans.arriveUntilSeconds,
           adaptive: modelValue.adaptiveSnipers.count,
-          maxFee: modelValue.adaptiveSnipers.maxFeeBps / 100,
+          maxFee: percentFromBps(modelValue.adaptiveSnipers.maxFeeBps),
         })
       }}
     </p>
@@ -134,7 +134,7 @@
           marketCap: modelValue.arbitrageurs.fairMarketCapSol,
           every: modelValue.arbitrageurs.checkEverySeconds,
           until: modelValue.arbitrageurs.untilSeconds,
-          gap: modelValue.arbitrageurs.gapBps / 100,
+          gap: percentFromBps(modelValue.arbitrageurs.gapBps),
         })
       }}
     </p>
@@ -142,6 +142,7 @@
 </template>
 
 <script setup lang="ts">
+import { percentFromBps } from '../../core/shared'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { sanitizeScenario, SCENARIO_LIMITS } from '../../features/comparison'
@@ -186,18 +187,16 @@ const selectPreset = (event: Event): void => {
 </script>
 
 <style lang="scss">
+@use '../../styles/mixins';
+
 .scenario-controls {
   margin: 0;
-  padding: var(--space-4);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-surface);
-  color: var(--color-surface-foreground);
+  @include mixins.surface;
 }
 
 .scenario-controls__legend {
   padding: 0 var(--space-2);
-  font-weight: 600;
+  font-weight: var(--font-weight-strong);
 }
 
 .scenario-controls__fields {

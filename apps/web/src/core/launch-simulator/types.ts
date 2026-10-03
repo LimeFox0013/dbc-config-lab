@@ -74,6 +74,8 @@ export interface SimulationResult {
   holdings: Record<Trade['trader'], BN>
   /** Curve state after the replay. */
   finalPool: VirtualPool
+  /** Fees a compounding migrated pool kept in its own liquidity, in quote base units. */
+  compounded: BN
   /** What the unlocked-liquidity withdrawal at graduation returned, or null if none happened. */
   liquidityPulled: PulledLiquidity | null
   /** The migrated pool after the replay, or null if the launch never graduated. */

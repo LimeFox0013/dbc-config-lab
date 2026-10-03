@@ -146,24 +146,25 @@
 </template>
 
 <script setup lang="ts">
+import { useFeeScheduleText } from '../../features/fee-text'
+import { errorMessage, formatShare, formatSol, formatSolChange } from '../../core/shared'
 import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BaseFeeMode } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { botProfit, Criterion, DEFAULT_SEARCH_SEEDS } from '../../core/config-search'
 import type { MeanMetrics, Objective } from '../../core/config-search'
 import type { CurveSpec, FeeSchedule } from '../../core/launch-config'
-import { CurveShape, DEFAULT_LAUNCH_CONFIG, LAUNCH_PRESETS, weightGrowthOf } from '../../core/launch-config'
+import { CurveShape, DEFAULT_LAUNCH_CONFIG, LAUNCH_PRESETS, UserPresetId, weightGrowthOf } from '../../core/launch-config'
 import type { LaunchPreset } from '../../core/launch-config'
 import { QUOTE_TOKENS } from '../../core/quote-token'
 import type { QuoteToken } from '../../core/quote-token'
-import { formatShare, formatSol, formatSolChange } from '../../features/comparison'
-import { createRecommender, GOAL_OBJECTIVES, LaunchGoal, matchingPreset, RECOMMENDED_PRESET_ID } from '../../features/recommendation'
+import { createRecommender, GOAL_OBJECTIVES, LaunchGoal, matchingPreset } from '../../features/recommendation'
 import type { Proposal, Recommendation } from '../../features/recommendation'
 import type { RecommenderPanelProps } from './types'
 
 const props = defineProps<RecommenderPanelProps>()
 const emit = defineEmits<{ use: [preset: LaunchPreset] }>()
 const { t } = useI18n()
+const feeScheduleText = useFeeScheduleText()
 
 const goals = Object.values(LaunchGoal)
 const weightKeys = Object.values(Criterion)
@@ -175,6 +176,8 @@ const result = shallowRef<Recommendation | null>(null)
 const searching = ref(false)
 const ran = ref(false)
 const searchError = ref<string | null>(null)
+/** Bumped per search and per scenario change, so a superseded search's result is dropped. */
+let latestRun = 0
 
 // Proposals were measured under one scenario; a changed scenario makes them stale.
 watch(
@@ -201,7 +204,6 @@ const setWeight = (weight: Criterion, event: Event) => {
 const recommender = createRecommender()
 onBeforeUnmount(recommender.dispose)
 const includeCurves = ref(false)
-let latestRun = 0
 
 const run = async () => {
   const runId = ++latestRun
@@ -219,7 +221,7 @@ const run = async () => {
     ran.value = true
   }
   catch (error) {
-    if (runId === latestRun) searchError.value = error instanceof Error ? error.message : String(error)
+    if (runId === latestRun) searchError.value = errorMessage(error)
   }
   finally {
     if (runId === latestRun) searching.value = false
@@ -244,7 +246,7 @@ const measuresLabel = (metrics: MeanMetrics): string =>
         t('components.recommenderPanel.measures.botShare', { share: formatShare(metrics.botShareOfEarlyBuys) }),
   ].join(' · ')
 
-/** The curve in plain words; null means the user's own curve. */
+/** The curve in plain words. */
 const curveLabel = (curve: CurveSpec, quote: QuoteToken): string => {
   const symbol = QUOTE_TOKENS[quote].symbol
   switch (curve.curveShape) {
@@ -271,18 +273,7 @@ const proposalLabel = (proposal: Proposal): string =>
     `${scheduleLabel(proposal.candidate.schedule)} · ${curveLabel(proposal.candidate.curve, proposal.candidate.config.quoteToken)}` :
       scheduleLabel(proposal.candidate.schedule)
 
-const scheduleLabel = (schedule: FeeSchedule): string =>
-  schedule.windowSeconds === 0 ?
-      t('components.recommenderPanel.flat', { fee: schedule.endingFeeBps / 100 }) :
-      t('components.recommenderPanel.schedule', {
-        start: schedule.startingFeeBps / 100,
-        end: schedule.endingFeeBps / 100,
-        seconds: schedule.windowSeconds,
-        curve:
-          schedule.mode === BaseFeeMode.FeeSchedulerLinear ?
-              t('components.recommenderPanel.linear') :
-              t('components.recommenderPanel.exponential'),
-      })
+const scheduleLabel = (schedule: FeeSchedule): string => feeScheduleText(schedule, schedule.mode)
 
 const use = (proposal: Proposal) => {
   const same = matchingPreset(proposal.candidate.config, LAUNCH_PRESETS)
@@ -291,7 +282,7 @@ const use = (proposal: Proposal) => {
     seeds: seedCount,
   })
   emit('use', {
-    id: RECOMMENDED_PRESET_ID,
+    id: UserPresetId.Recommended,
     name: t('components.recommenderPanel.recommendedName', { schedule: proposalLabel(proposal) }),
     intent: same ? `${intent} ${t('components.recommenderPanel.sameAsPreset', { preset: same.name })}` : intent,
     config: proposal.candidate.config,
@@ -300,15 +291,13 @@ const use = (proposal: Proposal) => {
 </script>
 
 <style lang="scss">
+@use '../../styles/mixins';
+
 .recommender-panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-4);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-surface);
-  color: var(--color-surface-foreground);
+  @include mixins.surface;
 }
 
 .recommender-panel__title {
@@ -326,13 +315,7 @@ const use = (proposal: Proposal) => {
 .recommender-panel__goal,
 .recommender-panel__run,
 .recommender-panel__use {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-background);
-  color: var(--color-background-foreground);
-  font-family: var(--font-family);
-  font-size: var(--font-size-2);
+  @include mixins.control;
   cursor: pointer;
 }
 
@@ -379,7 +362,7 @@ const use = (proposal: Proposal) => {
 }
 
 .recommender-panel__schedule {
-  font-weight: 600;
+  font-weight: var(--font-weight-strong);
 }
 
 .recommender-panel__include-curves {

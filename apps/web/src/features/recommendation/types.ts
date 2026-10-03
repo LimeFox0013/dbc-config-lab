@@ -46,3 +46,9 @@ export interface RecommendRequest {
 export type RecommendResponse =
   | { id: number; ok: true; recommendation: Recommendation | null }
   | { id: number; ok: false; reason: string }
+
+/** A request posted to the worker, waiting for its answer. */
+export interface PendingRecommendation {
+  resolve: (value: Recommendation | null) => void
+  reject: (reason: Error) => void
+}

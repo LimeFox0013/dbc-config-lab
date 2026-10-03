@@ -1,17 +1,23 @@
-import type { SolanaNetwork } from '../../core/config-deploy'
-import type { LaunchPreset } from '../../core/launch-config'
+import type { DeployTarget } from '../../features/deployment'
 import type { ConnectedWallet } from '../../features/wallet'
+import type { SolanaNetwork } from '../../core/shared'
 
 export interface DeployPanelProps {
-  presets: LaunchPreset[]
+  targets: DeployTarget[]
   /** Selected at first; a config from someone else's link should never be the default. */
-  initialPresetId: LaunchPreset['id']
+  initialTargetId: DeployTarget['id']
 }
 
-export interface PoolLaunchSectionProps {
+export interface EarningsSectionProps {
   network: SolanaNetwork
   connected: ConnectedWallet | null
   mainnetAcknowledged: boolean
-  /** The config deployed in this session, if any; the user may enter any other. */
-  initialConfigAddress: string
+}
+
+export interface BrandingSectionProps {
+  network: SolanaNetwork
+  connected: ConnectedWallet | null
+  mainnetAcknowledged: boolean
+  /** The config deployed in this session, whose launch page is offered; empty until one is. */
+  configAddress: string
 }

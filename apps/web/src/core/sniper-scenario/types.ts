@@ -97,6 +97,8 @@ export interface ScenarioMetrics {
   partnerCreatorFees: number
   /** Partner + creator fees on the migrated pool after graduation. */
   postGraduationFees: number
+  /** Fees a compounding migrated pool kept in its own liquidity instead of paying out. */
+  compoundedFees: number
   graduated: boolean
   /** Seconds from launch to graduation; null when it never graduated. */
   graduationSeconds: number | null

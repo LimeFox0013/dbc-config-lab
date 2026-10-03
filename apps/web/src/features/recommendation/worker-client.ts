@@ -1,15 +1,11 @@
 import { plainCopy } from '../../core/shared'
 import { recommend } from './utils'
 import type {
+  PendingRecommendation,
   Recommendation,
   RecommendRequest,
   RecommendResponse,
 } from './types'
-
-type Pending = {
-  resolve: (value: Recommendation | null) => void
-  reject: (reason: Error) => void
-}
 
 /**
  * Runs recommendations off the main thread so a long search never freezes the page.
@@ -24,7 +20,7 @@ export const createRecommender = () => {
           new URL('../../workers/recommend.worker.ts', import.meta.url),
           { type: 'module' },
         )
-  const pending = new Map<number, Pending>()
+  const pending = new Map<number, PendingRecommendation>()
   let nextId = 0
 
   worker?.addEventListener(

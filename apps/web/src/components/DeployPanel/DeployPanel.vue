@@ -8,12 +8,12 @@
       <label class="deploy-panel__field">
         <span class="deploy-panel__label">{{ t('components.deployPanel.preset') }}</span>
         <select
-          v-model="presetId"
+          v-model="targetId"
           class="deploy-panel__select"
-          :disabled="inputsLocked || launchBusy"
+          :disabled="busy || launchBusy || claimBusy || brandingBusy"
         >
           <option
-            v-for="option in presets"
+            v-for="option in targets"
             :key="option.id"
             :value="option.id"
           >
@@ -21,65 +21,17 @@
           </option>
         </select>
       </label>
-      <label class="deploy-panel__field">
-        <span class="deploy-panel__label">{{ t('components.deployPanel.network') }}</span>
-        <select
-          v-model="network"
-          class="deploy-panel__select"
-          :disabled="inputsLocked || launchBusy"
-        >
-          <option :value="SolanaNetwork.Devnet">
-            {{ t('components.deployPanel.devnet') }}
-          </option>
-          <option :value="SolanaNetwork.Mainnet">
-            {{ t('components.deployPanel.mainnet') }}
-          </option>
-        </select>
-      </label>
     </div>
 
-    <label
-      v-if="network === SolanaNetwork.Mainnet"
-      class="deploy-panel__acknowledge"
-    >
-      <input
-        v-model="mainnetAcknowledged"
-        type="checkbox"
-      />
-      {{ t('components.deployPanel.mainnetAcknowledge') }}
-    </label>
-
-    <div class="deploy-panel__wallets">
-      <p
-        v-if="connected"
-        class="deploy-panel__connected"
-      >
-        {{ t('components.deployPanel.connectedAs', { wallet: connected.wallet.name, address: connected.owner.toBase58() }) }}
-      </p>
-      <template v-else-if="wallets.length > 0">
-        <button
-          v-for="wallet in wallets"
-          :key="wallet.name"
-          type="button"
-          class="deploy-panel__button"
-          @click="connect(wallet)"
-        >
-          <img
-            v-if="isSafeWalletIcon(wallet.icon)"
-            :src="wallet.icon"
-            alt=""
-            class="deploy-panel__wallet-icon"
-          />
-          {{ t('components.deployPanel.connect', { wallet: wallet.name }) }}
-        </button>
-      </template>
-      <p
-        v-else
-        class="deploy-panel__hint"
-      >
-        {{ t('components.deployPanel.noWallet') }}
-      </p>
-    </div>
+    <WalletBar
+      v-model:network="network"
+      v-model:acknowledged="mainnetAcknowledged"
+      :wallets="wallets"
+      :connected="connected"
+      :acknowledgement="WalletAcknowledgement.Deploy"
+      :disabled="busy || launchBusy || claimBusy || brandingBusy"
+      @connect="connect"
+    />
 
     <button
       v-if="step !== DeployStep.Ready && step !== DeployStep.Signing && step !== DeployStep.Done"
@@ -88,7 +40,7 @@
       :disabled="!prepareAllowed || step === DeployStep.Preparing"
       @click="prepare"
     >
-      {{ step === DeployStep.Preparing ? t('components.deployPanel.preparing') : t('components.deployPanel.prepare') }}
+      {{ step === DeployStep.Preparing ? t('common.signing.preparing') : t('components.deployPanel.prepare') }}
     </button>
 
     <dl
@@ -127,10 +79,10 @@
       <dt>{{ t('components.deployPanel.summary.fee') }}</dt>
       <dd class="deploy-panel__value">
         {{
-          t('components.deployPanel.summary.feeValue', {
-            start: prepared.summary.startingFeeBps / 100,
-            end: prepared.summary.endingFeeBps / 100,
-            seconds: prepared.summary.feeWindowSeconds,
+          feeScheduleText({
+            startingFeeBps: prepared.summary.startingFeeBps,
+            endingFeeBps: prepared.summary.endingFeeBps,
+            windowSeconds: prepared.summary.feeWindowSeconds,
           })
         }}
       </dd>
@@ -144,7 +96,7 @@
       :disabled="step === DeployStep.Signing"
       @click="signAndSend"
     >
-      {{ step === DeployStep.Signing ? t('components.deployPanel.signing') : t('components.deployPanel.sign') }}
+      {{ step === DeployStep.Signing ? t('common.signing.signing') : t('common.signing.sign') }}
     </button>
 
     <p
@@ -163,7 +115,7 @@
         target="_blank"
         rel="noopener noreferrer"
         class="deploy-panel__link"
-      >{{ t('components.deployPanel.viewTransaction') }}</a>
+      >{{ t('common.signing.viewTransaction') }}</a>
     </p>
 
     <p
@@ -174,12 +126,25 @@
       {{ error }}
     </p>
 
-    <PoolLaunchSection
+    <PoolLaunch
       :network="network"
       :connected="connected"
       :mainnet-acknowledged="mainnetAcknowledged"
       :initial-config-address="deployedConfigAddress"
       @busy="launchBusy = $event"
+    />
+    <BrandingSection
+      :network="network"
+      :connected="connected"
+      :mainnet-acknowledged="mainnetAcknowledged"
+      :config-address="deployedConfigAddress"
+      @busy="brandingBusy = $event"
+    />
+    <EarningsSection
+      :network="network"
+      :connected="connected"
+      :mainnet-acknowledged="mainnetAcknowledged"
+      @busy="claimBusy = $event"
     />
   </section>
 </template>
@@ -187,26 +152,31 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { explorerAddressUrl, explorerTransactionUrl, SolanaNetwork } from '../../core/config-deploy'
-import type { LaunchPreset } from '../../core/launch-config'
+import { explorerAddressUrl, explorerTransactionUrl } from '../../core/config-deploy'
 import { QUOTE_TOKENS } from '../../core/quote-token'
-import { DeployStep, isSafeWalletIcon, useDeployment } from '../../features/deployment'
+import { DeployStep, useDeployment } from '../../features/deployment'
+import { useFeeScheduleText } from '../../features/fee-text'
+import type { DeployTarget } from '../../features/deployment'
 import { ConfigTermsRows } from '../ConfigTermsRows'
-import PoolLaunchSection from './PoolLaunchSection.vue'
+import { WalletAcknowledgement, WalletBar } from '../WalletBar'
+import BrandingSection from './BrandingSection.vue'
+import EarningsSection from './EarningsSection.vue'
+import { PoolLaunch } from '../PoolLaunch'
 import type { DeployPanelProps } from './types'
 
 const props = defineProps<DeployPanelProps>()
 const { t } = useI18n()
+const feeScheduleText = useFeeScheduleText()
 
-const presetId = ref<LaunchPreset['id']>(props.initialPresetId)
-const preset = computed<LaunchPreset>(() => {
-  const found = props.presets.find((candidate) => candidate.id === presetId.value)
-  if (!found) throw new Error(`Unknown preset ${presetId.value}`)
+const targetId = ref<DeployTarget['id']>(props.initialTargetId)
+const target = computed<DeployTarget>(() => {
+  const found = props.targets.find((candidate) => candidate.id === targetId.value)
+  if (!found) throw new Error(`Unknown config ${targetId.value}`)
   return found
 })
 
 const {
-  inputsLocked,
+  busy,
   network,
   mainnetAcknowledged,
   wallets,
@@ -219,28 +189,34 @@ const {
   connect,
   prepare,
   signAndSend,
-} = useDeployment(preset)
+} = useDeployment(target)
 
 /** A token launch is being prepared or signed on the panel's network and wallet. */
 const launchBusy = ref(false)
+/** A fee claim is being prepared or signed on the panel's network and wallet. */
+const claimBusy = ref(false)
+/** Branding is being prepared or signed on the panel's network and wallet. */
+const brandingBusy = ref(false)
 
 /** The last config deployed here, offered as the one to launch a token on. */
 const deployedConfigAddress = ref('')
+// A config exists on the network it was deployed to; on another it would be offered in vain.
+watch(network, () => {
+  deployedConfigAddress.value = ''
+})
 watch(step, (current) => {
   if (current === DeployStep.Done && prepared.value) deployedConfigAddress.value = prepared.value.summary.configAddress
 })
 </script>
 
 <style lang="scss">
+@use '../../styles/mixins';
+
 .deploy-panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-4);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-surface);
-  color: var(--color-surface-foreground);
+  @include mixins.surface;
 }
 
 .deploy-panel__title {
@@ -248,8 +224,7 @@ watch(step, (current) => {
   font-size: var(--font-size-3);
 }
 
-.deploy-panel__row,
-.deploy-panel__wallets {
+.deploy-panel__row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-4);
@@ -262,9 +237,7 @@ watch(step, (current) => {
   gap: var(--space-1);
 }
 
-.deploy-panel__label,
-.deploy-panel__hint,
-.deploy-panel__connected {
+.deploy-panel__label {
   margin: 0;
   font-size: var(--font-size-2);
   color: var(--color-muted-foreground);
@@ -272,13 +245,7 @@ watch(step, (current) => {
 
 .deploy-panel__select,
 .deploy-panel__button {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-background);
-  color: var(--color-background-foreground);
-  font-family: var(--font-family);
-  font-size: var(--font-size-2);
+  @include mixins.control;
 }
 
 .deploy-panel__button {
@@ -286,29 +253,11 @@ watch(step, (current) => {
   gap: var(--space-2);
   align-items: center;
   align-self: flex-start;
-  cursor: pointer;
-
-  &:disabled {
-    cursor: not-allowed;
-    color: var(--color-muted-foreground);
-  }
+  @include mixins.clickable;
 }
 
 .deploy-panel__button--primary:enabled {
   border-color: var(--color-gain);
-}
-
-.deploy-panel__wallet-icon {
-  width: var(--space-4);
-  height: var(--space-4);
-}
-
-.deploy-panel__acknowledge {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  color: var(--color-loss);
-  font-size: var(--font-size-2);
 }
 
 .deploy-panel__summary {
@@ -334,7 +283,7 @@ watch(step, (current) => {
 
 .deploy-panel__value--network {
   color: var(--color-loss);
-  font-weight: 600;
+  font-weight: var(--font-weight-strong);
 }
 
 .deploy-panel__done {

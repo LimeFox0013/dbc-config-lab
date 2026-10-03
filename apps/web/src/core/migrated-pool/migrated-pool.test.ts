@@ -1,18 +1,25 @@
 import BN from 'bn.js'
 import { describe, expect, it } from 'vitest'
 import {
+  CollectFeeMode,
+  DEAD_LIQUIDITY,
   decodePodAlignedFeeTimeScheduler,
   getPriceFromSqrtPrice,
 } from '@meteora-ag/cp-amm-sdk'
 import {
+  createDbcProgram,
   DammV2DynamicFeeMode,
   MigratedCollectFeeMode,
   MigrationFeeOption,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { connectionFor } from '../config-deploy'
+import { fromPoolConfig } from '../onchain-config'
 import { compileLaunchConfig, DEFAULT_LAUNCH_CONFIG } from '../launch-config'
 import type { LaunchConfig } from '../launch-config'
-import { toPoolConfig } from '../launch-simulator/utils'
 import {
+  afterMigratedSwap,
   lockedLiquidity,
   migratedFeeBps,
   migratedUnsupportedReason,
@@ -21,6 +28,8 @@ import {
   toMigratedPool,
   withUnlockedLiquidityPulled,
 } from '.'
+import { SolanaNetwork } from '../shared'
+import { toPoolConfig } from '../launch-simulator'
 
 const compile = (config: LaunchConfig) => {
   const compiled = compileLaunchConfig(config)
@@ -31,6 +40,36 @@ const compile = (config: LaunchConfig) => {
 const parameters = compile(DEFAULT_LAUNCH_CONFIG)
 const pool = toMigratedPool(parameters, toPoolConfig(parameters))
 const BASE_DECIMALS = DEFAULT_LAUNCH_CONFIG.token.tokenBaseDecimal
+
+const compoundingConfig: LaunchConfig = {
+  ...DEFAULT_LAUNCH_CONFIG,
+  migration: {
+    ...DEFAULT_LAUNCH_CONFIG.migration,
+    migrationFeeOption: MigrationFeeOption.Customizable,
+    migratedPoolFee: {
+      collectFeeMode: MigratedCollectFeeMode.Compounding,
+      dynamicFee: DammV2DynamicFeeMode.Disabled,
+      poolFeeBps: 100,
+      compoundingFeeBps: 5000,
+    },
+  },
+}
+const compoundingParameters = compile(compoundingConfig)
+
+const compoundingFixture: {
+  configBase64: string
+  opening: {
+    liquidity: string
+    sqrtPrice: string
+    reserveA: string
+    reserveB: string
+  }
+} = JSON.parse(
+  readFileSync(
+    join(__dirname, 'fixtures', 'compounding-migration.json'),
+    'utf8',
+  ),
+)
 
 describe('toMigratedPool', () => {
   it('stores the flat fee in a record the SDK decodes back', () => {
@@ -82,7 +121,7 @@ describe('migratedUnsupportedReason', () => {
     expect(migratedUnsupportedReason(parameters)).toBeNull()
   })
 
-  it('refuses compounding fees and the dynamic fee on the migrated pool', () => {
+  it('refuses the dynamic fee on the migrated pool', () => {
     const customizable = {
       ...DEFAULT_LAUNCH_CONFIG,
       migration: {
@@ -90,16 +129,6 @@ describe('migratedUnsupportedReason', () => {
         migrationFeeOption: MigrationFeeOption.Customizable,
       },
     }
-    expect(
-      migratedUnsupportedReason({
-        ...parameters,
-        migratedPoolFee: {
-          collectFeeMode: MigratedCollectFeeMode.Compounding,
-          dynamicFee: 0,
-          poolFeeBps: 100,
-        },
-      }),
-    ).not.toBeNull()
     expect(
       migratedUnsupportedReason({
         ...compile(customizable),
@@ -110,6 +139,10 @@ describe('migratedUnsupportedReason', () => {
         },
       }),
     ).not.toBeNull()
+  })
+
+  it('accepts a compounding graduation pool', () => {
+    expect(migratedUnsupportedReason(compoundingParameters)).toBeNull()
   })
 })
 
@@ -172,5 +205,76 @@ describe('pullableLiquidityPercent', () => {
         creatorPermanentLockedLiquidityPercentage: 10,
       }),
     ).toBe(55)
+  })
+})
+
+describe('compounding graduation pool', () => {
+  it('opens exactly as a real compounding migration did', () => {
+    const chain = compoundingFixture.opening
+    const parameters = fromPoolConfig(
+      createDbcProgram(
+        connectionFor(SolanaNetwork.Mainnet),
+      ).program.coder.accounts.decode(
+        'poolConfig',
+        Buffer.from(compoundingFixture.configBase64, 'base64'),
+      ),
+    )
+    const opened = toMigratedPool(parameters, toPoolConfig(parameters))
+    expect(opened.collectFeeMode).toBe(CollectFeeMode.Compounding)
+    expect(opened.poolFees.compoundingFeeBps).toBe(1000)
+    expect({
+      liquidity: opened.liquidity.toString(),
+      sqrtPrice: opened.sqrtPrice.toString(),
+      reserveA: opened.tokenAAmount.toString(),
+      reserveB: opened.tokenBAmount.toString(),
+    }).toEqual({
+      liquidity: chain.liquidity,
+      sqrtPrice: chain.sqrtPrice,
+      reserveA: chain.reserveA,
+      reserveB: chain.reserveB,
+    })
+  })
+
+  const opened = toMigratedPool(
+    compoundingParameters,
+    toPoolConfig(compoundingParameters),
+  )
+
+  it('keeps the compounding share of a buy in its quote reserve', () => {
+    const swap = quoteMigratedSwap(opened, false, new BN(1_000_000_000), 0)
+    const after = afterMigratedSwap(opened, swap)
+    expect(swap.quote.compoundingFee.gtn(0)).toBe(true)
+    expect(after.tokenBAmount.toString()).toBe(
+      opened.tokenBAmount
+        .add(swap.quote.excludedFeeInputAmount)
+        .add(swap.quote.compoundingFee)
+        .toString(),
+    )
+    expect(after.tokenAAmount.toString()).toBe(
+      opened.tokenAAmount.sub(swap.quote.outputAmount).toString(),
+    )
+    expect(after.sqrtPrice.gt(opened.sqrtPrice)).toBe(true)
+  })
+
+  it('pays a liquidity pull out of its reserves pro rata, keeping the dead liquidity', () => {
+    const unlocked = compile({
+      ...compoundingConfig,
+      liquidityDistribution: {
+        partnerLiquidityPercentage: 0,
+        partnerPermanentLockedLiquidityPercentage: 10,
+        creatorLiquidityPercentage: 90,
+        creatorPermanentLockedLiquidityPercentage: 0,
+      },
+    })
+    const pool = toMigratedPool(unlocked, toPoolConfig(unlocked))
+    const { pool: left, pulled } = withUnlockedLiquidityPulled(unlocked, pool)
+    expect(left.liquidity.gt(DEAD_LIQUIDITY)).toBe(true)
+    expect(left.tokenBAmount.add(pulled.quote).toString()).toBe(
+      pool.tokenBAmount.toString(),
+    )
+    // Roughly 90% of what LPs can own leaves; the dead liquidity never can.
+    const share = pulled.quote.muln(1000).div(pool.tokenBAmount).toNumber()
+    expect(share).toBeGreaterThan(890)
+    expect(share).toBeLessThan(900)
   })
 })

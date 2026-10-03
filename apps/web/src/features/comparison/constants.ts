@@ -18,3 +18,9 @@ export const SCENARIO_LIMITS = {
 
 /** Precision kept when turning a ratio of Q64 prices into a float multiple. */
 export const MULTIPLE_PRECISION = 1_000_000_000
+
+/** Comparison entries built from a real config, or cloned from one, carry these id prefixes. */
+export enum EntryIdPrefix {
+  OnChain = 'on-chain',
+  Clone = 'clone',
+}

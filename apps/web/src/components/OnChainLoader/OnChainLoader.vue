@@ -108,14 +108,14 @@
 </template>
 
 <script setup lang="ts">
+import type { RealLaunchesState } from './types'
+import { formatShare, formatSol, SolanaNetwork } from '../../core/shared'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { connectionFor, SolanaNetwork } from '../../core/config-deploy'
-import { formatShare, formatSol } from '../../features/comparison'
+import { connectionFor } from '../../core/config-deploy'
 import { loadOnChainConfig, MAX_ADDRESS_LENGTH } from '../../features/onchain-config'
 import type { OnChainConfig } from '../../features/onchain-config'
 import { fetchRealLaunches } from '../../features/real-launches'
-import type { RealLaunchesResult } from '../../features/real-launches'
 
 const emit = defineEmits<{ load: [loaded: OnChainConfig] }>()
 const { t } = useI18n()
@@ -126,12 +126,12 @@ const loading = ref(false)
 const status = ref<string | null>(null)
 const failed = ref(false)
 /** How the real launches on the last loaded config went; read after the config loads. */
-const real = ref<{ loading: true } | { loading: false, result: RealLaunchesResult } | null>(null)
+const real = ref<RealLaunchesState | null>(null)
 /** Bumped on every load, so a slower read for an earlier config never shows. */
-let loads = 0
+let lookup = 0
 
 const load = async (): Promise<void> => {
-  const attempt = ++loads
+  const current = ++lookup
   loading.value = true
   status.value = null
   real.value = null
@@ -139,7 +139,7 @@ const load = async (): Promise<void> => {
   loading.value = false
   failed.value = !result.ok
   if (!result.ok) {
-    status.value = t(`components.onChainLoader.rejections.${result.rejection}`, { detail: result.detail ?? '' })
+    status.value = t(`common.loadRejections.${result.rejection}`, { detail: result.detail ?? '' })
     return
   }
   status.value = t('components.onChainLoader.loaded')
@@ -147,11 +147,13 @@ const load = async (): Promise<void> => {
   real.value = { loading: true }
   const { configAddress, parameters, quoteToken } = result.loaded
   const launches = await fetchRealLaunches(connectionFor(result.loaded.network), configAddress, parameters, quoteToken)
-  if (attempt === loads) real.value = { loading: false, result: launches }
+  if (current === lookup) real.value = { loading: false, result: launches }
 }
 </script>
 
 <style lang="scss">
+@use '../../styles/mixins';
+
 .on-chain-loader__real {
   display: flex;
   flex-direction: column;
@@ -184,11 +186,7 @@ const load = async (): Promise<void> => {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-surface);
-  color: var(--color-surface-foreground);
+  @include mixins.surface;
 }
 
 .on-chain-loader__title {
@@ -228,13 +226,7 @@ const load = async (): Promise<void> => {
 
 .on-chain-loader__control,
 .on-chain-loader__load {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-background);
-  color: var(--color-background-foreground);
-  font-family: var(--font-family);
-  font-size: var(--font-size-2);
+  @include mixins.control;
 }
 
 .on-chain-loader__address {

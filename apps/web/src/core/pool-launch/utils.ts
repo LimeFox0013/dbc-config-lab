@@ -6,7 +6,7 @@ import {
   MetadataRejection,
 } from './constants'
 import type { TokenMetadata } from './types'
-import { BPS_SCALE } from '../launch-simulator'
+import { BPS_SCALE } from '../shared'
 
 /** The first reason the metadata cannot be used, or null when it can. */
 export const metadataRejection = (

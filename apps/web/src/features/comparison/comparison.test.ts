@@ -4,8 +4,6 @@ import { DEFAULT_SCENARIO, runScenario } from '../../core/sniper-scenario'
 import { compileLaunchConfig } from '../../core/launch-config'
 import {
   compareConfigs,
-  formatSol,
-  formatSolChange,
   presetEntry,
   pricePath,
   sanitizeScenario,
@@ -71,14 +69,6 @@ describe('sanitizeScenario', () => {
     expect(spec.seed).toBe(0)
     expect(spec.snipers.count).toBe(SCENARIO_LIMITS.maxTraders)
     expect(spec.humans.count).toBe(SCENARIO_LIMITS.minTraders)
-  })
-})
-
-describe('formatting', () => {
-  it('signs changes but not plain amounts', () => {
-    expect(formatSolChange(1.044)).toBe('+1.04')
-    expect(formatSolChange(-4.756)).toBe('-4.76')
-    expect(formatSol(0.613)).toBe('0.61')
   })
 })
 

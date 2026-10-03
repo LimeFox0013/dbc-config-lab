@@ -10,6 +10,8 @@ export interface ReplayedLaunch {
   migrated?: {
     pool: string
     swaps: number
+    /** The graduated pool compounds part of its fees into its own liquidity. */
+    compounding?: boolean
   }
 }
 

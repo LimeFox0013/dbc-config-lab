@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SolanaNetwork } from '../../core/config-deploy'
 import { canPrepare, isSafeWalletIcon } from '.'
+import { SolanaNetwork } from '../../core/shared'
 
 describe('canPrepare', () => {
   it('allows devnet without acknowledgement', () => {

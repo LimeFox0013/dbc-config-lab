@@ -10,21 +10,14 @@ import type {
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { QUOTE_TOKENS } from '../quote-token'
 import type { QuoteToken } from '../quote-token'
-import { CurveShape } from './constants'
+import {
+  CurveShape,
+  DEFAULT_MARKET_CAPS,
+  DEFAULT_WEIGHT_GROWTH,
+  LIQUIDITY_WEIGHT_SEGMENTS,
+  MIN_SHAPED_CURVE_LEFTOVER,
+} from './constants'
 import type { CurveSpec, LaunchConfig } from './types'
-
-/** Market caps (in the quote token; SOL here) at which every shape graduates near the 85 SOL standard baseline. */
-export const DEFAULT_MARKET_CAPS = {
-  initialMarketCap: 20,
-  migrationMarketCap: 425,
-} as const
-
-/** Segment count and default growth for liquidity-weighted curves. */
-export const LIQUIDITY_WEIGHT_SEGMENTS = 16
-export const DEFAULT_WEIGHT_GROWTH = 1.1
-
-/** Two-segment and weighted builders need a non-zero leftover buffer; 0.1% of a 1B supply. */
-export const MIN_SHAPED_CURVE_LEFTOVER = 1_000_000
 
 /** Weights where each segment holds `growth` times the liquidity of the one before. */
 export const geometricWeights = (growth: number): number[] =>

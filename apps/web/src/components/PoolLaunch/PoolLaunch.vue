@@ -1,63 +1,64 @@
 <template>
   <section class="pool-launch">
     <h3 class="pool-launch__title">
-      {{ t('components.deployPanel.launch.title') }}
+      {{ t('components.poolLaunch.title') }}
     </h3>
     <p class="pool-launch__hint">
-      {{ t('components.deployPanel.launch.intro') }}
+      {{ t(configLocked ? 'components.poolLaunch.introLocked' : 'components.poolLaunch.intro') }}
     </p>
 
     <div class="pool-launch__fields">
       <label class="pool-launch__field pool-launch__field--wide">
-        <span class="pool-launch__label">{{ t('components.deployPanel.launch.config') }}</span>
+        <span class="pool-launch__label">{{ t('components.poolLaunch.config') }}</span>
         <input
           v-model.trim="configAddress"
           class="pool-launch__input"
           type="text"
           spellcheck="false"
           :maxlength="MAX_ADDRESS_LENGTH"
-          :disabled="inputsLocked"
+          :readonly="configLocked"
+          :disabled="busy"
         />
       </label>
       <label class="pool-launch__field">
-        <span class="pool-launch__label">{{ t('components.deployPanel.launch.name') }}</span>
+        <span class="pool-launch__label">{{ t('components.poolLaunch.name') }}</span>
         <input
           v-model="metadata.name"
           class="pool-launch__input"
           type="text"
           :maxlength="METADATA_LIMITS.name"
-          :disabled="inputsLocked"
+          :disabled="busy"
         />
       </label>
       <label class="pool-launch__field">
-        <span class="pool-launch__label">{{ t('components.deployPanel.launch.symbol') }}</span>
+        <span class="pool-launch__label">{{ t('components.poolLaunch.symbol') }}</span>
         <input
           v-model="metadata.symbol"
           class="pool-launch__input"
           type="text"
           :maxlength="METADATA_LIMITS.symbol"
-          :disabled="inputsLocked"
+          :disabled="busy"
         />
       </label>
       <label class="pool-launch__field pool-launch__field--wide">
-        <span class="pool-launch__label">{{ t('components.deployPanel.launch.uri') }}</span>
+        <span class="pool-launch__label">{{ t('components.poolLaunch.uri') }}</span>
         <input
           v-model="metadata.uri"
           class="pool-launch__input"
           type="url"
           :maxlength="METADATA_LIMITS.uri"
-          :disabled="inputsLocked"
+          :disabled="busy"
         />
       </label>
       <label class="pool-launch__field">
-        <span class="pool-launch__label">{{ t('components.deployPanel.launch.firstBuy') }}</span>
+        <span class="pool-launch__label">{{ t('components.poolLaunch.firstBuy') }}</span>
         <input
           v-model.number="firstBuy"
           class="pool-launch__input"
           type="number"
           min="0"
           step="any"
-          :disabled="inputsLocked"
+          :disabled="busy"
         />
       </label>
     </div>
@@ -66,7 +67,7 @@
       v-if="rejection && (metadata.name || metadata.symbol || metadata.uri)"
       class="pool-launch__hint"
     >
-      {{ t(`components.deployPanel.launch.rejections.${rejection}`) }}
+      {{ t(`components.poolLaunch.rejections.${rejection}`) }}
     </p>
 
     <button
@@ -76,7 +77,7 @@
       :disabled="!prepareAllowed || step === DeployStep.Preparing"
       @click="prepare"
     >
-      {{ step === DeployStep.Preparing ? t('components.deployPanel.preparing') : t('components.deployPanel.launch.prepare') }}
+      {{ step === DeployStep.Preparing ? t('common.signing.preparing') : t('components.poolLaunch.prepare') }}
     </button>
 
     <dl
@@ -87,50 +88,50 @@
       <dd class="pool-launch__value pool-launch__value--network">
         {{ prepared.summary.network }}
       </dd>
-      <dt>{{ t('components.deployPanel.launch.summary.token') }}</dt>
+      <dt>{{ t('components.poolLaunch.summary.token') }}</dt>
       <dd class="pool-launch__value">
-        {{ t('components.deployPanel.launch.summary.tokenValue', { name: prepared.summary.metadata.name, symbol: prepared.summary.metadata.symbol }) }}
+        {{ t('components.poolLaunch.summary.tokenValue', { name: prepared.summary.metadata.name, symbol: prepared.summary.metadata.symbol }) }}
       </dd>
-      <dt>{{ t('components.deployPanel.launch.summary.mint') }}</dt>
+      <dt>{{ t('components.poolLaunch.summary.mint') }}</dt>
       <dd class="pool-launch__value">
         {{ prepared.summary.mintAddress }}
       </dd>
-      <dt>{{ t('components.deployPanel.launch.summary.pool') }}</dt>
+      <dt>{{ t('components.poolLaunch.summary.pool') }}</dt>
       <dd class="pool-launch__value">
         {{ prepared.summary.poolAddress }}
       </dd>
-      <dt>{{ t('components.deployPanel.launch.config') }}</dt>
+      <dt>{{ t('components.poolLaunch.config') }}</dt>
       <dd class="pool-launch__value">
         {{ prepared.summary.configAddress }}
       </dd>
-      <dt>{{ t('components.deployPanel.launch.summary.creator') }}</dt>
+      <dt>{{ t('components.poolLaunch.summary.creator') }}</dt>
       <dd class="pool-launch__value">
         {{ prepared.summary.creator }}
       </dd>
-      <dt>{{ t('components.deployPanel.launch.uri') }}</dt>
+      <dt>{{ t('components.poolLaunch.uri') }}</dt>
       <dd class="pool-launch__value">
-        {{ prepared.summary.metadata.uri || t('components.deployPanel.launch.summary.noUri') }}
+        {{ prepared.summary.metadata.uri || t('components.poolLaunch.summary.noUri') }}
       </dd>
       <ConfigTermsRows :terms="prepared.summary.terms" />
-      <dt>{{ t('components.deployPanel.launch.firstBuy') }}</dt>
+      <dt>{{ t('components.poolLaunch.firstBuy') }}</dt>
       <dd
         class="pool-launch__value"
         :class="{ 'pool-launch__value--warning': highFee }"
       >
         <template v-if="prepared.summary.firstBuy">
           {{
-            t('components.deployPanel.launch.summary.firstBuyValue', {
+            t('components.poolLaunch.summary.firstBuyValue', {
               amount: prepared.summary.firstBuy.amount,
               symbol: QUOTE_TOKENS[prepared.summary.quoteToken].symbol,
-              tokens: tokenFormat.format(prepared.summary.firstBuy.expectedTokens),
-              minimum: tokenFormat.format(prepared.summary.firstBuy.minimumTokens),
-              fee: prepared.summary.firstBuy.baseFeeBps / 100,
+              tokens: formatCount(prepared.summary.firstBuy.expectedTokens),
+              minimum: formatCount(prepared.summary.firstBuy.minimumTokens),
+              fee: percentFromBps(prepared.summary.firstBuy.baseFeeBps),
             })
           }}
-          <span v-if="prepared.summary.firstBuy.atMinimumFee">{{ t('components.deployPanel.launch.summary.atMinimumFee') }}</span>
+          <span v-if="prepared.summary.firstBuy.atMinimumFee">{{ t('components.poolLaunch.summary.atMinimumFee') }}</span>
         </template>
         <template v-else>
-          {{ t('components.deployPanel.launch.summary.noFirstBuy') }}
+          {{ t('components.poolLaunch.summary.noFirstBuy') }}
         </template>
       </dd>
     </dl>
@@ -140,21 +141,21 @@
       class="pool-launch__error"
       role="alert"
     >
-      {{ t('components.deployPanel.launch.creationFee', { sol: prepared.summary.terms.poolCreationFeeSol }) }}
+      {{ t('components.poolLaunch.creationFee', { sol: prepared.summary.terms.poolCreationFeeSol }) }}
     </p>
     <p
       v-if="prepared && PARTNER_AUTHORITY_OPTIONS.has(prepared.summary.terms.tokenAuthority) && step !== DeployStep.Done"
       class="pool-launch__error"
       role="alert"
     >
-      {{ t('components.deployPanel.launch.partnerAuthority') }}
+      {{ t('components.poolLaunch.partnerAuthority') }}
     </p>
     <p
       v-if="prepared && highFee && step !== DeployStep.Done"
       class="pool-launch__error"
       role="alert"
     >
-      {{ t('components.deployPanel.launch.highFee', { fee: (prepared.summary.firstBuy?.baseFeeBps ?? 0) / 100 }) }}
+      {{ t('components.poolLaunch.highFee', { fee: percentFromBps(prepared.summary.firstBuy?.baseFeeBps ?? 0) }) }}
     </p>
 
     <button
@@ -164,32 +165,32 @@
       :disabled="step === DeployStep.Signing"
       @click="signAndSend"
     >
-      {{ step === DeployStep.Signing ? t('components.deployPanel.signing') : t('components.deployPanel.sign') }}
+      {{ step === DeployStep.Signing ? t('common.signing.signing') : t('common.signing.sign') }}
     </button>
 
     <p
       v-if="step === DeployStep.Done && signature && prepared"
       class="pool-launch__done"
     >
-      {{ t('components.deployPanel.launch.done') }}
+      {{ t('components.poolLaunch.done') }}
       <a
         :href="explorerAddressUrl(prepared.summary.mintAddress, network)"
         target="_blank"
         rel="noopener noreferrer"
         class="pool-launch__link"
-      >{{ t('components.deployPanel.launch.viewToken') }}</a>
+      >{{ t('components.poolLaunch.viewToken') }}</a>
       <a
         :href="explorerAddressUrl(prepared.summary.poolAddress, network)"
         target="_blank"
         rel="noopener noreferrer"
         class="pool-launch__link"
-      >{{ t('components.deployPanel.launch.viewPool') }}</a>
+      >{{ t('components.poolLaunch.viewPool') }}</a>
       <a
         :href="explorerTransactionUrl(signature, network)"
         target="_blank"
         rel="noopener noreferrer"
         class="pool-launch__link"
-      >{{ t('components.deployPanel.viewTransaction') }}</a>
+      >{{ t('common.signing.viewTransaction') }}</a>
     </p>
 
     <p
@@ -199,10 +200,18 @@
     >
       {{ error }}
     </p>
+    <p
+      v-if="loadRejection"
+      class="pool-launch__error"
+      role="alert"
+    >
+      {{ t(`common.loadRejections.${loadRejection.rejection}`, { detail: loadRejection.detail ?? '' }) }}
+    </p>
   </section>
 </template>
 
 <script setup lang="ts">
+import { formatCount, percentFromBps } from '../../core/shared'
 import { computed, toRefs, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { explorerAddressUrl, explorerTransactionUrl } from '../../core/config-deploy'
@@ -213,9 +222,9 @@ import { MAX_ADDRESS_LENGTH } from '../../features/onchain-config'
 import { usePoolLaunch } from '../../features/pool-launch'
 import { ConfigTermsRows } from '../ConfigTermsRows'
 import { HIGH_FIRST_BUY_FEE_BPS } from './constants'
-import type { PoolLaunchSectionProps } from './types'
+import type { PoolLaunchProps } from './types'
 
-const props = defineProps<PoolLaunchSectionProps>()
+const props = withDefaults(defineProps<PoolLaunchProps>(), { configLocked: false })
 /** The panel's network and wallet must not change while a launch is prepared or signed. */
 const emit = defineEmits<{ busy: [busy: boolean] }>()
 const { t } = useI18n()
@@ -228,23 +237,25 @@ const {
   rejection,
   prepared,
   step,
+  busy,
   error,
+  loadRejection,
   signature,
   prepareAllowed,
   prepare,
   signAndSend,
 } = usePoolLaunch({ network, connected, mainnetAcknowledged }, initialConfigAddress)
 
-const inputsLocked = computed(() => step.value === DeployStep.Preparing || step.value === DeployStep.Signing)
-watch(inputsLocked, (busy) => emit('busy', busy))
+watch(busy, (value) => emit('busy', value))
 
 /** A first buy paying an anti-sniper fee is almost always a mistake worth stating. */
 const highFee = computed(() => (prepared.value?.summary.firstBuy?.baseFeeBps ?? 0) >= HIGH_FIRST_BUY_FEE_BPS)
 
-const tokenFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 </script>
 
 <style lang="scss">
+@use '../../styles/mixins';
+
 .pool-launch {
   display: flex;
   flex-direction: column;
@@ -284,23 +295,12 @@ const tokenFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
 .pool-launch__input,
 .pool-launch__button {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width-1) solid var(--color-border);
-  border-radius: var(--radius-2);
-  background: var(--color-background);
-  color: var(--color-background-foreground);
-  font-family: var(--font-family);
-  font-size: var(--font-size-2);
+  @include mixins.control;
 }
 
 .pool-launch__button {
   align-self: flex-start;
-  cursor: pointer;
-
-  &:disabled {
-    cursor: not-allowed;
-    color: var(--color-muted-foreground);
-  }
+  @include mixins.clickable;
 }
 
 .pool-launch__button--primary:enabled {

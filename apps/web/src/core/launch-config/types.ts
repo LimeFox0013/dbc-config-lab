@@ -1,3 +1,4 @@
+import type { BaseFeeMode } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type {
   BuildCurveBaseParams,
   ConfigParameters,
@@ -49,4 +50,15 @@ export interface LaunchPreset {
   /** What the preset is for, in plain language. */
   intent: string
   config: LaunchConfig
+}
+
+export type ScheduleMode =
+  BaseFeeMode.FeeSchedulerLinear | BaseFeeMode.FeeSchedulerExponential
+
+/** A fee that falls from `startingFeeBps` to `endingFeeBps` over a window; flat when the window is 0. */
+export interface FeeSchedule {
+  mode: ScheduleMode
+  startingFeeBps: number
+  endingFeeBps: number
+  windowSeconds: number
 }

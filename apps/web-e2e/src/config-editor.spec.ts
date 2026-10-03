@@ -52,6 +52,25 @@ test.describe('config editor', () => {
     await expect(editor(page).getByText(/below the 750 USDC/)).toBeVisible()
   })
 
+  test('a custom graduation pool can compound part of its fees into its liquidity', async ({
+    page,
+  }) => {
+    await editor(page)
+      .getByRole('combobox', { name: 'Graduation pool fee' })
+      .selectOption({ label: 'Custom' })
+    await editor(page)
+      .getByRole('combobox', { name: 'Graduation pool fees' })
+      .selectOption({ label: 'Partly compounded into the pool' })
+    await expect(
+      editor(page).getByRole('spinbutton', {
+        name: /Share of LP fees compounded/,
+      }),
+    ).toHaveValue('50')
+    await expect(
+      editor(page).getByText('Meteora would accept this config.'),
+    ).toBeVisible()
+  })
+
   test('a falling fee reveals its opening fee and window', async ({ page }) => {
     await expect(
       editor(page).getByRole('spinbutton', { name: /Falls over/ }),

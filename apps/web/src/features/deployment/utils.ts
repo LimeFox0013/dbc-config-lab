@@ -1,5 +1,5 @@
-import { SolanaNetwork } from '../../core/config-deploy'
 import { WALLET_ICON_PREFIX } from './constants'
+import { SolanaNetwork } from '../../core/shared'
 
 export const isSafeWalletIcon = (icon: string): boolean =>
   icon.startsWith(WALLET_ICON_PREFIX)

@@ -7,11 +7,11 @@ test.describe('replay check', () => {
     await page.goto('/')
     const check = page.locator('.replay-check')
     await expect(check.locator('summary')).toContainText(
-      '3 mainnet launches, 322 bonding-curve swaps, 2 graduations and 889 swaps after graduation',
+      '5 mainnet launches, 335 bonding-curve swaps, 4 graduations and 919 swaps after graduation',
     )
     await check.locator('summary').click()
     const links = check.getByRole('link')
-    await expect(links).toHaveCount(5)
+    await expect(links).toHaveCount(9)
     await expect(check).toContainText('1 curve swap ·')
     await expect(links.first()).toHaveAttribute(
       'href',

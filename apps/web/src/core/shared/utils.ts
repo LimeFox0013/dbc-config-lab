@@ -1,3 +1,4 @@
+import { ADDRESS_EDGE } from './constants'
 /** A thrown value as readable text. */
 export const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
@@ -21,3 +22,11 @@ export const plainCopy = <T>(value: T): T => {
   const copy: T = JSON.parse(JSON.stringify(value))
   return copy
 }
+
+/** An address shortened for display, e.g. "DrkD…Kt5D". */
+export const shortAddress = (address: string): string =>
+  `${address.slice(0, ADDRESS_EDGE)}…${address.slice(-ADDRESS_EDGE)}`
+
+/** A plain object, as untrusted JSON may or may not contain one. */
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)

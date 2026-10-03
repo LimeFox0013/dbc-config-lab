@@ -28,7 +28,7 @@ import {
   ReadError,
   record,
 } from './readers'
-import type { Reader } from './readers'
+import type { Reader } from './types'
 
 const TOKEN_TYPES = [TokenType.SPLToken, TokenType.Token2022]
 const TOKEN_DECIMALS = [

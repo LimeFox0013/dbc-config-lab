@@ -1,19 +1,28 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Keypair } from '@solana/web3.js'
 import type { Connection } from '@solana/web3.js'
+import BN from 'bn.js'
 import {
+  CollectFeeMode,
+  MigratedCollectFeeMode,
   MigrationFeeOption,
   TokenAuthorityOption,
+  TokenType,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { DEFAULT_LAUNCH_CONFIG, withQuoteToken } from '../launch-config'
+import {
+  compileLaunchConfig,
+  DEFAULT_LAUNCH_CONFIG,
+  withQuoteToken,
+} from '../launch-config'
 import { QUOTE_TOKENS, QuoteToken } from '../quote-token'
 import {
+  configTerms,
   connectionFor,
   explorerAddressUrl,
   explorerTransactionUrl,
   prepareDeployment,
-  SolanaNetwork,
 } from '.'
+import { SolanaNetwork } from '../shared'
 
 describe('explorer links', () => {
   it('adds the cluster for devnet and nothing for mainnet', () => {
@@ -149,7 +158,10 @@ describe('prepareDeployment', () => {
         creatorPercentage: 40,
         creatorLockedPercentage: 10,
       },
-      lockedVestingTokens: 0,
+      lockedVesting: { totalTokens: 0 },
+      partnerLiquidityVesting: null,
+      creatorLiquidityVesting: null,
+      migrationPoolFeeBps: 200,
       migrationFeeOption: MigrationFeeOption.FixedBps200,
       migrationFeePercentage: 5,
       migrationCreatorFeePercentage: 50,
@@ -179,6 +191,87 @@ describe('prepareDeployment', () => {
       quoteMint: devnetUsdc,
       migrationThreshold: 12_750,
       keepersMigrate: true,
+    })
+  })
+})
+
+describe('configTerms', () => {
+  const compiled = compileLaunchConfig(DEFAULT_LAUNCH_CONFIG)
+  if (!compiled.ok) throw new Error(compiled.reason)
+  const base = compiled.parameters
+  const DAY = 86_400
+  const tokens = (whole: number) =>
+    new BN(whole).mul(new BN(10).pow(new BN(base.tokenDecimal)))
+
+  it('shows every term that decides who gets the graduation liquidity, and when', () => {
+    const terms = configTerms(
+      {
+        ...base,
+        partnerLiquidityPercentage: 0,
+        partnerPermanentLockedLiquidityPercentage: 10,
+        creatorLiquidityPercentage: 0,
+        creatorPermanentLockedLiquidityPercentage: 0,
+        creatorLiquidityVestingInfo: {
+          vestingPercentage: 90,
+          bpsPerPeriod: 0,
+          numberOfPeriods: 12,
+          cliffDurationFromMigrationTime: 365 * DAY,
+          frequency: 30 * DAY,
+        },
+      },
+      QuoteToken.Sol,
+    )
+    expect(terms.partnerLiquidityVesting).toBeNull()
+    expect(terms.creatorLiquidityVesting).toEqual({
+      percentage: 90,
+      cliffSeconds: 365 * DAY,
+      periods: 12,
+      periodSeconds: 30 * DAY,
+    })
+  })
+
+  it('shows the graduated pool fee, how fees are taken, supply, token program and vesting schedule', () => {
+    const terms = configTerms(
+      {
+        ...base,
+        collectFeeMode: CollectFeeMode.OutputToken,
+        migrationFeeOption: MigrationFeeOption.Customizable,
+        migratedPoolFee: {
+          ...base.migratedPoolFee,
+          collectFeeMode: MigratedCollectFeeMode.Compounding,
+          poolFeeBps: 1000,
+        },
+        compoundingFeeBps: 2500,
+        tokenType: TokenType.Token2022,
+        tokenSupply: {
+          preMigrationTokenSupply: tokens(1_000_000_000),
+          postMigrationTokenSupply: tokens(900_000_000),
+        },
+        lockedVesting: {
+          amountPerPeriod: tokens(1_000),
+          cliffDurationFromMigrationTime: new BN(7 * DAY),
+          frequency: new BN(DAY),
+          numberOfPeriod: new BN(10),
+          cliffUnlockAmount: tokens(5_000),
+        },
+      },
+      QuoteToken.Sol,
+    )
+    expect(terms).toMatchObject({
+      feesCollectedIn: CollectFeeMode.OutputToken,
+      migrationPoolFeeBps: 1000,
+      graduatedFeesCollectedIn: MigratedCollectFeeMode.Compounding,
+      compoundingFeeBps: 2500,
+      tokenType: TokenType.Token2022,
+      fixedSupply: { preMigration: 1_000_000_000, postMigration: 900_000_000 },
+      lockedVesting: {
+        totalTokens: 15_000,
+        cliffTokens: 5_000,
+        cliffSeconds: 7 * DAY,
+        tokensPerPeriod: 1_000,
+        periods: 10,
+        periodSeconds: DAY,
+      },
     })
   })
 })
