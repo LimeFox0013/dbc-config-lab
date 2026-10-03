@@ -8,6 +8,7 @@
         {{ t('views.compare.subtitle') }}
       </p>
     </header>
+    <ReplayCheck />
     <p
       v-if="sharedNotice"
       class="compare-view__notice"
@@ -41,6 +42,7 @@ import { ConfigEditor } from '../components/ConfigEditor'
 import { DeployPanel } from '../components/DeployPanel'
 import { OnChainLoader } from '../components/OnChainLoader'
 import { RecommenderPanel } from '../components/RecommenderPanel'
+import { ReplayCheck } from '../components/ReplayCheck'
 import { ScenarioControls } from '../components/ScenarioControls'
 import { LAUNCH_PRESETS } from '../core/launch-config'
 import type { LaunchPreset } from '../core/launch-config'

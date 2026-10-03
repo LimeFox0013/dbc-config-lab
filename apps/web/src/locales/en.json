@@ -22,6 +22,17 @@
     }
   },
   "components": {
+    "replayCheck": {
+      "summary": "Checked against real launches: {launches} mainnet launches, {curveSwaps} bonding-curve swaps, {migrations} graduations and {migratedSwaps} swaps after graduation — every fee, amount and price equal to the chain.",
+      "explanation": "Each launch was rebuilt from a fresh pool by replaying its own on-chain swap history through this simulator; every swap's fees, output and resulting price, and each graduation pool's opening liquidity, matched what the programs recorded. Run the command to check it yourself — read-only, over the public RPC.",
+      "curveSwaps": "{n} curve swap | {n} curve swaps",
+      "migratedSwaps": "{n} swap after graduation | {n} swaps after graduation",
+      "feeSetup": {
+        "volatility-fee": "Volatility fee",
+        "fees-in-token": "Fees taken in the token",
+        "fees-in-sol": "Fees taken in SOL"
+      }
+    },
     "scenarioControls": {
       "legend": "Trader scenario",
       "seed": "Seed",

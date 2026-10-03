@@ -129,7 +129,7 @@ const load = async (): Promise<void> => {
 
 .on-chain-loader__field--wide {
   flex: 1;
-  min-width: var(--text-max-width-narrow);
+  min-width: min(var(--text-max-width-narrow), 100%);
 }
 
 .on-chain-loader__control,

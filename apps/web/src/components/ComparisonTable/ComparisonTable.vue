@@ -1,105 +1,107 @@
 <template>
-  <table class="comparison-table">
-    <caption class="comparison-table__caption">
-      {{ t('components.comparisonTable.caption') }}
-    </caption>
-    <thead>
-      <tr>
-        <th
-          scope="col"
-          class="comparison-table__head"
+  <div class="comparison-table">
+    <table class="comparison-table__table">
+      <caption class="comparison-table__caption">
+        {{ t('components.comparisonTable.caption') }}
+      </caption>
+      <thead>
+        <tr>
+          <th
+            scope="col"
+            class="comparison-table__head"
+          >
+            {{ t('components.comparisonTable.config') }}
+          </th>
+          <th
+            scope="col"
+            class="comparison-table__head comparison-table__head--number"
+          >
+            {{ t('components.comparisonTable.sniperProfit') }}
+          </th>
+          <th
+            scope="col"
+            class="comparison-table__head comparison-table__head--number"
+          >
+            {{ t('components.comparisonTable.adaptiveSniperProfit') }}
+          </th>
+          <th
+            scope="col"
+            class="comparison-table__head comparison-table__head--number"
+          >
+            {{ t('components.comparisonTable.humanProfit') }}
+          </th>
+          <th
+            scope="col"
+            class="comparison-table__head comparison-table__head--number"
+          >
+            {{ t('components.comparisonTable.humanFees') }}
+          </th>
+          <th
+            scope="col"
+            class="comparison-table__head comparison-table__head--number"
+          >
+            {{ t('components.comparisonTable.partnerCreatorFees') }}
+          </th>
+          <th
+            scope="col"
+            class="comparison-table__head"
+          >
+            {{ t('components.comparisonTable.graduated') }}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          v-for="row in rows"
+          :key="row.entry.id"
+          class="comparison-table__row"
         >
-          {{ t('components.comparisonTable.config') }}
-        </th>
-        <th
-          scope="col"
-          class="comparison-table__head comparison-table__head--number"
-        >
-          {{ t('components.comparisonTable.sniperProfit') }}
-        </th>
-        <th
-          scope="col"
-          class="comparison-table__head comparison-table__head--number"
-        >
-          {{ t('components.comparisonTable.adaptiveSniperProfit') }}
-        </th>
-        <th
-          scope="col"
-          class="comparison-table__head comparison-table__head--number"
-        >
-          {{ t('components.comparisonTable.humanProfit') }}
-        </th>
-        <th
-          scope="col"
-          class="comparison-table__head comparison-table__head--number"
-        >
-          {{ t('components.comparisonTable.humanFees') }}
-        </th>
-        <th
-          scope="col"
-          class="comparison-table__head comparison-table__head--number"
-        >
-          {{ t('components.comparisonTable.partnerCreatorFees') }}
-        </th>
-        <th
-          scope="col"
-          class="comparison-table__head"
-        >
-          {{ t('components.comparisonTable.graduated') }}
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr
-        v-for="row in rows"
-        :key="row.entry.id"
-        class="comparison-table__row"
-      >
-        <th
-          scope="row"
-          class="comparison-table__config"
-        >
-          <span class="comparison-table__name">{{ row.entry.name }}</span>
-          <span class="comparison-table__intent">{{ row.entry.intent }}</span>
-        </th>
-        <template v-if="row.ok">
-          <td :class="amountClass(row.metrics.sniperProfit)">
-            {{ formatSolChange(row.metrics.sniperProfit) }}
+          <th
+            scope="row"
+            class="comparison-table__config"
+          >
+            <span class="comparison-table__name">{{ row.entry.name }}</span>
+            <span class="comparison-table__intent">{{ row.entry.intent }}</span>
+          </th>
+          <template v-if="row.ok">
+            <td :class="amountClass(row.metrics.sniperProfit)">
+              {{ formatSolChange(row.metrics.sniperProfit) }}
+            </td>
+            <td :class="amountClass(row.metrics.adaptiveSniperProfit)">
+              {{ formatSolChange(row.metrics.adaptiveSniperProfit) }}
+            </td>
+            <td :class="amountClass(row.metrics.humanProfit)">
+              {{ formatSolChange(row.metrics.humanProfit) }}
+            </td>
+            <td class="comparison-table__amount">
+              {{ formatSol(row.metrics.humanFees) }}
+            </td>
+            <td class="comparison-table__amount">
+              {{ formatSol(row.metrics.partnerCreatorFees + row.metrics.postGraduationFees) }}
+              <span
+                v-if="row.metrics.postGraduationFees > 0"
+                class="comparison-table__detail"
+              >{{ t('components.comparisonTable.afterGraduation', { sol: formatSol(row.metrics.postGraduationFees) }) }}</span>
+            </td>
+            <td class="comparison-table__cell">
+              {{
+                row.metrics.graduationSeconds === null
+                  ? t('components.comparisonTable.no')
+                  : t('components.comparisonTable.graduatedAfter', { seconds: row.metrics.graduationSeconds })
+              }}
+            </td>
+          </template>
+          <td
+            v-else
+            colspan="6"
+            class="comparison-table__refused"
+          >
+            {{ t('components.comparisonTable.refused', { reason: row.reason }) }}
           </td>
-          <td :class="amountClass(row.metrics.adaptiveSniperProfit)">
-            {{ formatSolChange(row.metrics.adaptiveSniperProfit) }}
-          </td>
-          <td :class="amountClass(row.metrics.humanProfit)">
-            {{ formatSolChange(row.metrics.humanProfit) }}
-          </td>
-          <td class="comparison-table__amount">
-            {{ formatSol(row.metrics.humanFees) }}
-          </td>
-          <td class="comparison-table__amount">
-            {{ formatSol(row.metrics.partnerCreatorFees + row.metrics.postGraduationFees) }}
-            <span
-              v-if="row.metrics.postGraduationFees > 0"
-              class="comparison-table__detail"
-            >{{ t('components.comparisonTable.afterGraduation', { sol: formatSol(row.metrics.postGraduationFees) }) }}</span>
-          </td>
-          <td class="comparison-table__cell">
-            {{
-              row.metrics.graduationSeconds === null
-                ? t('components.comparisonTable.no')
-                : t('components.comparisonTable.graduatedAfter', { seconds: row.metrics.graduationSeconds })
-            }}
-          </td>
-        </template>
-        <td
-          v-else
-          colspan="6"
-          class="comparison-table__refused"
-        >
-          {{ t('components.comparisonTable.refused', { reason: row.reason }) }}
-        </td>
-      </tr>
-    </tbody>
-  </table>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -117,13 +119,17 @@ const amountClass = (sol: number): string[] => [
 </script>
 
 <style lang="scss">
+/* Wide tables scroll inside their own box instead of widening the page. */
 .comparison-table {
+  overflow-x: auto;
+  border-radius: var(--radius-2);
+}
+
+.comparison-table__table {
   width: 100%;
   border-collapse: collapse;
   background: var(--color-surface);
   color: var(--color-surface-foreground);
-  border-radius: var(--radius-2);
-  overflow: hidden;
 }
 
 .comparison-table__caption {
