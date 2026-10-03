@@ -154,6 +154,8 @@ import type { MeanMetrics, Objective } from '../../core/config-search'
 import type { CurveSpec, FeeSchedule } from '../../core/launch-config'
 import { CurveShape, DEFAULT_LAUNCH_CONFIG, LAUNCH_PRESETS, weightGrowthOf } from '../../core/launch-config'
 import type { LaunchPreset } from '../../core/launch-config'
+import { QUOTE_TOKENS } from '../../core/quote-token'
+import type { QuoteToken } from '../../core/quote-token'
 import { formatShare, formatSol, formatSolChange } from '../../features/comparison'
 import { createRecommender, GOAL_OBJECTIVES, LaunchGoal, matchingPreset, RECOMMENDED_PRESET_ID } from '../../features/recommendation'
 import type { Proposal, Recommendation } from '../../features/recommendation'
@@ -243,27 +245,30 @@ const measuresLabel = (metrics: MeanMetrics): string =>
   ].join(' · ')
 
 /** The curve in plain words; null means the user's own curve. */
-const curveLabel = (curve: CurveSpec): string => {
+const curveLabel = (curve: CurveSpec, quote: QuoteToken): string => {
+  const symbol = QUOTE_TOKENS[quote].symbol
   switch (curve.curveShape) {
     case CurveShape.Standard:
-      return t('components.recommenderPanel.curves.standard', { sol: curve.migrationQuoteThreshold })
+      return t('components.recommenderPanel.curves.standard', { amount: curve.migrationQuoteThreshold, symbol })
     case CurveShape.LiquidityWeights:
       return t('components.recommenderPanel.curves.liquidity-weights', {
         from: curve.initialMarketCap,
         to: curve.migrationMarketCap,
+        symbol,
         growth: weightGrowthOf(curve.liquidityWeights).toFixed(2),
       })
     default:
       return t(`components.recommenderPanel.curves.${curve.curveShape}`, {
         from: curve.initialMarketCap,
         to: curve.migrationMarketCap,
+        symbol,
       })
   }
 }
 
 const proposalLabel = (proposal: Proposal): string =>
   proposal.candidate.curve ?
-    `${scheduleLabel(proposal.candidate.schedule)} · ${curveLabel(proposal.candidate.curve)}` :
+    `${scheduleLabel(proposal.candidate.schedule)} · ${curveLabel(proposal.candidate.curve, proposal.candidate.config.quoteToken)}` :
       scheduleLabel(proposal.candidate.schedule)
 
 const scheduleLabel = (schedule: FeeSchedule): string =>

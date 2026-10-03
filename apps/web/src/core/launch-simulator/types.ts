@@ -9,13 +9,30 @@ interface TradeBase {
   trader: string
 }
 
-export type Trade =
+/** A trade whose side and size are known before the replay reaches it. */
+export type ExecutableTrade =
   | (TradeBase & {
       side: TradeSide.Buy | TradeSide.Sell
-      /** Quote lamports for a buy, base units for a sell. */
+      /** Quote base units for a buy, base units for a sell. */
       amountIn: BN
     })
   | (TradeBase & { side: TradeSide.SellAll })
+
+/**
+ * A trade decided when the replay reaches it: a buy of `clip` while the live price is more
+ * than `gapBps` below the fair price, a sale worth about `clip` while it is that far above
+ * (up to the trader's holding), otherwise nothing.
+ */
+export type FairPriceTrade = TradeBase & {
+  side: TradeSide.TowardFairPrice
+  /** Quote base units per base unit, scaled by 2^128 like sqrtPrice². */
+  fairPriceX128: BN
+  /** Quote base units. */
+  clip: BN
+  gapBps: number
+}
+
+export type Trade = ExecutableTrade | FairPriceTrade
 
 export interface FeeShares {
   partner: BN
@@ -25,7 +42,8 @@ export interface FeeShares {
 }
 
 export interface TradeOutcome {
-  trade: Trade
+  /** The trade as executed; a fair-price trade appears as the buy or sale it became. */
+  trade: ExecutableTrade
   venue: Venue
   status: TradeStatus
   /** Input actually consumed, fee included. */
@@ -65,4 +83,15 @@ export interface SimulationResult {
 export interface SimulationOptions {
   /** Whoever holds unlocked liquidity in the migrated pool withdraws it right after graduation. */
   unlockedLiquidityPulled: boolean
+}
+
+export interface FirstBuyQuote {
+  /** Base units the buy receives. */
+  amountOut: BN
+  /** Quote base units it spends, fee included. */
+  amountInUsed: BN
+  /** The base fee the program charges this buy. */
+  baseFeeBps: number
+  /** The config lets the creator's bundled first buy pay only the minimum fee. */
+  atMinimumFee: boolean
 }

@@ -37,7 +37,8 @@ export type EditorField =
 export type EditResult =
   { ok: true; config: LaunchConfig } | { ok: false; reason: EditRejection }
 
+/** `keepersMigrate`: Meteora's migration keepers would graduate pools on this config. */
 export type EditorStatus =
-  | { valid: true; simulatable: true }
-  | { valid: true; simulatable: false; reason: string }
+  | { valid: true; simulatable: true; keepersMigrate: boolean }
+  | { valid: true; simulatable: false; reason: string; keepersMigrate: boolean }
   | { valid: false; reason: string }

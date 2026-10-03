@@ -5,12 +5,15 @@ import {
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   compileLaunchConfig,
+  CurveShape,
   DEFAULT_LAUNCH_CONFIG,
   LAUNCH_PRESETS,
+  withCurve,
+  withQuoteToken,
 } from '../launch-config'
 import type { LaunchConfig } from '../launch-config'
 import BN from 'bn.js'
-import { baseFeeBpsAt, TradeSide } from '../launch-simulator'
+import { baseFeeBpsAt, TradeSide, TradeStatus } from '../launch-simulator'
 import {
   DEFAULT_SCENARIO,
   generateTrades,
@@ -20,6 +23,7 @@ import {
   scenarioMetrics,
   TraderGroup,
 } from '.'
+import { QuoteToken } from '../quote-token'
 
 const compile = (config: LaunchConfig) => {
   const compiled = compileLaunchConfig(config)
@@ -44,9 +48,9 @@ const ANTI_SNIPE: LaunchConfig = {
 }
 
 const summary = (config: LaunchConfig) =>
-  Object.values(runScenario(compile(config), DEFAULT_SCENARIO).groups).map(
-    (g) => [g.group, g.spent.toString(), g.profit.toString()],
-  )
+  Object.values(
+    runScenario(compile(config), DEFAULT_SCENARIO, QuoteToken.Sol).groups,
+  ).map((g) => [g.group, g.spent.toString(), g.profit.toString()])
 
 describe('runScenario', () => {
   it('reproduces exactly from the same seed', () => {
@@ -57,14 +61,18 @@ describe('runScenario', () => {
 
   it('generates different trades for a different seed', () => {
     const at = (seed: number) =>
-      generateTrades({ ...DEFAULT_SCENARIO, seed }, () => 0).map((t) => t.at)
+      generateTrades(
+        { ...DEFAULT_SCENARIO, seed },
+        { feeBpsAt: () => 0, quote: QuoteToken.Sol, fairPriceX128: null },
+      ).map((t) => t.at)
     expect(at(1)).not.toEqual(at(2))
   })
 
   it('makes sniping less profitable under a falling fee schedule than under a flat fee', () => {
     const sniperProfit = (config: LaunchConfig) =>
-      runScenario(compile(config), DEFAULT_SCENARIO).groups[TraderGroup.Sniper]
-        .profit
+      runScenario(compile(config), DEFAULT_SCENARIO, QuoteToken.Sol).groups[
+        TraderGroup.Sniper
+      ].profit
 
     expect(
       sniperProfit(ANTI_SNIPE).lt(sniperProfit(DEFAULT_LAUNCH_CONFIG)),
@@ -75,6 +83,7 @@ describe('runScenario', () => {
     const { simulation, groups } = runScenario(
       compile(DEFAULT_LAUNCH_CONFIG),
       DEFAULT_SCENARIO,
+      QuoteToken.Sol,
     )
     const sniperSells = simulation.outcomes.filter(
       (o) =>
@@ -97,9 +106,11 @@ describe('runScenario', () => {
       [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         .map(
           (seed) =>
-            runScenario(parameters, { ...DEFAULT_SCENARIO, seed }).groups[
-              TraderGroup.Human
-            ].profit,
+            runScenario(
+              parameters,
+              { ...DEFAULT_SCENARIO, seed },
+              QuoteToken.Sol,
+            ).groups[TraderGroup.Human].profit,
         )
         .reduce((a, b) => a.add(b))
 
@@ -117,7 +128,7 @@ describe('adaptive snipers', () => {
     adaptiveSnipers: { ...DEFAULT_SCENARIO.adaptiveSnipers, count: 3 },
   }
   const adaptiveBuyTimes = (config: LaunchConfig) =>
-    runScenario(compile(config), withAdaptive)
+    runScenario(compile(config), withAdaptive, QuoteToken.Sol)
       .simulation.outcomes.filter(
         (o) =>
           o.trade.trader.startsWith(TraderGroup.AdaptiveSniper) &&
@@ -136,6 +147,7 @@ describe('adaptive snipers', () => {
     const buys = runScenario(
       parameters,
       withAdaptive,
+      QuoteToken.Sol,
     ).simulation.outcomes.filter(
       (o) =>
         o.trade.trader.startsWith(TraderGroup.AdaptiveSniper) &&
@@ -151,7 +163,7 @@ describe('adaptive snipers', () => {
 
   it('draws the same amounts under every config', () => {
     const amounts = (config: LaunchConfig) =>
-      runScenario(compile(config), withAdaptive)
+      runScenario(compile(config), withAdaptive, QuoteToken.Sol)
         .simulation.outcomes.filter((o) => o.trade.side === TradeSide.Buy)
         .map((o) =>
           o.trade.side === TradeSide.Buy ? o.trade.amountIn.toString() : '',
@@ -161,10 +173,14 @@ describe('adaptive snipers', () => {
   })
 
   it('profits more than a first-second sniper under a steep fee window', () => {
-    const { groups } = runScenario(compile(ANTI_SNIPE), {
-      ...withAdaptive,
-      adaptiveSnipers: { ...withAdaptive.adaptiveSnipers, count: 5 },
-    })
+    const { groups } = runScenario(
+      compile(ANTI_SNIPE),
+      {
+        ...withAdaptive,
+        adaptiveSnipers: { ...withAdaptive.adaptiveSnipers, count: 5 },
+      },
+      QuoteToken.Sol,
+    )
     expect(
       groups[TraderGroup.AdaptiveSniper].profit.gt(
         groups[TraderGroup.Sniper].profit,
@@ -178,7 +194,9 @@ describe('scenario presets', () => {
     '%s runs against every built-in config',
     (_, spec) => {
       LAUNCH_PRESETS.forEach((preset) => {
-        expect(() => runScenario(compile(preset.config), spec)).not.toThrow()
+        expect(() =>
+          runScenario(compile(preset.config), spec, QuoteToken.Sol),
+        ).not.toThrow()
       })
     },
   )
@@ -206,10 +224,18 @@ describe('fees in either token', () => {
     'a flat fee costs humans its rate on the SOL they trade (collect fee mode %s)',
     (mode) => {
       const parameters = compile(withCollectFeeMode(mode))
-      const { groups } = runScenario(parameters, DEFAULT_SCENARIO)
+      const { groups } = runScenario(
+        parameters,
+        DEFAULT_SCENARIO,
+        QuoteToken.Sol,
+      )
       const human = groups[TraderGroup.Human]
       const traded = human.spent.add(human.received).toNumber() / SOL
-      const { humanFees } = scenarioMetrics(parameters, DEFAULT_SCENARIO)
+      const { humanFees } = scenarioMetrics(
+        parameters,
+        DEFAULT_SCENARIO,
+        QuoteToken.Sol,
+      )
       expect(humanFees / traded).toBeGreaterThan(0.0099)
       expect(humanFees / traded).toBeLessThan(0.0102)
     },
@@ -219,10 +245,12 @@ describe('fees in either token', () => {
     const quote = scenarioMetrics(
       compile(withCollectFeeMode(CollectFeeMode.QuoteToken)),
       DEFAULT_SCENARIO,
+      QuoteToken.Sol,
     )
     const output = scenarioMetrics(
       compile(withCollectFeeMode(CollectFeeMode.OutputToken)),
       DEFAULT_SCENARIO,
+      QuoteToken.Sol,
     )
     expect(output.partnerCreatorFees).toBeGreaterThan(
       quote.partnerCreatorFees * 0.9,
@@ -239,8 +267,8 @@ describe('liquidity pulled after graduation', () => {
 
   it('changes nothing when all liquidity is locked, and says nothing was pulled', () => {
     const parameters = compile(DEFAULT_LAUNCH_CONFIG)
-    const kept = scenarioMetrics(parameters, hype)
-    const withdrawn = scenarioMetrics(parameters, pulled)
+    const kept = scenarioMetrics(parameters, hype, QuoteToken.Sol)
+    const withdrawn = scenarioMetrics(parameters, pulled, QuoteToken.Sol)
     expect(kept.liquidityPulled).toBeNull()
     expect(withdrawn.liquidityPulled).toBe(0)
     expect({ ...withdrawn, liquidityPulled: null }).toEqual(kept)
@@ -256,10 +284,87 @@ describe('liquidity pulled after graduation', () => {
         creatorPermanentLockedLiquidityPercentage: 10,
       },
     })
-    const kept = scenarioMetrics(parameters, hype)
-    const withdrawn = scenarioMetrics(parameters, pulled)
+    const kept = scenarioMetrics(parameters, hype, QuoteToken.Sol)
+    const withdrawn = scenarioMetrics(parameters, pulled, QuoteToken.Sol)
     expect(kept.graduated).toBe(true)
     expect(withdrawn.humanProfit).toBeLessThan(kept.humanProfit)
     expect(withdrawn.liquidityPulled).toBeGreaterThan(0)
+  })
+})
+
+describe('quote tokens', () => {
+  it('gives the same SOL figures for a launch and the same launch priced in USDC', () => {
+    const usdc = compileLaunchConfig(
+      withQuoteToken(DEFAULT_LAUNCH_CONFIG, QuoteToken.Usdc),
+    )
+    if (!usdc.ok) throw new Error(usdc.reason)
+    const inSol = scenarioMetrics(
+      compile(DEFAULT_LAUNCH_CONFIG),
+      DEFAULT_SCENARIO,
+      QuoteToken.Sol,
+    )
+    const inUsdc = scenarioMetrics(
+      usdc.parameters,
+      DEFAULT_SCENARIO,
+      QuoteToken.Usdc,
+    )
+    expect(inUsdc.humanProfit).toBeCloseTo(inSol.humanProfit, 2)
+    expect(inUsdc.sniperProfit).toBeCloseTo(inSol.sniperProfit, 2)
+    expect(inUsdc.raised).toBeCloseTo(inSol.raised, 2)
+  })
+})
+
+describe('arbitrage traders with an outside price', () => {
+  const stock = SCENARIO_PRESETS[ScenarioPresetId.StockListing]
+  const marketCapCurve = (initialMarketCap: number) =>
+    compile(
+      withCurve(DEFAULT_LAUNCH_CONFIG, {
+        curveShape: CurveShape.MarketCap,
+        initialMarketCap,
+        migrationMarketCap: stock.arbitrageurs.fairMarketCapSol,
+      }),
+    )
+
+  it('changes nothing in a situation without them', () => {
+    const metrics = scenarioMetrics(
+      compile(DEFAULT_LAUNCH_CONFIG),
+      DEFAULT_SCENARIO,
+      QuoteToken.Sol,
+    )
+    expect(metrics.arbitrageProfit).toBe(0)
+    expect(metrics.fairValueGapPercent).toBeNull()
+  })
+
+  it('trades the launch to the outside price', () => {
+    const { fairValueGapPercent } = scenarioMetrics(
+      compile(DEFAULT_LAUNCH_CONFIG),
+      stock,
+      QuoteToken.Sol,
+    )
+    expect(Math.abs(fairValueGapPercent ?? Infinity)).toBeLessThan(
+      (stock.arbitrageurs.gapBps / 100) * 2,
+    )
+  })
+
+  it('takes far more from a curve opening far below the outside price', () => {
+    const far = scenarioMetrics(marketCapCurve(20), stock, QuoteToken.Sol)
+    const near = scenarioMetrics(marketCapCurve(250), stock, QuoteToken.Sol)
+    expect(near.arbitrageProfit).toBeGreaterThanOrEqual(0)
+    expect(far.arbitrageProfit).toBeGreaterThan(near.arbitrageProfit * 5)
+  })
+
+  it('never tries to sell more than it holds', () => {
+    const { simulation } = runScenario(
+      compile(DEFAULT_LAUNCH_CONFIG),
+      stock,
+      QuoteToken.Sol,
+    )
+    const arbitrage = simulation.outcomes.filter((o) =>
+      o.trade.trader.startsWith(TraderGroup.Arbitrageur),
+    )
+    expect(arbitrage.some((o) => o.trade.side === TradeSide.Sell)).toBe(true)
+    expect(arbitrage.filter((o) => o.status === TradeStatus.Rejected)).toEqual(
+      [],
+    )
   })
 })

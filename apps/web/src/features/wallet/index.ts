@@ -7,7 +7,7 @@ import { SolanaSignAndSendTransaction } from '@solana/wallet-standard-features'
 import { StandardConnect } from '@wallet-standard/features'
 import { CHAIN_BY_NETWORK } from '../../core/config-deploy'
 import type {
-  PreparedDeployment,
+  PreparedTransaction,
   SolanaNetwork,
 } from '../../core/config-deploy'
 import type { DeployWallet } from './types'
@@ -47,13 +47,13 @@ export const connectWallet = async (
 }
 
 /** Has the wallet add the payer signature and submit, then waits for confirmation. */
-export const signAndSendDeployment = async (
+export const signAndSendPrepared = async (
   connection: Connection,
   connected: ConnectedWallet,
-  deployment: PreparedDeployment,
+  prepared: PreparedTransaction,
   network: SolanaNetwork,
 ): Promise<string> => {
-  const { transaction } = deployment
+  const { transaction } = prepared
   const [output] = await connected.wallet.features[
     SolanaSignAndSendTransaction
   ].signAndSendTransaction({
@@ -73,7 +73,7 @@ export const signAndSendDeployment = async (
     {
       signature,
       blockhash,
-      lastValidBlockHeight: deployment.lastValidBlockHeight,
+      lastValidBlockHeight: prepared.lastValidBlockHeight,
     },
     'confirmed',
   )

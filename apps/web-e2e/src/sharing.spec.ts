@@ -36,7 +36,7 @@ test.describe('sharing', () => {
   }) => {
     await page.goto('/#config=not-a-real-config')
     await expect(page.getByRole('alert')).toContainText('damaged')
-    await expect(page.locator('tbody tr')).toHaveCount(4)
+    await expect(page.locator('tbody tr')).toHaveCount(5)
   })
 
   test('shows ready-to-run SDK code for the config', async ({ page }) => {

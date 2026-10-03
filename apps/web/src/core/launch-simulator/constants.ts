@@ -5,7 +5,14 @@ export enum TradeSide {
   Sell = 'sell',
   /** Sell the trader's whole holding, whatever it is at that moment. */
   SellAll = 'sell-all',
+  /** Buy below a fair price or sell above it, decided against the live price at that moment. */
+  TowardFairPrice = 'toward-fair-price',
 }
+
+export const BPS_SCALE = 10_000
+
+/** sqrtPrice is Q64, so a price compared with sqrtPrice² carries this many fractional bits. */
+export const PRICE_X128_SHIFT = 128
 
 export enum TradeStatus {
   Filled = 'filled',

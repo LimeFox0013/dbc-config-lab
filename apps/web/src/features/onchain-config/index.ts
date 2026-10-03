@@ -10,12 +10,18 @@ import type {
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { SolanaNetwork } from '../../core/config-deploy'
 import { fromPoolConfig } from '../../core/onchain-config'
+import { quoteTokenOfMint } from '../../core/quote-token'
 import { errorMessage } from '../../core/shared'
 import { DbcAccount, LoadRejection, MAX_ADDRESS_LENGTH } from './constants'
-import type { LoadResult } from './types'
+import type { LoadResult, ReadResult } from './types'
 
-export { LoadRejection, MAX_ADDRESS_LENGTH } from './constants'
-export type { LoadResult, OnChainConfig } from './types'
+export { DbcAccount, LoadRejection, MAX_ADDRESS_LENGTH } from './constants'
+export type {
+  LoadResult,
+  OnChainConfig,
+  ReadOnChainConfig,
+  ReadResult,
+} from './types'
 
 const parseAddress = (raw: string): PublicKey | null => {
   const trimmed = raw.trim()
@@ -80,43 +86,66 @@ const readDbcAccount = async (
     : { ok: false, rejection: LoadRejection.NotAConfigOrPool }
 }
 
+/** A decoded config as read from chain, whatever token it is priced in. */
+const readConfig = (
+  config: PoolConfig,
+  network: SolanaNetwork,
+  configAddress: PublicKey,
+  poolAddress?: PublicKey,
+): ReadResult => ({
+  ok: true,
+  read: {
+    configAddress: configAddress.toBase58(),
+    ...(poolAddress ? { poolAddress: poolAddress.toBase58() } : {}),
+    network,
+    parameters: fromPoolConfig(config),
+    quoteMint: config.quoteMint.toBase58(),
+  },
+})
+
 /**
- * Loads a DBC config from its address, or from the address of a pool launched with it.
- * Read-only: one or two account reads over the public RPC, no wallet involved.
+ * Reads a DBC config from its address, or from the address of a pool launched with it,
+ * in raw on-chain units. Read-only: one or two account reads over the public RPC.
  */
-export const loadOnChainConfig = async (
+export const readOnChainConfig = async (
   connection: Connection,
   network: SolanaNetwork,
   rawAddress: string,
-): Promise<LoadResult> => {
+): Promise<ReadResult> => {
   const address = parseAddress(rawAddress)
   if (!address) return { ok: false, rejection: LoadRejection.NotAnAddress }
 
   const first = await readDbcAccount(connection, address)
   if (!first.ok) return first
-  if (first.account.kind === DbcAccount.PoolConfig) {
-    return {
-      ok: true,
-      loaded: {
-        configAddress: address.toBase58(),
-        network,
-        parameters: fromPoolConfig(first.account.config),
-      },
-    }
-  }
+  if (first.account.kind === DbcAccount.PoolConfig)
+    return readConfig(first.account.config, network, address)
 
   const configAddress = first.account.pool.poolState.config
   const second = await readDbcAccount(connection, configAddress)
   if (!second.ok) return second
   if (second.account.kind !== DbcAccount.PoolConfig)
     return { ok: false, rejection: LoadRejection.NotAConfigOrPool }
-  return {
-    ok: true,
-    loaded: {
-      configAddress: configAddress.toBase58(),
-      poolAddress: address.toBase58(),
-      network,
-      parameters: fromPoolConfig(second.account.config),
-    },
-  }
+  return readConfig(second.account.config, network, configAddress, address)
+}
+
+/**
+ * Loads a DBC config for simulation: read from chain, then priced in its quote token. A
+ * token the simulator cannot price is refused rather than simulated in the wrong units.
+ */
+export const loadOnChainConfig = async (
+  connection: Connection,
+  network: SolanaNetwork,
+  rawAddress: string,
+): Promise<LoadResult> => {
+  const result = await readOnChainConfig(connection, network, rawAddress)
+  if (!result.ok) return result
+  const { quoteMint, ...read } = result.read
+  const quoteToken = quoteTokenOfMint(quoteMint, network)
+  return quoteToken
+    ? { ok: true, loaded: { ...read, quoteToken } }
+    : {
+        ok: false,
+        rejection: LoadRejection.UnsupportedQuoteToken,
+        detail: quoteMint,
+      }
 }

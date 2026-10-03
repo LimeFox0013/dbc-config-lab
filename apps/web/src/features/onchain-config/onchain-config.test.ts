@@ -1,11 +1,7 @@
-import BN from 'bn.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Keypair, PublicKey } from '@solana/web3.js'
 import type { AccountInfo } from '@solana/web3.js'
-import {
-  createDbcProgram,
-  DYNAMIC_BONDING_CURVE_PROGRAM_ID,
-} from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { DYNAMIC_BONDING_CURVE_PROGRAM_ID } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { connectionFor, SolanaNetwork } from '../../core/config-deploy'
 import {
@@ -17,22 +13,15 @@ import {
   withCurve,
 } from '../../core/launch-config'
 import type { LaunchConfig } from '../../core/launch-config'
-import { toInitialPool, toPoolConfig } from '../../core/launch-simulator/utils'
 import {
   DEFAULT_SCENARIO,
   scenarioMetrics,
   SCENARIO_PRESETS,
   ScenarioPresetId,
 } from '../../core/sniper-scenario'
-// Test-only: Anchor's own account encoder writes into a fixed 1000-byte buffer (upstream
-// TODO), too small for a PoolConfig, so fixtures encode with the same IDL layout directly.
-import { BorshAccountsCoder } from '@coral-xyz/anchor'
-import { IdlCoder } from '@coral-xyz/anchor/dist/cjs/coder/borsh/idl'
-import { DbcAccount } from './constants'
 import { loadOnChainConfig, LoadRejection } from '.'
-
-/** Stored curves are fixed arrays of 20 points; unused ones are zero. */
-const STORED_CURVE_POINTS = 20
+import { QUOTE_TOKENS, QuoteToken } from '../../core/quote-token'
+import { configAccountData, poolAccountData } from '../../testing/dbc-accounts'
 
 const compile = (config: LaunchConfig): ConfigParameters => {
   const compiled = compileLaunchConfig(config)
@@ -41,50 +30,6 @@ const compile = (config: LaunchConfig): ConfigParameters => {
 }
 
 const connection = connectionFor(SolanaNetwork.Devnet)
-const { program } = createDbcProgram(connection)
-const accountsCoder = new BorshAccountsCoder(program.idl)
-
-const FIXTURE_BUFFER_BYTES = 8192
-
-/** Account bytes exactly as the program stores them: discriminator, then the Borsh layout. */
-const encodeAccount = (name: DbcAccount, value: unknown): Buffer => {
-  const typeDef = program.idl.types?.find((t) => t.name === name)
-  if (!typeDef) throw new Error(`no IDL type ${name}`)
-  const layout = IdlCoder.typeDefLayout({
-    typeDef,
-    types: program.idl.types ?? [],
-  })
-  const buffer = Buffer.alloc(FIXTURE_BUFFER_BYTES)
-  const length = layout.encode(value, buffer)
-  return Buffer.concat([
-    accountsCoder.accountDiscriminator(name),
-    buffer.subarray(0, length),
-  ])
-}
-
-const configAccountData = async (
-  parameters: ConfigParameters,
-): Promise<Buffer> => {
-  const config = toPoolConfig(parameters)
-  const padding = Array.from(
-    { length: STORED_CURVE_POINTS - config.curve.length },
-    () => ({ sqrtPrice: new BN(0), liquidity: new BN(0) }),
-  )
-  return encodeAccount(DbcAccount.PoolConfig, {
-    ...config,
-    curve: [...config.curve, ...padding],
-  })
-}
-
-const poolAccountData = async (
-  parameters: ConfigParameters,
-  configAddress: PublicKey,
-): Promise<Buffer> => {
-  const pool = toInitialPool(parameters)
-  return encodeAccount(DbcAccount.VirtualPool, {
-    poolState: { ...pool.poolState, config: configAddress },
-  })
-}
 
 const account = (
   data: Buffer,
@@ -125,9 +70,7 @@ describe('loadOnChainConfig', () => {
       const parameters = compile(config)
       const address = Keypair.generate().publicKey
       const { connection: c } = withAccounts(
-        new Map([
-          [address.toBase58(), account(await configAccountData(parameters))],
-        ]),
+        new Map([[address.toBase58(), account(configAccountData(parameters))]]),
       )
 
       const result = await loadOnChainConfig(
@@ -140,9 +83,13 @@ describe('loadOnChainConfig', () => {
         DEFAULT_SCENARIO,
         SCENARIO_PRESETS[ScenarioPresetId.Hype],
       ]) {
-        expect(scenarioMetrics(result.loaded.parameters, scenario)).toEqual(
-          scenarioMetrics(parameters, scenario),
-        )
+        expect(
+          scenarioMetrics(
+            result.loaded.parameters,
+            scenario,
+            result.loaded.quoteToken,
+          ),
+        ).toEqual(scenarioMetrics(parameters, scenario, QuoteToken.Sol))
       }
     },
   )
@@ -153,13 +100,10 @@ describe('loadOnChainConfig', () => {
     const poolAddress = Keypair.generate().publicKey
     const { connection: c } = withAccounts(
       new Map([
-        [
-          configAddress.toBase58(),
-          account(await configAccountData(parameters)),
-        ],
+        [configAddress.toBase58(), account(configAccountData(parameters))],
         [
           poolAddress.toBase58(),
-          account(await poolAccountData(parameters, configAddress)),
+          account(poolAccountData(parameters, configAddress)),
         ],
       ]),
     )
@@ -175,6 +119,59 @@ describe('loadOnChainConfig', () => {
         configAddress: configAddress.toBase58(),
         poolAddress: poolAddress.toBase58(),
       },
+    })
+  })
+
+  it('simulates a USDC config in USDC, not as if it were priced in SOL', async () => {
+    const usdc = {
+      ...DEFAULT_LAUNCH_CONFIG,
+      quoteToken: QuoteToken.Usdc,
+      migrationQuoteThreshold: 15_000,
+    }
+    const parameters = compile(usdc)
+    const address = Keypair.generate().publicKey
+    const usdcMint = new PublicKey(
+      QUOTE_TOKENS[QuoteToken.Usdc].mints[SolanaNetwork.Mainnet],
+    )
+    const { connection: c } = withAccounts(
+      new Map([
+        [address.toBase58(), account(configAccountData(parameters, usdcMint))],
+      ]),
+    )
+
+    const result = await loadOnChainConfig(
+      c,
+      SolanaNetwork.Mainnet,
+      address.toBase58(),
+    )
+    if (!result.ok) throw new Error(result.rejection)
+    expect(result.loaded.quoteToken).toBe(QuoteToken.Usdc)
+    expect(
+      scenarioMetrics(
+        result.loaded.parameters,
+        DEFAULT_SCENARIO,
+        result.loaded.quoteToken,
+      ),
+    ).toEqual(scenarioMetrics(parameters, DEFAULT_SCENARIO, QuoteToken.Usdc))
+  })
+
+  it('refuses a config priced in a token it cannot simulate, naming the mint', async () => {
+    const address = Keypair.generate().publicKey
+    const otherMint = Keypair.generate().publicKey
+    const { connection: c } = withAccounts(
+      new Map([
+        [
+          address.toBase58(),
+          account(configAccountData(compile(DEFAULT_LAUNCH_CONFIG), otherMint)),
+        ],
+      ]),
+    )
+    expect(
+      await loadOnChainConfig(c, SolanaNetwork.Devnet, address.toBase58()),
+    ).toEqual({
+      ok: false,
+      rejection: LoadRejection.UnsupportedQuoteToken,
+      detail: otherMint.toBase58(),
     })
   })
 
@@ -205,7 +202,7 @@ describe('loadOnChainConfig', () => {
 
   it('refuses an account the DBC program does not own, even with config-shaped data', async () => {
     const address = Keypair.generate().publicKey
-    const data = await configAccountData(compile(DEFAULT_LAUNCH_CONFIG))
+    const data = configAccountData(compile(DEFAULT_LAUNCH_CONFIG))
     const { connection: c } = withAccounts(
       new Map([
         [address.toBase58(), account(data, Keypair.generate().publicKey)],

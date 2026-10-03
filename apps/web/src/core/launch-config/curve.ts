@@ -8,10 +8,12 @@ import type {
   BuildCurveBaseParams,
   ConfigParameters,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { QUOTE_TOKENS } from '../quote-token'
+import type { QuoteToken } from '../quote-token'
 import { CurveShape } from './constants'
 import type { CurveSpec, LaunchConfig } from './types'
 
-/** Market caps (SOL) at which every shape graduates near the 85 SOL standard baseline. */
+/** Market caps (in the quote token; SOL here) at which every shape graduates near the 85 SOL standard baseline. */
 export const DEFAULT_MARKET_CAPS = {
   initialMarketCap: 20,
   migrationMarketCap: 425,
@@ -35,8 +37,12 @@ export const weightGrowthOf = (weights: number[]): number => {
     : 1
 }
 
+/** The builder inputs; quote decimals always follow the config's quote token. */
 const baseOf = (config: LaunchConfig): BuildCurveBaseParams => ({
-  token: config.token,
+  token: {
+    ...config.token,
+    tokenQuoteDecimal: QUOTE_TOKENS[config.quoteToken].decimals,
+  },
   fee: config.fee,
   migration: config.migration,
   liquidityDistribution: config.liquidityDistribution,
@@ -95,7 +101,7 @@ export const withCurve = (
     needsBuffer && base.token.leftover < MIN_SHAPED_CURVE_LEFTOVER
       ? { ...base.token, leftover: MIN_SHAPED_CURVE_LEFTOVER }
       : base.token
-  return { ...base, token, ...spec }
+  return { ...base, token, quoteToken: config.quoteToken, ...spec }
 }
 
 /** The curve part of a config. */
@@ -155,3 +161,42 @@ export const defaultCurve = (shape: CurveShape): CurveSpec => {
       }
   }
 }
+
+/** A curve's amounts (threshold, market caps) re-priced from one quote token to another. */
+export const priceCurve = (
+  curve: CurveSpec,
+  from: QuoteToken,
+  to: QuoteToken,
+): CurveSpec => {
+  const rate = QUOTE_TOKENS[from].solPerToken / QUOTE_TOKENS[to].solPerToken
+  const converted = (amount: number): number => Math.round(amount * rate)
+  return curve.curveShape === CurveShape.Standard
+    ? {
+        ...curve,
+        migrationQuoteThreshold: converted(curve.migrationQuoteThreshold),
+      }
+    : {
+        ...curve,
+        initialMarketCap: converted(curve.initialMarketCap),
+        migrationMarketCap: converted(curve.migrationMarketCap),
+      }
+}
+
+/**
+ * The same launch priced in another quote token: the threshold and market caps are
+ * converted at the reference rate, so the launch stays the same size.
+ */
+export const withQuoteToken = (
+  config: LaunchConfig,
+  quoteToken: QuoteToken,
+): LaunchConfig => ({
+  ...withCurve(
+    config,
+    priceCurve(curveOf(config), config.quoteToken, quoteToken),
+  ),
+  quoteToken,
+  token: {
+    ...config.token,
+    tokenQuoteDecimal: QUOTE_TOKENS[quoteToken].decimals,
+  },
+})

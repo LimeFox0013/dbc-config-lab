@@ -8,7 +8,8 @@ export enum FieldKind {
 export enum FieldUnit {
   Tokens = 'tokens',
   Percent = 'percent',
-  Sol = 'sol',
+  /** Amounts in the config's own quote token. */
+  Quote = 'quote',
   Seconds = 'seconds',
   None = 'none',
 }
@@ -22,6 +23,7 @@ export enum FieldGroup {
 }
 
 export enum EditorFieldId {
+  QuoteToken = 'quote-token',
   TotalSupply = 'total-supply',
   BaseDecimals = 'base-decimals',
   SupplyOnMigration = 'supply-on-migration',
@@ -37,6 +39,7 @@ export enum EditorFieldId {
   FeeWindow = 'fee-window',
   CreatorTradingFeeShare = 'creator-trading-fee-share',
   DynamicFee = 'dynamic-fee',
+  FirstBuyMinFee = 'first-buy-min-fee',
   FeeCollection = 'fee-collection',
   MigratedPoolFeeOption = 'migrated-pool-fee-option',
   MigratedPoolFee = 'migrated-pool-fee',
@@ -51,6 +54,12 @@ export enum EditorFieldId {
 export enum DynamicFeeChoice {
   Off = 0,
   On = 1,
+}
+
+/** Whether the pool creator's bundled first buy pays only the minimum base fee. */
+export enum FirstBuyFeeChoice {
+  Schedule = 0,
+  Minimum = 1,
 }
 
 /** How the trading fee moves over the launch: flat, or falling along a curve. */

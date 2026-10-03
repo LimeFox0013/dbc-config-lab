@@ -48,9 +48,12 @@
       "snipers": "Snipers",
       "humans": "Human buyers",
       "summary": "{snipers} snipers buy within {sniperWindow}s and sell {hold}s later; {adaptive} patient bots wait until the fee is at most {maxFee}%, then buy and sell; {humans} humans buy between {from}s and {until}s.",
+      "arbitrageSummary": "{count} arbitrage traders know an outside price of {marketCap} SOL market cap: every {every}s until {until}s they buy while the launch is more than {gap}% cheaper and sell while it is that much dearer. Tokens still held at the end are valued at that price.",
       "preset": "Launch situation",
       "custom": "Custom",
       "adaptiveSnipers": "Patient bots",
+      "arbitrageurs": "Arbitrage traders",
+      "fairMarketCap": "Outside market cap (SOL)",
       "liquidityPulled": "Unlocked liquidity is pulled right after graduation",
       "presets": {
         "typical": {
@@ -68,6 +71,10 @@
         "patient-bots": {
           "name": "Patient bots",
           "description": "No first-second snipers; bots instead wait for the fee to drop before buying."
+        },
+        "stock-listing": {
+          "name": "Tokenized stock listing",
+          "description": "A newly tokenized name with an outside price: thin human demand over half an hour, and traders who know that price trading the launch toward it."
         }
       }
     },
@@ -85,7 +92,10 @@
       "afterGraduation": "{sol} after graduation",
       "liquidityPulled": "{sol} SOL of liquidity pulled",
       "pullable": "{percent}% of graduation liquidity can be pulled",
-      "graduatedAfter": "Yes, after {seconds}s"
+      "graduatedAfter": "Yes, after {seconds}s",
+      "pricedIn": "Priced in {symbol}: budgets and results converted at 1 SOL = {rate} {symbol}.",
+      "keepersWontMigrate": "Threshold below the {minimum} {symbol} Meteora’s migration keepers act on: real pools on it would not graduate automatically.",
+      "fairValue": "ends {gap} from the outside price · arbitrage traders {arbitrage} SOL"
     },
     "deployPanel": {
       "title": "Deploy a config",
@@ -110,11 +120,72 @@
         "payer": "Paid by",
         "feeClaimer": "Fees go to",
         "leftoverReceiver": "Leftover tokens go to",
-        "quoteMint": "Quote token (wrapped SOL)",
+        "quoteMint": "Quote token",
+        "quoteMintValue": "{symbol} · {mint}",
         "fee": "Trading fee",
         "feeValue": "{start}% falling to {end}% over {seconds}s",
         "threshold": "Graduates at",
-        "thresholdValue": "{sol} SOL"
+        "thresholdValue": "{amount} {symbol}",
+        "keepers": "Graduates automatically",
+        "keepersYes": "Yes — Meteora’s migration keepers act on this threshold",
+        "keepersNo": "No — below the keepers’ {minimum} {symbol} minimum, so someone must run the migration by hand",
+        "dynamicFee": "Volatility fee",
+        "dynamicFeeOn": "On — rises after sharp price moves",
+        "dynamicFeeOff": "Off",
+        "tokenAuthority": "Token authority",
+        "tokenAuthorityOptions": {
+          "0": "Creator can update metadata",
+          "1": "Nobody — metadata and supply are fixed",
+          "2": "The config’s partner can update metadata",
+          "3": "Creator can update metadata and mint more tokens",
+          "4": "The config’s partner can update metadata and mint more tokens"
+        },
+        "creatorShare": "Creator’s share of trading fees",
+        "percentValue": "{value}%",
+        "liquidity": "Graduation liquidity",
+        "liquidityValue": "You {partner}% + {partnerLocked}% locked · creator {creator}% + {creatorLocked}% locked",
+        "lockedVesting": "Tokens vesting to the creator",
+        "lockedVestingValue": "{tokens}",
+        "migrationPoolFee": "Graduation pool fee",
+        "migrationFee": "Migration fee",
+        "migrationFeeValue": "{fee}% of graduation liquidity, {creator}% of it to the creator",
+        "poolCreationFee": "Pool creation fee",
+        "poolCreationFeeValue": "{sol} SOL"
+      },
+      "launch": {
+        "title": "Launch a token on a config",
+        "intro": "Creates a new token and its bonding-curve pool on a config — the one deployed above, or any config address — with your wallet as the pool creator. An optional first buy runs in the same transaction, so nobody can buy before it.",
+        "config": "Config address",
+        "name": "Token name",
+        "symbol": "Symbol",
+        "uri": "Metadata URI (optional)",
+        "firstBuy": "First buy (in the config’s quote token, optional)",
+        "prepare": "Prepare launch",
+        "done": "Token launched.",
+        "viewToken": "View token",
+        "viewPool": "View pool",
+        "highFee": "This first buy pays a {fee}% fee: the config’s opening fee applies to it. Turn on “first buy at the minimum fee” in the config, or buy later.",
+        "rejections": {
+          "name-missing": "Give the token a name.",
+          "name-too-long": "Names are at most 32 characters.",
+          "symbol-missing": "Give the token a symbol.",
+          "symbol-too-long": "Symbols are at most 10 characters.",
+          "uri-too-long": "The metadata URI is at most 200 characters.",
+          "uri-scheme": "The metadata URI must start with https://, ipfs:// or ar://."
+        },
+        "summary": {
+          "token": "Token",
+          "tokenValue": "{name} ({symbol})",
+          "mint": "Token mint",
+          "pool": "Pool",
+          "creator": "Pool creator",
+          "noUri": "None — wallets will show no image",
+          "firstBuyValue": "{amount} {symbol} for about {tokens} tokens (at least {minimum}), {fee}% fee",
+          "atMinimumFee": "— at the config’s minimum fee",
+          "noFirstBuy": "None"
+        },
+        "creationFee": "This config charges whoever launches on it a {sol} SOL pool creation fee, on top of the network fee.",
+        "partnerAuthority": "This config gives its partner — not you — authority over your token’s metadata, or over minting more of it."
       }
     },
     "recommenderPanel": {
@@ -165,10 +236,10 @@
       "includeCurves": "Also try other curve shapes and graduation thresholds (slower)",
       "searchFailed": "The search failed: {reason}",
       "curves": {
-        "standard": "curve graduating at {sol} SOL",
-        "market-cap": "market-cap curve {from} → {to} SOL",
-        "two-segments": "two-segment curve {from} → {to} SOL",
-        "liquidity-weights": "weighted curve {from} → {to} SOL, growth {growth}"
+        "standard": "curve graduating at {amount} {symbol}",
+        "market-cap": "market-cap curve {from} → {to} {symbol}",
+        "two-segments": "two-segment curve {from} → {to} {symbol}",
+        "liquidity-weights": "weighted curve {from} → {to} {symbol}, growth {growth}"
       }
     },
     "configEditor": {
@@ -186,6 +257,7 @@
         "liquidity": "Liquidity after graduation"
       },
       "fields": {
+        "quote-token": "Priced in",
         "total-supply": "Total supply",
         "base-decimals": "Token decimals",
         "supply-on-migration": "Supply left for the graduation pool",
@@ -196,6 +268,7 @@
         "fee-window": "Falls over",
         "creator-trading-fee-share": "Creator’s share of trading fees",
         "dynamic-fee": "Volatility fee",
+        "first-buy-min-fee": "Creator’s first buy",
         "fee-collection": "Fees taken in",
         "migrated-pool-fee-option": "Graduation pool fee",
         "migrated-pool-fee": "Custom pool fee",
@@ -213,7 +286,6 @@
       "units": {
         "tokens": "tokens",
         "percent": "%",
-        "sol": "SOL",
         "seconds": "s"
       },
       "options": {
@@ -228,8 +300,8 @@
           "1": "On — rises after sharp price moves"
         },
         "feeCollection": {
-          "0": "SOL",
-          "1": "The token bought (SOL on sells)"
+          "0": "The quote token",
+          "1": "The token bought (quote token on sells)"
         },
         "feeCurve": {
           "0": "Flat",
@@ -250,6 +322,14 @@
           "market-cap": "Market cap",
           "two-segments": "Two segments",
           "liquidity-weights": "Liquidity weights"
+        },
+        "quoteToken": {
+          "sol": "SOL",
+          "usdc": "USDC"
+        },
+        "firstBuyFee": {
+          "0": "Pays the fee schedule",
+          "1": "Pays only the minimum fee"
         }
       },
       "rejections": {
@@ -260,7 +340,8 @@
       "status": {
         "valid": "Meteora would accept this config.",
         "invalid": "Meteora would reject this config: {reason}",
-        "notSimulatable": "Meteora would accept this config, but it cannot be simulated exactly: {reason}"
+        "notSimulatable": "Meteora would accept this config, but it cannot be simulated exactly: {reason}",
+        "keepersWontMigrate": "The graduation threshold is below the {minimum} {symbol} Meteora’s migration keepers act on: pools on this config will not graduate automatically."
       },
       "copyLink": "Copy share link",
       "showCode": "Show code",
@@ -286,7 +367,28 @@
         "not-found": "No account exists at that address on this network.",
         "not-dbc-account": "That account does not belong to Meteora’s DBC program.",
         "not-a-config-or-pool": "That DBC account is neither a config nor a pool.",
-        "network-error": "Could not reach the network ({detail}). Try again."
+        "network-error": "Could not reach the network ({detail}). Try again.",
+        "unsupported-quote-token": "This config is priced in a token the lab cannot simulate yet ({detail}); SOL and USDC configs are supported."
+      },
+      "real": {
+        "title": "How real launches on this config went",
+        "loading": "Reading the pools launched with this config…",
+        "all": "All {total} pools launched with this config:",
+        "sampled": "{sampled} of the {total} pools launched with this config, spread evenly:",
+        "completed": "Completed the curve",
+        "traction": "Reached 10% of the threshold",
+        "neverTraded": "Never traded",
+        "raised": "Median raised",
+        "fees": "Partner + creator fees per launch (bonding curve)",
+        "time": "Median time to complete the curve",
+        "seconds": "{seconds}s",
+        "timeUnknown": "Not available (pools on this config count time in slots)",
+        "solValue": "{sol} SOL",
+        "compare": "The comparison below simulates the same config under the launch situation you picked — set the two side by side to see whether the situation is realistic for this launchpad.",
+        "rejections": {
+          "network-error": "Could not read the pools ({detail}).",
+          "no-pools": "No pools have been launched with this config yet."
+        }
       }
     }
   }

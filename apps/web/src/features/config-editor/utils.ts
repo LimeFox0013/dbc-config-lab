@@ -3,6 +3,7 @@ import type { LaunchConfig } from '../../core/launch-config'
 import { migratedUnsupportedReason } from '../../core/migrated-pool'
 import { EditRejection, FieldKind } from './constants'
 import type { EditorField, EditorStatus, EditResult } from './types'
+import { keepersMigrate } from '../../core/quote-token'
 
 /** Applies a user-entered value to a field, rejecting non-numbers, unknown options and hidden fields. */
 export const applyEdit = (
@@ -30,7 +31,16 @@ export const editorStatus = (config: LaunchConfig): EditorStatus => {
   const compiled = compileLaunchConfig(config)
   if (!compiled.ok) return { valid: false, reason: compiled.reason }
   const unsupported = migratedUnsupportedReason(compiled.parameters)
+  const migrates = keepersMigrate(
+    compiled.parameters.migrationQuoteThreshold,
+    compiled.quoteToken,
+  )
   return unsupported
-    ? { valid: true, simulatable: false, reason: unsupported }
-    : { valid: true, simulatable: true }
+    ? {
+        valid: true,
+        simulatable: false,
+        reason: unsupported,
+        keepersMigrate: migrates,
+      }
+    : { valid: true, simulatable: true, keepersMigrate: migrates }
 }

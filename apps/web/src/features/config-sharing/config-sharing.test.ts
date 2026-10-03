@@ -6,8 +6,11 @@ import {
   defaultCurve,
   LAUNCH_PRESETS,
   withCurve,
+  withQuoteToken,
 } from '../../core/launch-config'
 import type { LaunchConfig } from '../../core/launch-config'
+import { QUOTE_TOKENS, QuoteToken } from '../../core/quote-token'
+import { SolanaNetwork } from '../../core/shared'
 import {
   decodeSharedConfig,
   encodeSharedConfig,
@@ -41,6 +44,16 @@ describe('round trip', () => {
     expect(result).toEqual({
       ok: true,
       shared: { config, name: 'Ünïcode — test' },
+    })
+  })
+
+  it('reopens a link made before quote tokens existed as a SOL config', () => {
+    const { quoteToken, ...withoutQuote } = DEFAULT_LAUNCH_CONFIG
+    expect(quoteToken).toBe(QuoteToken.Sol)
+    const result = decodeSharedConfig(encodeRaw({ v: 1, config: withoutQuote }))
+    expect(result).toEqual({
+      ok: true,
+      shared: { config: DEFAULT_LAUNCH_CONFIG },
     })
   })
 
@@ -185,4 +198,16 @@ describe('toTypeScript', () => {
       ).toBe(true)
     },
   )
+
+  it('creates a USDC config against devnet USDC, with USDC decimals', () => {
+    const code = toTypeScript(
+      withQuoteToken(DEFAULT_LAUNCH_CONFIG, QuoteToken.Usdc),
+    )
+    expect(code).toContain(
+      QUOTE_TOKENS[QuoteToken.Usdc].mints[SolanaNetwork.Devnet],
+    )
+    expect(code).toContain('"tokenQuoteDecimal": 6')
+    expect(code).toContain('"migrationQuoteThreshold": 12750')
+    expect(code).not.toContain('quoteToken')
+  })
 })

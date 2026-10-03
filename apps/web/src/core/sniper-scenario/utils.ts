@@ -1,13 +1,26 @@
 import BN from 'bn.js'
-import { feeTotal, TradeSide, TradeStatus } from '../launch-simulator'
+import {
+  feeTotal,
+  PRICE_X128_SHIFT,
+  TradeSide,
+  TradeStatus,
+} from '../launch-simulator'
+import type { ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { Trade, TradeOutcome } from '../launch-simulator'
+import { quoteUnitsFromSol } from '../quote-token'
+import type { QuoteToken } from '../quote-token'
 import {
   EARLY_WINDOW_SECONDS,
-  LAMPORTS_PER_SOL,
   TRADER_ID_SEPARATOR,
   TraderGroup,
 } from './constants'
-import type { FeeBpsAt, GroupOutcome, Range, ScenarioSpec } from './types'
+import type {
+  FeeBpsAt,
+  GroupOutcome,
+  Range,
+  ScenarioSpec,
+  TradeContext,
+} from './types'
 
 /** mulberry32 — small seeded PRNG, so a scenario reruns identically from its seed. */
 export const seededRandom = (seed: number): (() => number) => {
@@ -23,8 +36,6 @@ export const seededRandom = (seed: number): (() => number) => {
 
 const between = (random: () => number, range: Range): number =>
   range.min + random() * (range.max - range.min)
-
-const lamports = (sol: number): BN => new BN(Math.round(sol * LAMPORTS_PER_SOL))
 
 export const traderId = (group: TraderGroup, index: number): Trade['trader'] =>
   `${group}${TRADER_ID_SEPARATOR}${index}`
@@ -53,15 +64,19 @@ const firstAffordableSecond = (
 
 /**
  * The scenario's trades. Random draws depend only on the spec and seed, in a fixed
- * order (snipers, humans, adaptive snipers); the only config-dependent decision is
- * when an adaptive sniper buys, read from `feeBpsAt`.
+ * order (snipers, humans, adaptive snipers, arbitrageurs); the only config-dependent
+ * decision made here is when an adaptive sniper buys, read from `feeBpsAt` — whether an
+ * arbitrageur buys or sells is decided by the replay at the live price. Budgets are
+ * written in SOL and spent in the config's quote token at the reference rate.
  */
 export const generateTrades = (
   spec: ScenarioSpec,
-  feeBpsAt: FeeBpsAt,
+  { feeBpsAt, quote, fairPriceX128 }: TradeContext,
 ): Trade[] => {
   const random = seededRandom(spec.seed)
-  const { snipers, humans, adaptiveSnipers } = spec
+  const budget = (range: Range): BN =>
+    quoteUnitsFromSol(between(random, range), quote)
+  const { snipers, humans, adaptiveSnipers, arbitrageurs } = spec
 
   const sniperTrades = Array.from(
     { length: snipers.count },
@@ -72,7 +87,7 @@ export const generateTrades = (
         {
           at,
           side: TradeSide.Buy,
-          amountIn: lamports(between(random, snipers.solPerBuy)),
+          amountIn: budget(snipers.solPerBuy),
           trader,
         },
         { at: at + snipers.holdSeconds, side: TradeSide.SellAll, trader },
@@ -90,7 +105,7 @@ export const generateTrades = (
         }),
       ),
       side: TradeSide.Buy,
-      amountIn: lamports(between(random, humans.solPerBuy)),
+      amountIn: budget(humans.solPerBuy),
       trader: traderId(TraderGroup.Human, index),
     }),
   )
@@ -99,7 +114,7 @@ export const generateTrades = (
     { length: adaptiveSnipers.count },
     (_, index): Trade[] => {
       const trader = traderId(TraderGroup.AdaptiveSniper, index)
-      const amountIn = lamports(between(random, adaptiveSnipers.solPerBuy))
+      const amountIn = budget(adaptiveSnipers.solPerBuy)
       const at = firstAffordableSecond(
         feeBpsAt,
         amountIn,
@@ -117,7 +132,51 @@ export const generateTrades = (
     },
   ).flat()
 
-  return [...sniperTrades, ...humanTrades, ...adaptiveTrades]
+  const fairPrice = fairPriceX128
+  const arbitrageTrades = !fairPrice
+    ? []
+    : Array.from({ length: arbitrageurs.count }, (_, index): Trade[] => {
+        const trader = traderId(TraderGroup.Arbitrageur, index)
+        const clip = budget(arbitrageurs.solPerTrade)
+        const first = Math.floor(random() * arbitrageurs.checkEverySeconds)
+        const checks = Math.floor(
+          (arbitrageurs.untilSeconds - first) / arbitrageurs.checkEverySeconds,
+        )
+        return Array.from(
+          { length: Math.max(0, checks + 1) },
+          (_, check): Trade => ({
+            at: first + check * arbitrageurs.checkEverySeconds,
+            side: TradeSide.TowardFairPrice,
+            trader,
+            clip,
+            gapBps: arbitrageurs.gapBps,
+            fairPriceX128: fairPrice,
+          }),
+        )
+      }).flat()
+
+  return [
+    ...sniperTrades,
+    ...humanTrades,
+    ...adaptiveTrades,
+    ...arbitrageTrades,
+  ]
+}
+
+/**
+ * The scenario's outside price per base unit, 2^128-scaled, in the config's quote token;
+ * null when the scenario has no arbitrageurs or the config's supply is not fixed.
+ */
+export const fairPriceX128Of = (
+  parameters: ConfigParameters,
+  spec: ScenarioSpec,
+  quote: QuoteToken,
+): BN | null => {
+  const supply = parameters.tokenSupply?.preMigrationTokenSupply
+  if (spec.arbitrageurs.count === 0 || !supply || supply.isZero()) return null
+  return quoteUnitsFromSol(spec.arbitrageurs.fairMarketCapSol, quote)
+    .shln(PRICE_X128_SHIFT)
+    .div(supply)
 }
 
 export const emptyGroupOutcome = (group: TraderGroup): GroupOutcome => ({
@@ -146,10 +205,6 @@ export const addOutcome = (
         received: group.received.add(outcome.amountOut),
         feesPaid: group.feesPaid.add(feeTotal(outcome.feeValue)),
       }
-
-/** Lamports to SOL; float precision is ample for ranking and two-decimal display. */
-export const toSol = (lamports: BN): number =>
-  Number(lamports.toString()) / LAMPORTS_PER_SOL
 
 const isExecuted = (outcome: TradeOutcome): boolean =>
   outcome.status !== TradeStatus.Rejected

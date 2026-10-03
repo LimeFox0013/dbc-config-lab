@@ -10,6 +10,7 @@
         <select
           v-model="presetId"
           class="deploy-panel__select"
+          :disabled="inputsLocked || launchBusy"
         >
           <option
             v-for="option in presets"
@@ -25,6 +26,7 @@
         <select
           v-model="network"
           class="deploy-panel__select"
+          :disabled="inputsLocked || launchBusy"
         >
           <option :value="SolanaNetwork.Devnet">
             {{ t('components.deployPanel.devnet') }}
@@ -115,7 +117,12 @@
       </dd>
       <dt>{{ t('components.deployPanel.summary.quoteMint') }}</dt>
       <dd class="deploy-panel__value">
-        {{ prepared.summary.quoteMint }}
+        {{
+          t('components.deployPanel.summary.quoteMintValue', {
+            symbol: QUOTE_TOKENS[prepared.summary.quoteToken].symbol,
+            mint: prepared.summary.quoteMint,
+          })
+        }}
       </dd>
       <dt>{{ t('components.deployPanel.summary.fee') }}</dt>
       <dd class="deploy-panel__value">
@@ -127,10 +134,7 @@
           })
         }}
       </dd>
-      <dt>{{ t('components.deployPanel.summary.threshold') }}</dt>
-      <dd class="deploy-panel__value">
-        {{ t('components.deployPanel.summary.thresholdValue', { sol: prepared.summary.migrationThresholdSol }) }}
-      </dd>
+      <ConfigTermsRows :terms="prepared.summary" />
     </dl>
 
     <button
@@ -169,21 +173,32 @@
     >
       {{ error }}
     </p>
+
+    <PoolLaunchSection
+      :network="network"
+      :connected="connected"
+      :mainnet-acknowledged="mainnetAcknowledged"
+      :initial-config-address="deployedConfigAddress"
+      @busy="launchBusy = $event"
+    />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { explorerAddressUrl, explorerTransactionUrl, SolanaNetwork } from '../../core/config-deploy'
 import type { LaunchPreset } from '../../core/launch-config'
+import { QUOTE_TOKENS } from '../../core/quote-token'
 import { DeployStep, isSafeWalletIcon, useDeployment } from '../../features/deployment'
+import { ConfigTermsRows } from '../ConfigTermsRows'
+import PoolLaunchSection from './PoolLaunchSection.vue'
 import type { DeployPanelProps } from './types'
 
 const props = defineProps<DeployPanelProps>()
 const { t } = useI18n()
 
-const presetId = ref<LaunchPreset['id']>(props.presets.find(Boolean)?.id ?? '')
+const presetId = ref<LaunchPreset['id']>(props.initialPresetId)
 const preset = computed<LaunchPreset>(() => {
   const found = props.presets.find((candidate) => candidate.id === presetId.value)
   if (!found) throw new Error(`Unknown preset ${presetId.value}`)
@@ -191,6 +206,7 @@ const preset = computed<LaunchPreset>(() => {
 })
 
 const {
+  inputsLocked,
   network,
   mainnetAcknowledged,
   wallets,
@@ -204,6 +220,15 @@ const {
   prepare,
   signAndSend,
 } = useDeployment(preset)
+
+/** A token launch is being prepared or signed on the panel's network and wallet. */
+const launchBusy = ref(false)
+
+/** The last config deployed here, offered as the one to launch a token on. */
+const deployedConfigAddress = ref('')
+watch(step, (current) => {
+  if (current === DeployStep.Done && prepared.value) deployedConfigAddress.value = prepared.value.summary.configAddress
+})
 </script>
 
 <style lang="scss">

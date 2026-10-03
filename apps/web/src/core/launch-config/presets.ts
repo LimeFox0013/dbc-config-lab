@@ -1,12 +1,17 @@
 import { BaseFeeMode } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { DEFAULT_LAUNCH_CONFIG } from './constants'
+import { QuoteToken } from '../quote-token'
+import { CurveShape, DEFAULT_LAUNCH_CONFIG } from './constants'
+import { withCurve, withQuoteToken } from './curve'
 import { FLAT_FEE_BPS, withSchedule } from './fee-schedule'
 import type { LaunchPreset } from './types'
 
 /**
- * Built-in configs for side-by-side comparison. Chosen from a fee-schedule sweep over 20
- * seeded scenarios: a short, steep window hurts first-second bots most while leaving later
- * buyers untouched; a long window taxes humans too.
+ * Built-in configs for side-by-side comparison. The fee schedules were chosen from a sweep
+ * over 20 seeded scenarios: a short, steep window hurts first-second bots most while leaving
+ * later buyers untouched; a long window taxes humans too. The stock listing's market caps
+ * came from a sweep under the tokenized-stock situation (10 seeds, 300 SOL outside price):
+ * opening at 250 graduates every time and leaves arbitrage traders ~12 SOL, against ~139
+ * for a curve opening near 20.
  */
 export const LAUNCH_PRESETS: LaunchPreset[] = [
   {
@@ -50,5 +55,19 @@ export const LAUNCH_PRESETS: LaunchPreset[] = [
       endingFeeBps: FLAT_FEE_BPS,
       windowSeconds: 60,
     }),
+  },
+  {
+    id: 'stock-listing',
+    name: 'Stock listing (USDC)',
+    intent:
+      'Opens at a 37,500 USDC market cap, just under a tokenized name’s ~45,000 USDC (300 SOL) outside price, so traders who know that price have little gap to take.',
+    config: withQuoteToken(
+      withCurve(DEFAULT_LAUNCH_CONFIG, {
+        curveShape: CurveShape.MarketCap,
+        initialMarketCap: 250,
+        migrationMarketCap: 300,
+      }),
+      QuoteToken.Usdc,
+    ),
   },
 ]

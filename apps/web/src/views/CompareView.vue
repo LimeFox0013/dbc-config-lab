@@ -28,7 +28,10 @@
     <OnChainLoader @load="addOnChain" />
     <ComparisonTable :rows="rows" />
     <PriceChart :rows="rows" />
-    <DeployPanel :presets="presets" />
+    <DeployPanel
+      :presets="presets"
+      :initial-preset-id="ownPresetId"
+    />
     <p class="compare-view__caveat">
       {{ t('views.compare.caveat') }}
     </p>
@@ -66,6 +69,8 @@ const addUserPreset = (preset: LaunchPreset): void => {
   userPresets.value = [preset, ...userPresets.value.filter((p) => p.id !== preset.id)]
 }
 const presets = computed(() => [...userPresets.value, ...LAUNCH_PRESETS])
+/** The deploy panel starts on the first config that did not arrive through a shared link. */
+const ownPresetId = computed(() => presets.value.find((p) => p.id !== SHARED_PRESET_ID)?.id ?? '')
 
 /** A config opened from a shared link joins the comparison; a refused link says why. */
 const sharedNotice = ref<string | null>(null)
@@ -104,7 +109,7 @@ const onChainEntry = (loaded: OnChainConfig): ComparisonEntry => ({
         [t('views.compare.onChainSlots', { ms: SLOT_DURATION_MS })] :
         []),
   ].join(' '),
-  compiled: { ok: true, parameters: loaded.parameters },
+  compiled: { ok: true, parameters: loaded.parameters, quoteToken: loaded.quoteToken },
 })
 
 const entries = computed(() => [...presets.value.map(presetEntry), ...onChain.value.map(onChainEntry)])

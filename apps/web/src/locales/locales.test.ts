@@ -32,9 +32,10 @@ const generatedKeys = (): string[] => [
       ? f.options.map((o) => `components.configEditor.options.${o.labelKey}`)
       : [],
   ),
-  ...EDITOR_FIELDS.filter((f) => f.unit !== FieldUnit.None).map(
-    (f) => `components.configEditor.units.${f.unit}`,
-  ),
+  // Quote amounts are labelled with the token's own symbol, not a message.
+  ...EDITOR_FIELDS.filter(
+    (f) => f.unit !== FieldUnit.None && f.unit !== FieldUnit.Quote,
+  ).map((f) => `components.configEditor.units.${f.unit}`),
   ...EDITOR_FIELDS.map((f) => `components.configEditor.groups.${f.group}`),
   ...Object.values(EditRejection).map(
     (r) => `components.configEditor.rejections.${r}`,

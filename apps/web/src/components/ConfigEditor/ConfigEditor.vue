@@ -51,7 +51,7 @@
             <span
               v-if="field.unit !== FieldUnit.None"
               class="config-editor__unit"
-            >({{ t(`components.configEditor.units.${field.unit}`) }})</span>
+            >({{ unitLabel(field.unit) }})</span>
           </span>
           <select
             v-if="field.kind === FieldKind.Select"
@@ -87,6 +87,18 @@
       role="status"
     >
       {{ statusText }}
+    </p>
+    <p
+      v-if="status.valid && !status.keepersMigrate"
+      class="config-editor__status config-editor__status--problem"
+      role="status"
+    >
+      {{
+        t('components.configEditor.status.keepersWontMigrate', {
+          minimum: QUOTE_TOKENS[config.quoteToken].keeperMinimumThreshold,
+          symbol: QUOTE_TOKENS[config.quoteToken].symbol,
+        })
+      }}
     </p>
 
     <div class="config-editor__actions">
@@ -155,6 +167,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { DEFAULT_LAUNCH_CONFIG, parseLaunchConfig, serializeLaunchConfig } from '../../core/launch-config'
 import type { LaunchConfig, LaunchPreset } from '../../core/launch-config'
+import { QUOTE_TOKENS } from '../../core/quote-token'
 import {
   applyEdit,
   EDITOR_FIELDS,
@@ -185,6 +198,12 @@ const lastRejection = ref<string | null>(null)
 const showCode = ref(false)
 const copyNotice = ref<string | null>(null)
 const manualCopy = ref<string | null>(null)
+
+/** Amount units follow the config's quote token; the rest are fixed words. */
+const unitLabel = (unit: FieldUnit): string =>
+  unit === FieldUnit.Quote ?
+    QUOTE_TOKENS[config.value.quoteToken].symbol :
+      t(`components.configEditor.units.${unit}`)
 
 const visibleFields = (group: FieldGroup): EditorField[] =>
   EDITOR_FIELDS.filter((field) => field.group === group && field.visible(config.value))

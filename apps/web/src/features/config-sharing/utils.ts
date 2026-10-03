@@ -1,10 +1,12 @@
 import { compileLaunchConfig } from '../../core/launch-config'
 import type { LaunchConfig } from '../../core/launch-config'
+import { QUOTE_TOKENS } from '../../core/quote-token'
+import { SolanaNetwork } from '../../core/shared'
 import {
   BUILDER_BY_SHAPE,
   MAX_SHARE_LENGTH,
+  NON_BUILDER_KEYS,
   NAME_MAX_LENGTH,
-  NATIVE_SOL_MINT_ADDRESS,
   SHARE_PARAM,
   SHARE_VERSION,
   ShareRejection,
@@ -97,10 +99,17 @@ export const decodeSharedConfig = (encoded: string): DecodeResult => {
 }
 
 /** The builder's own parameters: everything but the tool's `curveShape` selector. */
+/** The builder's own parameters; quote decimals follow the quote token, as when compiling. */
 const builderParams = (config: LaunchConfig): string =>
   JSON.stringify(
-    config,
-    (key, value: unknown) => (key === 'curveShape' ? undefined : value),
+    {
+      ...config,
+      token: {
+        ...config.token,
+        tokenQuoteDecimal: QUOTE_TOKENS[config.quoteToken].decimals,
+      },
+    },
+    (key, value: unknown) => (NON_BUILDER_KEYS.has(key) ? undefined : value),
     2,
   )
 
@@ -123,7 +132,7 @@ const transaction = await client.partner.createConfig({
   config: configKey.publicKey,
   feeClaimer: wallet,
   leftoverReceiver: wallet,
-  quoteMint: new PublicKey('${NATIVE_SOL_MINT_ADDRESS}'),
+  quoteMint: new PublicKey('${QUOTE_TOKENS[config.quoteToken].mints[SolanaNetwork.Devnet]}'), // ${QUOTE_TOKENS[config.quoteToken].symbol} on devnet
   payer: wallet,
 })
 // Sign with configKey and your wallet, then send.

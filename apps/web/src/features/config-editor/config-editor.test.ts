@@ -11,8 +11,10 @@ import {
   parseLaunchConfig,
   serializeLaunchConfig,
   withCurve,
+  withQuoteToken,
 } from '../../core/launch-config'
 import type { LaunchConfig } from '../../core/launch-config'
+import { QuoteToken } from '../../core/quote-token'
 import {
   applyEdit,
   DynamicFeeChoice,
@@ -162,7 +164,10 @@ describe('editorStatus', () => {
       DynamicFeeChoice.On,
     )
     expect(config.fee.dynamicFeeEnabled).toBe(true)
-    expect(editorStatus(config)).toEqual({ valid: true, simulatable: true })
+    expect(editorStatus(config)).toMatchObject({
+      valid: true,
+      simulatable: true,
+    })
   })
 
   it('takes fees in the bought token when asked', () => {
@@ -172,16 +177,42 @@ describe('editorStatus', () => {
       CollectFeeMode.OutputToken,
     )
     expect(config.fee.collectFeeMode).toBe(CollectFeeMode.OutputToken)
-    expect(editorStatus(config)).toEqual({ valid: true, simulatable: true })
+    expect(editorStatus(config)).toMatchObject({
+      valid: true,
+      simulatable: true,
+    })
   })
 
-  it('accepts every built-in preset', () => {
+  it('accepts every built-in preset, each one graduating automatically', () => {
     LAUNCH_PRESETS.forEach((p) =>
       expect(editorStatus(p.config)).toEqual({
         valid: true,
         simulatable: true,
+        keepersMigrate: true,
       }),
     )
+  })
+
+  it('says when a threshold is below what the migration keepers act on', () => {
+    const below = { ...DEFAULT_LAUNCH_CONFIG, migrationQuoteThreshold: 9 }
+    expect(editorStatus(below)).toMatchObject({
+      valid: true,
+      keepersMigrate: false,
+    })
+    const usdc = withQuoteToken(DEFAULT_LAUNCH_CONFIG, QuoteToken.Usdc)
+    expect(editorStatus(usdc)).toMatchObject({
+      valid: true,
+      keepersMigrate: true,
+    })
+    expect(
+      editorStatus(
+        withCurve(usdc, {
+          curveShape: CurveShape.Standard,
+          percentageSupplyOnMigration: 20,
+          migrationQuoteThreshold: 749,
+        }),
+      ),
+    ).toMatchObject({ valid: true, keepersMigrate: false })
   })
 
   it('reports the program’s reason when the LP split does not add up to 100%', () => {
@@ -206,7 +237,10 @@ describe('curve shapes', () => {
     'a %s curve compiles from its defaults',
     (shape) => {
       const config = withCurve(DEFAULT_LAUNCH_CONFIG, defaultCurve(shape))
-      expect(editorStatus(config)).toEqual({ valid: true, simulatable: true })
+      expect(editorStatus(config)).toMatchObject({
+        valid: true,
+        simulatable: true,
+      })
     },
   )
 

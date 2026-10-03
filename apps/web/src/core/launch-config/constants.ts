@@ -9,9 +9,10 @@ import {
   TokenDecimal,
   TokenType,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { QUOTE_TOKENS, QuoteToken } from '../quote-token'
 import type { LaunchConfig } from './types'
 
-export const SOL_DECIMALS = 9
+export const SOL_DECIMALS = QUOTE_TOKENS[QuoteToken.Sol].decimals
 
 export enum CurveShape {
   Standard = 'standard',
@@ -65,6 +66,7 @@ export const DEFAULT_LAUNCH_CONFIG: LaunchConfig = {
     cliffDurationFromMigrationTime: 0,
   },
   activationType: ActivationType.Timestamp,
+  quoteToken: QuoteToken.Sol,
   curveShape: CurveShape.Standard,
   percentageSupplyOnMigration: 20,
   migrationQuoteThreshold: 85,

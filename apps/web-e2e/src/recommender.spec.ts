@@ -22,7 +22,7 @@ test.describe('recommender', () => {
   }) => {
     await page.getByRole('button', { name: 'Find best configs' }).click()
     await page.getByRole('button', { name: 'Use this config' }).first().click()
-    await expect(page.locator('tbody tr')).toHaveCount(5)
+    await expect(page.locator('tbody tr')).toHaveCount(6)
     await expect(page.locator('tbody tr').first()).toContainText('Recommended:')
     await expect(
       page.getByRole('combobox', { name: 'Config' }).locator('option').first(),

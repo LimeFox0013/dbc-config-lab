@@ -1,15 +1,39 @@
 import type { Page, Route } from '@playwright/test'
 import { DEVNET_RPC, DEVNET_WS, FAKE_BLOCKHASH } from './constants'
 
+/** An account the mock serves: its owning program and its data. */
+export interface MockAccount {
+  owner: string
+  base64: string
+}
+
 export interface RpcMockOptions {
   /** Error the dry run reports; null for a passing dry run. */
   simulationError: string | null
+  /** Accounts that exist, by address; every other address reads as empty. */
+  accounts?: Record<string, MockAccount>
 }
 
 interface RpcRequest {
   id: unknown
   method: string
+  params?: unknown
 }
+
+const firstParam = (params: unknown): unknown =>
+  Array.isArray(params) ? params[0] : undefined
+
+const accountValue = (account: MockAccount | undefined) =>
+  account
+    ? {
+        data: [account.base64, 'base64'],
+        executable: false,
+        lamports: 1_000_000_000,
+        owner: account.owner,
+        rentEpoch: 0,
+        space: Buffer.from(account.base64, 'base64').length,
+      }
+    : null
 
 const isRpcRequest = (body: unknown): body is RpcRequest =>
   typeof body === 'object' &&
@@ -34,8 +58,26 @@ export const mockDevnetRpc = async (
     const body: unknown = route.request().postDataJSON()
     if (!isRpcRequest(body))
       return route.fulfill({ status: 400, body: 'not a JSON-RPC request' })
-    const { id, method } = body
+    const { id, method, params } = body
     methods.push(method)
+    const accountAt = (address: unknown) =>
+      accountValue(
+        typeof address === 'string' ? options.accounts?.[address] : undefined,
+      )
+    if (method === 'getAccountInfo')
+      return reply(route, id, {
+        context: { slot: 1 },
+        value: accountAt(firstParam(params)),
+      })
+    // Pools launched with a config: the mock knows of none.
+    if (method === 'getProgramAccounts') return reply(route, id, [])
+    if (method === 'getMultipleAccounts') {
+      const addresses = firstParam(params)
+      return reply(route, id, {
+        context: { slot: 1 },
+        value: Array.isArray(addresses) ? addresses.map(accountAt) : [],
+      })
+    }
     if (method === 'getLatestBlockhash') {
       return reply(route, id, {
         context: { slot: 1 },

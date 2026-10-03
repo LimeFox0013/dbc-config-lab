@@ -17,9 +17,11 @@ export {
   defaultCurve,
   geometricWeights,
   LIQUIDITY_WEIGHT_SEGMENTS,
+  priceCurve,
   MIN_SHAPED_CURVE_LEFTOVER,
   weightGrowthOf,
   withCurve,
+  withQuoteToken,
 } from './curve'
 export { LAUNCH_PRESETS } from './presets'
 export {
@@ -44,7 +46,7 @@ export const compileLaunchConfig = (
       ...parameters,
       leftoverReceiver: VALIDATION_LEFTOVER_RECEIVER,
     })
-    return { ok: true, parameters }
+    return { ok: true, parameters, quoteToken: config.quoteToken }
   } catch (error) {
     return { ok: false, reason: errorMessage(error) }
   }

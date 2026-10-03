@@ -5,7 +5,11 @@ import {
   LAUNCH_PRESETS,
   parseLaunchConfig,
   serializeLaunchConfig,
+  withCurve,
+  withQuoteToken,
 } from '.'
+import { CurveShape } from './constants'
+import { QUOTE_TOKENS, QuoteToken } from '../quote-token'
 
 describe('compileLaunchConfig', () => {
   it('compiles the default config into on-chain parameters', () => {
@@ -43,5 +47,36 @@ describe('LAUNCH_PRESETS', () => {
     expect(new Set(LAUNCH_PRESETS.map((preset) => preset.id)).size).toBe(
       LAUNCH_PRESETS.length,
     )
+  })
+})
+
+describe('withQuoteToken', () => {
+  it('prices the same launch in USDC at the reference rate, with USDC decimals', () => {
+    const usdc = withQuoteToken(DEFAULT_LAUNCH_CONFIG, QuoteToken.Usdc)
+    expect(usdc).toMatchObject({
+      quoteToken: QuoteToken.Usdc,
+      migrationQuoteThreshold: 12_750,
+      token: { tokenQuoteDecimal: 6 },
+    })
+    const compiled = compileLaunchConfig(usdc)
+    if (!compiled.ok) throw new Error(compiled.reason)
+    expect(compiled.quoteToken).toBe(QuoteToken.Usdc)
+    expect(compiled.parameters.migrationQuoteThreshold.toString()).toBe(
+      String(12_750 * 10 ** QUOTE_TOKENS[QuoteToken.Usdc].decimals),
+    )
+  })
+
+  it('converts market caps too, and converts back to the same config', () => {
+    const marketCap = withCurve(DEFAULT_LAUNCH_CONFIG, {
+      curveShape: CurveShape.MarketCap,
+      initialMarketCap: 20,
+      migrationMarketCap: 425,
+    })
+    const usdc = withQuoteToken(marketCap, QuoteToken.Usdc)
+    expect(usdc).toMatchObject({
+      initialMarketCap: 3000,
+      migrationMarketCap: 63_750,
+    })
+    expect(withQuoteToken(usdc, QuoteToken.Sol)).toEqual(marketCap)
   })
 })

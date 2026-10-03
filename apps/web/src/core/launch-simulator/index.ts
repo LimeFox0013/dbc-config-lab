@@ -13,14 +13,19 @@ import type {
   VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
+  BPS_SCALE,
   DEFAULT_SIMULATION_OPTIONS,
   FeeToken,
+  PRICE_X128_SHIFT,
   TradeSide,
   TradeStatus,
   Venue,
 } from './constants'
 import type {
+  ExecutableTrade,
+  FairPriceTrade,
   FeeShares,
+  FirstBuyQuote,
   SimulationOptions,
   SimulationResult,
   Trade,
@@ -54,14 +59,19 @@ import type {
 } from '../migrated-pool'
 
 export {
+  BPS_SCALE,
   FeeToken,
+  PRICE_X128_SHIFT,
   SLOT_DURATION_MS,
   TradeSide,
   TradeStatus,
   Venue,
 } from './constants'
 export type {
+  ExecutableTrade,
+  FairPriceTrade,
   FeeShares,
+  FirstBuyQuote,
   SimulationOptions,
   SimulationResult,
   Trade,
@@ -75,7 +85,7 @@ type Replay = Omit<SimulationResult, 'finalPool' | 'migratedPool'> & {
 }
 
 const rejected = (
-  trade: Trade,
+  trade: ExecutableTrade,
   replay: Replay,
   reason: string,
 ): TradeOutcome => ({
@@ -118,14 +128,14 @@ const holdingOf = (replay: Replay, trader: Trade['trader']): BN =>
   replay.holdings[trader] ?? new BN(0)
 
 /** Input amount of a trade, resolving sell-all against the trader's current holding. */
-const amountInOf = (replay: Replay, trade: Trade): BN =>
+const amountInOf = (replay: Replay, trade: ExecutableTrade): BN =>
   trade.side === TradeSide.SellAll
     ? holdingOf(replay, trade.trader)
     : trade.amountIn
 
 const holdingAfter = (
   replay: Replay,
-  trade: Trade,
+  trade: ExecutableTrade,
   consumed: BN,
   received: BN,
 ): BN =>
@@ -158,7 +168,7 @@ const applyMigratedTrade = (
   parameters: ConfigParameters,
   replay: Replay,
   migrated: MigratedPool,
-  trade: Trade,
+  trade: ExecutableTrade,
   amountIn: BN,
 ): Replay => {
   const isSell = trade.side !== TradeSide.Buy
@@ -238,13 +248,52 @@ const openMigratedPool = (
     : { pool, pulled: null }
 }
 
+/** The live price on whichever venue is trading, as sqrtPrice² (2^128-scaled). */
+const livePriceX128 = (replay: Replay): BN => {
+  const sqrtPrice =
+    replay.migrated?.sqrtPrice ?? replay.pool.poolState.sqrtPrice
+  return sqrtPrice.mul(sqrtPrice)
+}
+
+/** What a fair-price trade does at the live price: a buy, a sale, or nothing. */
+const resolveFairPriceTrade = (
+  replay: Replay,
+  trade: FairPriceTrade,
+): ExecutableTrade | null => {
+  // Graduated into a pool the model does not simulate: there is no live price to trade at.
+  if (replay.graduatedAt !== null && !replay.migrated) return null
+  const live = livePriceX128(replay)
+  const fair = trade.fairPriceX128.muln(BPS_SCALE)
+  const { at, trader, clip } = trade
+  if (live.muln(BPS_SCALE + trade.gapBps).lt(fair))
+    return { at, trader, side: TradeSide.Buy, amountIn: clip }
+  const holding = holdingOf(replay, trader)
+  if (live.muln(BPS_SCALE - trade.gapBps).gt(fair) && !holding.isZero()) {
+    const worthClip = clip.shln(PRICE_X128_SHIFT).div(live)
+    return {
+      at,
+      trader,
+      side: TradeSide.Sell,
+      amountIn: BN.min(holding, worthClip),
+    }
+  }
+  return null
+}
+
 const applyTrade =
   (
     parameters: ConfigParameters,
     config: PoolConfig,
     options: SimulationOptions,
   ) =>
-  (replay: Replay, trade: Trade): Replay => {
+  (replay: Replay, scheduled: Trade): Replay => {
+    if (scheduled.side === TradeSide.TowardFairPrice) {
+      const resolved = resolveFairPriceTrade(replay, scheduled)
+      return resolved
+        ? applyTrade(parameters, config, options)(replay, resolved)
+        : replay
+    }
+    const trade = scheduled
     const { pool } = replay
     const reject = (reason: string): Replay => ({
       ...replay,
@@ -459,7 +508,25 @@ export const exitValue = (
   ).outputAmount
 }
 
-const BPS_PER_UNIT = 10_000
+const baseFeeHandlerOf = (parameters: ConfigParameters) => {
+  const {
+    cliffFeeNumerator,
+    firstFactor,
+    secondFactor,
+    thirdFactor,
+    baseFeeMode,
+  } = parameters.poolFees.baseFee
+  return getBaseFeeHandler(
+    cliffFeeNumerator,
+    firstFactor,
+    secondFactor,
+    thirdFactor,
+    baseFeeMode,
+  )
+}
+
+const toBps = (numerator: BN): number =>
+  numerator.muln(BPS_SCALE).div(new BN(FEE_DENOMINATOR)).toNumber()
 
 /**
  * The base fee, in basis points, the program charges a buy of `amountIn` at `at` seconds
@@ -470,25 +537,42 @@ export const baseFeeBpsAt = (
   parameters: ConfigParameters,
   at: Trade['at'],
   amountIn: BN,
-): number => {
-  const {
-    cliffFeeNumerator,
-    firstFactor,
-    secondFactor,
-    thirdFactor,
-    baseFeeMode,
-  } = parameters.poolFees.baseFee
-  const numerator = getBaseFeeHandler(
-    cliffFeeNumerator,
-    firstFactor,
-    secondFactor,
-    thirdFactor,
-    baseFeeMode,
-  ).getBaseFeeNumeratorFromIncludedFeeAmount(
-    pointAt(at, parameters.activationType),
-    new BN(0),
-    TradeDirection.QuoteToBase,
-    amountIn,
+): number =>
+  toBps(
+    baseFeeHandlerOf(parameters).getBaseFeeNumeratorFromIncludedFeeAmount(
+      pointAt(at, parameters.activationType),
+      new BN(0),
+      TradeDirection.QuoteToBase,
+      amountIn,
+    ),
   )
-  return numerator.muln(BPS_PER_UNIT).div(new BN(FEE_DENOMINATOR)).toNumber()
+
+/**
+ * The buy a pool's creator makes in the same transaction that creates the pool, priced by
+ * the SDK at the moment of activation. When the config allows it, the program charges this
+ * one swap only its minimum base fee.
+ */
+export const quoteFirstBuy = (
+  parameters: ConfigParameters,
+  amountIn: BN,
+): FirstBuyQuote => {
+  const minFee = parameters.enableFirstSwapWithMinFee
+  const quote = swapQuotePartialFill(
+    toInitialPool(parameters),
+    toPoolConfig(parameters),
+    false,
+    amountIn,
+    0,
+    false,
+    pointAt(0, parameters.activationType),
+    minFee,
+  )
+  return {
+    amountOut: quote.outputAmount,
+    amountInUsed: quote.includedFeeInputAmount,
+    baseFeeBps: minFee
+      ? toBps(baseFeeHandlerOf(parameters).getMinBaseFeeNumerator())
+      : baseFeeBpsAt(parameters, 0, amountIn),
+    atMinimumFee: minFee,
+  }
 }

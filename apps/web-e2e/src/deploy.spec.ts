@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { FAKE_WALLET_ADDRESS, FAKE_WALLET_NAME } from './fixtures/constants'
 import { mockDevnetRpc } from './fixtures/devnet-rpc'
 import { installFakeWallet } from './fixtures/fake-wallet'
@@ -124,5 +126,32 @@ test.describe('deploy with a wallet', () => {
         : []
     })
     expect(chains).toEqual(['solana:devnet'])
+  })
+
+  test('a shared config is never preselected, and its summary shows every earning and control setting', async ({
+    page,
+  }) => {
+    const shared = Buffer.from(
+      readFileSync(
+        join(__dirname, 'fixtures', 'creator-fee-shared-config.json'),
+        'utf8',
+      ),
+    ).toString('base64url')
+    await mockDevnetRpc(page, { simulationError: null })
+    await page.goto(`/#config=${shared}`)
+    const panel = page.locator('.deploy-panel')
+    const config = panel.getByRole('combobox', { name: 'Config' })
+    await expect(config).not.toHaveValue('shared')
+
+    await config.selectOption('shared')
+    await page
+      .getByRole('button', { name: `Connect ${FAKE_WALLET_NAME}` })
+      .click()
+    await page.getByRole('button', { name: 'Prepare transaction' }).click()
+
+    const summary = page.locator('.deploy-panel__summary')
+    await expect(summary).toContainText('Creator can update metadata')
+    await expect(summary).toContainText('Creator’s share of trading fees100%')
+    await expect(summary).toContainText('You 0% + 50% locked')
   })
 })

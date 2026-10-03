@@ -43,7 +43,7 @@ import type {
 import { connectionFor, SolanaNetwork } from '../src/core/config-deploy'
 import { toMigratedPool } from '../src/core/migrated-pool'
 import type { MigratedPool } from '../src/core/migrated-pool'
-import { loadOnChainConfig } from '../src/features/onchain-config'
+import { readOnChainConfig } from '../src/features/onchain-config'
 import {
   nextQuoteReserve,
   toInitialPool,
@@ -137,6 +137,31 @@ const rpc = async (
   }
   throw new Error(
     `${method}: still rate limited after ${MAX_ATTEMPTS} attempts`,
+  )
+}
+
+/**
+ * A confirmed transaction by signature. Public RPC nodes behind a load balancer sometimes
+ * answer null for one they do not have yet; that is retried, then reported by signature.
+ */
+const transactionOf = async (
+  endpoint: string,
+  signature: string,
+): Promise<unknown> => {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const transaction = await rpc(endpoint, 'getTransaction', [
+      signature,
+      {
+        encoding: 'json',
+        maxSupportedTransactionVersion: MAX_TRANSACTION_VERSION,
+        commitment: 'confirmed',
+      },
+    ])
+    if (transaction !== null) return transaction
+    await sleep(RETRY_BACKOFF_MS * attempt)
+  }
+  throw new Error(
+    `getTransaction: ${signature} still unavailable after ${MAX_ATTEMPTS} attempts`,
   )
 }
 
@@ -360,14 +385,7 @@ const replayMigratedPool = async (
 
   for (const signature of signatures) {
     await sleep(REQUEST_GAP_MS)
-    const transaction = await rpc(endpoint, 'getTransaction', [
-      signature,
-      {
-        encoding: 'json',
-        maxSupportedTransactionVersion: MAX_TRANSACTION_VERSION,
-        commitment: 'confirmed',
-      },
-    ])
+    const transaction = await transactionOf(endpoint, signature)
     const events = eventsOf(transaction, CP_AMM_PROGRAM_ID, decode).filter(
       (event) => String(field(event.data, 'pool')) === address,
     )
@@ -488,13 +506,14 @@ const main = async () => {
   const connection = connectionFor(SolanaNetwork.Mainnet)
   const { program } = createDbcProgram(connection)
 
-  const loaded = await loadOnChainConfig(
+  // Raw units throughout, so a launch priced in any token can be checked.
+  const loaded = await readOnChainConfig(
     connection,
     SolanaNetwork.Mainnet,
     address,
   )
   if (!loaded.ok) throw new Error(`Load refused: ${loaded.rejection}`)
-  const parameters = loaded.loaded.parameters
+  const parameters = loaded.read.parameters
   const config = toPoolConfig(parameters)
   const poolInfo = await connection.getAccountInfo(new PublicKey(address))
   if (!poolInfo) throw new Error('Pool not found')
@@ -504,7 +523,7 @@ const main = async () => {
   )
   const dynamicFee = config.poolFees.dynamicFee.initialized !== 0
   console.log(
-    `Pool ${address} · config ${loaded.loaded.configAddress} · dynamic fee ${dynamicFee ? 'on' : 'off'} · collect fee mode ${config.collectFeeMode}`,
+    `Pool ${address} · config ${loaded.read.configAddress} · dynamic fee ${dynamicFee ? 'on' : 'off'} · collect fee mode ${config.collectFeeMode}`,
   )
 
   const decode = (base64: string) => {
@@ -530,14 +549,7 @@ const main = async () => {
 
   for (const signature of signatures) {
     await sleep(REQUEST_GAP_MS)
-    const transaction = await rpc(connection.rpcEndpoint, 'getTransaction', [
-      signature,
-      {
-        encoding: 'json',
-        maxSupportedTransactionVersion: MAX_TRANSACTION_VERSION,
-        commitment: 'confirmed',
-      },
-    ])
+    const transaction = await transactionOf(connection.rpcEndpoint, signature)
     const poolEvents = eventsOf(
       transaction,
       DYNAMIC_BONDING_CURVE_PROGRAM_ID,

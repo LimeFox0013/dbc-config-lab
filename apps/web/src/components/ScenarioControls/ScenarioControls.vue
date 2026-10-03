@@ -70,6 +70,31 @@
           @change="update({ adaptiveSnipers: { ...modelValue.adaptiveSnipers, count: readNumber($event) } })"
         />
       </label>
+      <label class="scenario-controls__field">
+        <span class="scenario-controls__label">{{ t('components.scenarioControls.arbitrageurs') }}</span>
+        <input
+          class="scenario-controls__input"
+          type="number"
+          :min="SCENARIO_LIMITS.minTraders"
+          :max="SCENARIO_LIMITS.maxTraders"
+          :value="modelValue.arbitrageurs.count"
+          @change="update({ arbitrageurs: { ...modelValue.arbitrageurs, count: readNumber($event) } })"
+        />
+      </label>
+      <label
+        v-if="modelValue.arbitrageurs.count > 0"
+        class="scenario-controls__field"
+      >
+        <span class="scenario-controls__label">{{ t('components.scenarioControls.fairMarketCap') }}</span>
+        <input
+          class="scenario-controls__input"
+          type="number"
+          :min="SCENARIO_LIMITS.minFairMarketCapSol"
+          :max="SCENARIO_LIMITS.maxFairMarketCapSol"
+          :value="modelValue.arbitrageurs.fairMarketCapSol"
+          @change="update({ arbitrageurs: { ...modelValue.arbitrageurs, fairMarketCapSol: readNumber($event) } })"
+        />
+      </label>
     </div>
     <label class="scenario-controls__toggle">
       <input
@@ -96,6 +121,20 @@
           until: modelValue.humans.arriveUntilSeconds,
           adaptive: modelValue.adaptiveSnipers.count,
           maxFee: modelValue.adaptiveSnipers.maxFeeBps / 100,
+        })
+      }}
+    </p>
+    <p
+      v-if="modelValue.arbitrageurs.count > 0"
+      class="scenario-controls__summary"
+    >
+      {{
+        t('components.scenarioControls.arbitrageSummary', {
+          count: modelValue.arbitrageurs.count,
+          marketCap: modelValue.arbitrageurs.fairMarketCapSol,
+          every: modelValue.arbitrageurs.checkEverySeconds,
+          until: modelValue.arbitrageurs.untilSeconds,
+          gap: modelValue.arbitrageurs.gapBps / 100,
         })
       }}
     </p>

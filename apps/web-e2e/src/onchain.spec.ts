@@ -2,12 +2,11 @@ import { expect, test } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEVNET_RPC } from './fixtures/constants'
+import { DBC_PROGRAM, DEVNET_RPC } from './fixtures/constants'
+import { mockDevnetRpc } from './fixtures/devnet-rpc'
 
 const CONFIG_ADDRESS = '4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofM'
 const OTHER_PROGRAM = '11111111111111111111111111111111'
-/** Meteora's DBC program id (the SDK's DYNAMIC_BONDING_CURVE_PROGRAM_ID). */
-const DBC_PROGRAM = 'dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN'
 
 const flatPoolConfig: { base64: string } = JSON.parse(
   readFileSync(join(__dirname, 'fixtures', 'flat-pool-config.json'), 'utf8'),
@@ -81,7 +80,7 @@ test.describe('on-chain config', () => {
     await expect(loader(page).getByRole('status')).toContainText(
       'does not belong to Meteora’s DBC program',
     )
-    await expect(page.locator('tbody tr')).toHaveCount(4)
+    await expect(page.locator('tbody tr')).toHaveCount(5)
   })
 
   test('refuses text that is not an address without reading the chain', async ({
@@ -97,5 +96,25 @@ test.describe('on-chain config', () => {
       'not a Solana address',
     )
     expect(counter.reads).toBe(0)
+  })
+
+  test('says how real launches on a loaded config went — here, that there are none yet', async ({
+    page,
+  }) => {
+    await mockDevnetRpc(page, {
+      simulationError: null,
+      accounts: {
+        [CONFIG_ADDRESS]: { owner: DBC_PROGRAM, base64: flatPoolConfig.base64 },
+      },
+    })
+    await page.goto('/')
+    await loader(page).getByRole('textbox').fill(CONFIG_ADDRESS)
+    await loader(page).getByRole('button', { name: 'Load' }).click()
+    await expect(loader(page)).toContainText(
+      'How real launches on this config went',
+    )
+    await expect(loader(page)).toContainText(
+      'No pools have been launched with this config yet.',
+    )
   })
 })

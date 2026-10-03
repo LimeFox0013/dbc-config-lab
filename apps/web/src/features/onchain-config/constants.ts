@@ -9,6 +9,7 @@ export enum LoadRejection {
   NotFound = 'not-found',
   NotDbcAccount = 'not-dbc-account',
   NotAConfigOrPool = 'not-a-config-or-pool',
+  UnsupportedQuoteToken = 'unsupported-quote-token',
   NetworkError = 'network-error',
 }
 

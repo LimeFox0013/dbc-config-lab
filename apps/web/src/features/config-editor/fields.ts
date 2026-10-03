@@ -14,6 +14,7 @@ import {
   scheduleOf,
   weightGrowthOf,
   withCurve,
+  withQuoteToken,
   withSchedule,
 } from '../../core/launch-config'
 import type {
@@ -21,6 +22,7 @@ import type {
   FeeSchedule,
   LaunchConfig,
 } from '../../core/launch-config'
+import { QUOTE_TOKEN_ORDER } from '../../core/quote-token'
 import { isEnumValue } from '../../core/shared'
 import {
   BPS_PER_PERCENT,
@@ -32,6 +34,7 @@ import {
   FieldGroup,
   FieldKind,
   FieldUnit,
+  FirstBuyFeeChoice,
   LIMITS,
   WEIGHT_GROWTH_LIMITS,
 } from './constants'
@@ -47,6 +50,9 @@ const isMigrationFeeOption = isEnumValue<MigrationFeeOption>(
 const isFeeCurve = isEnumValue<FeeCurve>(Object.values(FeeCurve))
 const isDynamicFeeChoice = isEnumValue<DynamicFeeChoice>(
   Object.values(DynamicFeeChoice),
+)
+const isFirstBuyFeeChoice = isEnumValue<FirstBuyFeeChoice>(
+  Object.values(FirstBuyFeeChoice),
 )
 const isCollectFeeMode = isEnumValue<CollectFeeMode>(
   Object.values(CollectFeeMode),
@@ -149,7 +155,7 @@ const marketCapField = (
   id,
   group: FieldGroup.Curve,
   kind: FieldKind.Number,
-  unit: FieldUnit.Sol,
+  unit: FieldUnit.Quote,
   min: 1,
   max: 1_000_000_000,
   step: 1,
@@ -163,6 +169,24 @@ const marketCapField = (
 
 /** Every editable field, in display order. */
 export const EDITOR_FIELDS: EditorField[] = [
+  {
+    id: EditorFieldId.QuoteToken,
+    group: FieldGroup.Token,
+    kind: FieldKind.Select,
+    unit: FieldUnit.None,
+    options: QUOTE_TOKEN_ORDER.map((quote, index) => ({
+      value: index,
+      labelKey: `quoteToken.${quote}`,
+    })),
+    read: (c) => QUOTE_TOKEN_ORDER.indexOf(c.quoteToken),
+    write: (c, v) => {
+      const quote = QUOTE_TOKEN_ORDER[v]
+      return quote === undefined || quote === c.quoteToken
+        ? c
+        : withQuoteToken(c, quote)
+    },
+    visible: always,
+  },
   {
     id: EditorFieldId.TotalSupply,
     group: FieldGroup.Token,
@@ -251,7 +275,7 @@ export const EDITOR_FIELDS: EditorField[] = [
     id: EditorFieldId.MigrationThreshold,
     group: FieldGroup.Curve,
     kind: FieldKind.Number,
-    unit: FieldUnit.Sol,
+    unit: FieldUnit.Quote,
     min: 1,
     max: 100_000,
     step: 1,
@@ -373,6 +397,30 @@ export const EDITOR_FIELDS: EditorField[] = [
         ? {
             ...c,
             fee: { ...c.fee, dynamicFeeEnabled: v === DynamicFeeChoice.On },
+          }
+        : c,
+    visible: always,
+  },
+  {
+    id: EditorFieldId.FirstBuyMinFee,
+    group: FieldGroup.Fees,
+    kind: FieldKind.Select,
+    unit: FieldUnit.None,
+    options: [FirstBuyFeeChoice.Schedule, FirstBuyFeeChoice.Minimum].map(
+      (value) => ({ value, labelKey: `firstBuyFee.${value}` }),
+    ),
+    read: (c) =>
+      c.fee.enableFirstSwapWithMinFee
+        ? FirstBuyFeeChoice.Minimum
+        : FirstBuyFeeChoice.Schedule,
+    write: (c, v) =>
+      isFirstBuyFeeChoice(v)
+        ? {
+            ...c,
+            fee: {
+              ...c.fee,
+              enableFirstSwapWithMinFee: v === FirstBuyFeeChoice.Minimum,
+            },
           }
         : c,
     visible: always,

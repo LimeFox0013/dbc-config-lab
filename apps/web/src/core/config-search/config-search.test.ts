@@ -4,6 +4,7 @@ import {
   compileLaunchConfig,
   DEFAULT_LAUNCH_CONFIG,
   FLAT_SCHEDULE,
+  withQuoteToken,
 } from '../launch-config'
 import {
   DEFAULT_SCENARIO,
@@ -11,7 +12,14 @@ import {
   ScenarioPresetId,
 } from '../sniper-scenario'
 import type { ScenarioSpec } from '../sniper-scenario'
-import { Criterion, objectiveOf, sanitizeObjective, searchConfigs } from '.'
+import { QuoteToken } from '../quote-token'
+import {
+  Criterion,
+  DEFAULT_CURVE_VARIANTS,
+  objectiveOf,
+  sanitizeObjective,
+  searchConfigs,
+} from '.'
 import type { MeanMetrics, Objective, SearchSpace } from '.'
 import { scoreCandidates } from './utils'
 
@@ -161,5 +169,33 @@ describe('objectives', () => {
       clamped[Criterion.BotDeterrence],
       clamped[Criterion.FeeIncome],
     ]).toEqual([1, 0, 0])
+  })
+})
+
+describe('curve search on a config priced in USDC', () => {
+  it('re-prices the SOL curve variants into USDC before trying them', () => {
+    const result = searchConfigs({
+      base: withQuoteToken(DEFAULT_LAUNCH_CONFIG, QuoteToken.Usdc),
+      objective: objectiveOf({ [Criterion.HumanOutcome]: 1 }),
+      scenario: DEFAULT_SCENARIO,
+      seeds: [1],
+      space: {
+        modes: [BaseFeeMode.FeeSchedulerLinear],
+        startingFeeBps: [100],
+        windowSeconds: [0],
+      },
+      curves: DEFAULT_CURVE_VARIANTS.slice(0, 1),
+    })
+    const tried = result.candidates.flatMap((c) => (c.curve ? [c.curve] : []))
+    expect(tried.length).toBeGreaterThan(0)
+    tried.forEach((curve) =>
+      expect(curve).toEqual({
+        ...DEFAULT_CURVE_VARIANTS[0],
+        migrationQuoteThreshold: 6000,
+      }),
+    )
+    result.candidates.forEach((c) =>
+      expect(c.config.quoteToken).toBe(QuoteToken.Usdc),
+    )
   })
 })

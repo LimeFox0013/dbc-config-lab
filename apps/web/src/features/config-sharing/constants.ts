@@ -24,5 +24,8 @@ export const BUILDER_BY_SHAPE: Record<CurveShape, string> = {
   [CurveShape.LiquidityWeights]: 'buildCurveWithLiquidityWeights',
 }
 
-export const NATIVE_SOL_MINT_ADDRESS =
-  'So11111111111111111111111111111111111111112'
+/** Keys of a launch config that are not builder parameters. */
+export const NON_BUILDER_KEYS: ReadonlySet<string> = new Set([
+  'curveShape',
+  'quoteToken',
+])

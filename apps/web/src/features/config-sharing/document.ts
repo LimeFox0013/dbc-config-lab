@@ -18,6 +18,7 @@ import type {
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { CurveShape, LIQUIDITY_WEIGHT_SEGMENTS } from '../../core/launch-config'
 import type { CurveSpec, LaunchConfig } from '../../core/launch-config'
+import { QUOTE_TOKEN_ORDER, QuoteToken } from '../../core/quote-token'
 import {
   arrayOf,
   boolean,
@@ -409,7 +410,14 @@ const readCurve = (f: Record<string, unknown>, path: string): CurveSpec => {
 /** A complete, well-typed launch config rebuilt from untrusted JSON, or a `ReadError`. */
 export const readLaunchConfig: Reader<LaunchConfig> = (value, path) => {
   const fields = record(value, path)
-  return { ...readBase(fields, path), ...readCurve(fields, path) }
+  return {
+    ...readBase(fields, path),
+    // Links made before other quote tokens existed carry none: they were SOL.
+    quoteToken:
+      at(fields, 'quoteToken', optional(oneOf(QUOTE_TOKEN_ORDER)), path) ??
+      QuoteToken.Sol,
+    ...readCurve(fields, path),
+  }
 }
 
 export { ReadError }

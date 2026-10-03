@@ -66,6 +66,14 @@
               v-if="pullable(row) > 0"
               class="comparison-table__intent comparison-table__intent--risk"
             >{{ t('components.comparisonTable.pullable', { percent: pullable(row) }) }}</span>
+            <span
+              v-if="quoteOf(row) !== null && quoteOf(row) !== QuoteToken.Sol"
+              class="comparison-table__intent"
+            >{{ t('components.comparisonTable.pricedIn', { symbol: symbolOf(row), rate: REFERENCE_USD_PER_SOL }) }}</span>
+            <span
+              v-if="!keepersMigrateFor(row)"
+              class="comparison-table__intent comparison-table__intent--risk"
+            >{{ t('components.comparisonTable.keepersWontMigrate', { symbol: symbolOf(row), minimum: keeperMinimumOf(row) }) }}</span>
           </th>
           <template v-if="row.ok">
             <td :class="amountClass(row.metrics.sniperProfit)">
@@ -91,7 +99,15 @@
               {{ graduationText(row.metrics) }}<span
                 v-if="row.metrics.liquidityPulled !== null && row.metrics.liquidityPulled > 0"
                 class="comparison-table__detail"
-              >{{ t('components.comparisonTable.liquidityPulled', { sol: formatSol(row.metrics.liquidityPulled) }) }}</span>
+              >{{ t('components.comparisonTable.liquidityPulled', { sol: formatSol(row.metrics.liquidityPulled) }) }}</span><span
+                v-if="row.metrics.fairValueGapPercent !== null"
+                class="comparison-table__detail"
+              >{{
+                t('components.comparisonTable.fairValue', {
+                  gap: formatPercentChange(row.metrics.fairValueGapPercent),
+                  arbitrage: formatSolChange(row.metrics.arbitrageProfit),
+                })
+              }}</span>
             </td>
           </template>
           <td
@@ -109,9 +125,10 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { formatSol, formatSolChange } from '../../features/comparison'
+import { formatPercentChange, formatSol, formatSolChange } from '../../features/comparison'
 import type { ComparisonMetrics, ComparisonRow } from '../../features/comparison'
 import { pullableLiquidityPercent } from '../../core/migrated-pool'
+import { keepersMigrate, QUOTE_TOKENS, QuoteToken, REFERENCE_USD_PER_SOL } from '../../core/quote-token'
 import type { ComparisonTableProps } from './types'
 
 defineProps<ComparisonTableProps>()
@@ -129,6 +146,16 @@ const graduationText = (metrics: ComparisonMetrics): string =>
 
 const pullable = (row: ComparisonRow): number =>
   row.entry.compiled.ok ? pullableLiquidityPercent(row.entry.compiled.parameters) : 0
+
+const quoteOf = (row: ComparisonRow): QuoteToken | null =>
+  row.entry.compiled.ok ? row.entry.compiled.quoteToken : null
+const symbolOf = (row: ComparisonRow): string => QUOTE_TOKENS[quoteOf(row) ?? QuoteToken.Sol].symbol
+const keeperMinimumOf = (row: ComparisonRow): number =>
+  QUOTE_TOKENS[quoteOf(row) ?? QuoteToken.Sol].keeperMinimumThreshold
+/** Configs that cannot be compiled have nothing to migrate, so they raise no flag. */
+const keepersMigrateFor = (row: ComparisonRow): boolean =>
+  !row.entry.compiled.ok ||
+  keepersMigrate(row.entry.compiled.parameters.migrationQuoteThreshold, row.entry.compiled.quoteToken)
 </script>
 
 <style lang="scss">

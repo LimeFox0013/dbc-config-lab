@@ -14,6 +14,24 @@ const clampInteger = (value: number, min: number, max: number): number =>
   clamp(Math.trunc(value), min, max)
 
 /** Brings user-edited scenario sizes back into the supported range. */
+/** Arbitrage traders check less often when their total checks would exceed the cap. */
+const cappedArbitrage = (
+  arbitrageurs: ScenarioSpec['arbitrageurs'],
+): ScenarioSpec['arbitrageurs'] => {
+  const checks =
+    (arbitrageurs.count * arbitrageurs.untilSeconds) /
+    arbitrageurs.checkEverySeconds
+  return checks <= SCENARIO_LIMITS.maxArbitrageChecks
+    ? arbitrageurs
+    : {
+        ...arbitrageurs,
+        checkEverySeconds: Math.ceil(
+          (arbitrageurs.count * arbitrageurs.untilSeconds) /
+            SCENARIO_LIMITS.maxArbitrageChecks,
+        ),
+      }
+}
+
 export const sanitizeScenario = (spec: ScenarioSpec): ScenarioSpec => ({
   ...spec,
   seed: clampInteger(spec.seed, 0, SCENARIO_LIMITS.maxSeed),
@@ -40,7 +58,42 @@ export const sanitizeScenario = (spec: ScenarioSpec): ScenarioSpec => ({
       SCENARIO_LIMITS.minTraders,
       SCENARIO_LIMITS.maxTraders,
     ),
+    maxWaitSeconds: clampInteger(
+      spec.adaptiveSnipers.maxWaitSeconds,
+      0,
+      SCENARIO_LIMITS.maxWaitSeconds,
+    ),
   },
+  arbitrageurs: cappedArbitrage({
+    ...spec.arbitrageurs,
+    count: clampInteger(
+      spec.arbitrageurs.count,
+      SCENARIO_LIMITS.minTraders,
+      SCENARIO_LIMITS.maxTraders,
+    ),
+    fairMarketCapSol: clamp(
+      Number.isFinite(spec.arbitrageurs.fairMarketCapSol)
+        ? spec.arbitrageurs.fairMarketCapSol
+        : SCENARIO_LIMITS.minFairMarketCapSol,
+      SCENARIO_LIMITS.minFairMarketCapSol,
+      SCENARIO_LIMITS.maxFairMarketCapSol,
+    ),
+    checkEverySeconds: clampInteger(
+      spec.arbitrageurs.checkEverySeconds,
+      SCENARIO_LIMITS.minCheckEverySeconds,
+      SCENARIO_LIMITS.maxArbitrageSeconds,
+    ),
+    untilSeconds: clampInteger(
+      spec.arbitrageurs.untilSeconds,
+      0,
+      SCENARIO_LIMITS.maxArbitrageSeconds,
+    ),
+    gapBps: clampInteger(
+      spec.arbitrageurs.gapBps,
+      0,
+      SCENARIO_LIMITS.maxGapBps,
+    ),
+  }),
   unlockedLiquidityPulled: spec.unlockedLiquidityPulled === true,
 })
 
@@ -84,12 +137,12 @@ export const compareRow = (
 ): ComparisonRow => {
   if (!entry.compiled.ok)
     return { entry, ok: false, reason: entry.compiled.reason }
-  const { parameters } = entry.compiled
-  const result = runScenario(parameters, spec)
+  const { parameters, quoteToken } = entry.compiled
+  const result = runScenario(parameters, spec, quoteToken)
   return {
     entry,
     ok: true,
-    metrics: metricsOf(result),
+    metrics: metricsOf(result, quoteToken),
     path: pricePath(parameters, result.simulation),
   }
 }
@@ -126,3 +179,12 @@ const shareFormat = new Intl.NumberFormat('en-US', {
 
 /** A 0–1 share as a whole percent, e.g. "35%". */
 export const formatShare = (share: number): string => shareFormat.format(share)
+
+const percentChangeFormat = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 0,
+  signDisplay: 'exceptZero',
+})
+
+/** A signed percent change, rounded, e.g. "+12%" or "-3%". */
+export const formatPercentChange = (percent: number): string =>
+  `${percentChangeFormat.format(percent)}%`

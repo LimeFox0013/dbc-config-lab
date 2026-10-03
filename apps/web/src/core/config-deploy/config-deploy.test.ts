@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Keypair } from '@solana/web3.js'
-import { DEFAULT_LAUNCH_CONFIG } from '../launch-config'
+import type { Connection } from '@solana/web3.js'
+import {
+  MigrationFeeOption,
+  TokenAuthorityOption,
+} from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { DEFAULT_LAUNCH_CONFIG, withQuoteToken } from '../launch-config'
+import { QUOTE_TOKENS, QuoteToken } from '../quote-token'
 import {
   connectionFor,
   explorerAddressUrl,
@@ -19,6 +25,23 @@ describe('explorer links', () => {
     )
   })
 })
+
+const mockPassingDryRun = (connection: Connection) => {
+  vi.spyOn(connection, 'getLatestBlockhash').mockResolvedValue({
+    blockhash: Keypair.generate().publicKey.toBase58(),
+    lastValidBlockHeight: 1,
+  })
+  vi.spyOn(connection, 'simulateTransaction').mockResolvedValue({
+    context: { slot: 1 },
+    value: {
+      err: null,
+      logs: [],
+      accounts: null,
+      unitsConsumed: 0,
+      returnData: null,
+    },
+  })
+}
 
 describe('prepareDeployment', () => {
   const owner = Keypair.generate().publicKey
@@ -69,20 +92,7 @@ describe('prepareDeployment', () => {
 
   it('returns a transaction signed by the config key only, with a matching summary', async () => {
     const connection = connectionFor(SolanaNetwork.Devnet)
-    vi.spyOn(connection, 'getLatestBlockhash').mockResolvedValue({
-      blockhash: Keypair.generate().publicKey.toBase58(),
-      lastValidBlockHeight: 1,
-    })
-    vi.spyOn(connection, 'simulateTransaction').mockResolvedValue({
-      context: { slot: 1 },
-      value: {
-        err: null,
-        logs: [],
-        accounts: null,
-        unitsConsumed: 0,
-        returnData: null,
-      },
-    })
+    mockPassingDryRun(connection)
 
     const result = await prepareDeployment(connection, {
       config: DEFAULT_LAUNCH_CONFIG,
@@ -99,5 +109,76 @@ describe('prepareDeployment', () => {
     expect(signed).toEqual([summary.configAddress])
     expect(summary.payer).toBe(owner.toBase58())
     expect(summary.feeClaimer).toBe(owner.toBase58())
+  })
+
+  it('summarises every setting that decides who earns, withdraws and controls the token', async () => {
+    const connection = connectionFor(SolanaNetwork.Devnet)
+    mockPassingDryRun(connection)
+
+    const result = await prepareDeployment(connection, {
+      config: {
+        ...DEFAULT_LAUNCH_CONFIG,
+        token: {
+          ...DEFAULT_LAUNCH_CONFIG.token,
+          tokenAuthorityOption: TokenAuthorityOption.CreatorUpdateAuthority,
+        },
+        fee: { ...DEFAULT_LAUNCH_CONFIG.fee, creatorTradingFeePercentage: 100 },
+        liquidityDistribution: {
+          partnerLiquidityPercentage: 40,
+          partnerPermanentLockedLiquidityPercentage: 10,
+          creatorLiquidityPercentage: 40,
+          creatorPermanentLockedLiquidityPercentage: 10,
+        },
+        migration: {
+          ...DEFAULT_LAUNCH_CONFIG.migration,
+          migrationFeeOption: MigrationFeeOption.FixedBps200,
+          migrationFee: { feePercentage: 5, creatorFeePercentage: 50 },
+        },
+      },
+      network: SolanaNetwork.Devnet,
+      owner,
+    })
+    if (!result.ok) throw new Error(result.reason)
+
+    expect(result.deployment.summary).toMatchObject({
+      tokenAuthority: TokenAuthorityOption.CreatorUpdateAuthority,
+      creatorTradingFeePercentage: 100,
+      liquidity: {
+        partnerPercentage: 40,
+        partnerLockedPercentage: 10,
+        creatorPercentage: 40,
+        creatorLockedPercentage: 10,
+      },
+      lockedVestingTokens: 0,
+      migrationFeeOption: MigrationFeeOption.FixedBps200,
+      migrationFeePercentage: 5,
+      migrationCreatorFeePercentage: 50,
+      poolCreationFeeSol: 0,
+      dynamicFeeEnabled: false,
+    })
+  })
+
+  it('creates a USDC config against the network’s own USDC mint', async () => {
+    const connection = connectionFor(SolanaNetwork.Devnet)
+    mockPassingDryRun(connection)
+
+    const result = await prepareDeployment(connection, {
+      config: withQuoteToken(DEFAULT_LAUNCH_CONFIG, QuoteToken.Usdc),
+      network: SolanaNetwork.Devnet,
+      owner,
+    })
+    if (!result.ok) throw new Error(result.reason)
+
+    const devnetUsdc = QUOTE_TOKENS[QuoteToken.Usdc].mints[SolanaNetwork.Devnet]
+    const accounts = result.deployment.transaction.instructions.flatMap((i) =>
+      i.keys.map((k) => k.pubkey.toBase58()),
+    )
+    expect(accounts).toContain(devnetUsdc)
+    expect(result.deployment.summary).toMatchObject({
+      quoteToken: QuoteToken.Usdc,
+      quoteMint: devnetUsdc,
+      migrationThreshold: 12_750,
+      keepersMigrate: true,
+    })
   })
 })

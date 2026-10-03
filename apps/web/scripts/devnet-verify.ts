@@ -14,10 +14,7 @@ import {
   sendAndConfirmTransaction,
 } from '@solana/web3.js'
 import type { Connection, Transaction } from '@solana/web3.js'
-import {
-  DynamicBondingCurveClient,
-  deriveDbcPoolAddress,
-} from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { DynamicBondingCurveClient } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   compileLaunchConfig,
   DEFAULT_LAUNCH_CONFIG,
@@ -30,14 +27,15 @@ import {
 import { simulateLaunch, TradeSide } from '../src/core/launch-simulator'
 import type { Trade } from '../src/core/launch-simulator'
 import { toPoolConfig } from '../src/core/launch-simulator/utils'
+import { preparePoolLaunch } from '../src/core/pool-launch'
+import { QuoteToken, quoteUnitsFromSol } from '../src/core/quote-token'
 
-const NATIVE_SOL_MINT = new PublicKey(
-  'So11111111111111111111111111111111111111112',
-)
 const AIRDROP_SOL = 1
 const FUNDING_WAIT_MS = 15 * 60 * 1000
 const FUNDING_POLL_MS = 5000
 const MIN_BALANCE_LAMPORTS = 0.3 * LAMPORTS_PER_SOL
+/** The creator's first buy, made in the transaction that creates the pool. */
+const FIRST_BUY_SOL = 0.05
 const BUYS_SOL = [0.1, 0.05]
 
 const results: Array<{ check: string; ok: boolean; detail: string }> = []
@@ -150,26 +148,47 @@ const main = async () => {
     )
   })
 
-  // 3. Pool + real swaps vs simulator replay.
-  const baseMint = Keypair.generate()
-  const createPool = await client.creator.createPool({
-    baseMint: baseMint.publicKey,
-    config: configAddress,
-    name: 'DBC Config Lab check',
-    symbol: 'DCLCHK',
-    uri: 'https://example.com/dcl.json',
-    payer: owner.publicKey,
-    poolCreator: owner.publicKey,
-  })
-  await send(connection, createPool, [owner, baseMint])
-  const poolAddress = deriveDbcPoolAddress(
-    NATIVE_SOL_MINT,
-    baseMint.publicKey,
+  // 3. Launch a token through the UI's code path, first buy included, then real swaps
+  //    vs the simulator's replay.
+  const launched = await preparePoolLaunch(connection, {
     configAddress,
+    parameters: compiled.parameters,
+    quoteToken: QuoteToken.Sol,
+    network: SolanaNetwork.Devnet,
+    owner: owner.publicKey,
+    metadata: {
+      name: 'DBC Config Lab check',
+      symbol: 'DCLCHK',
+      uri: 'https://example.com/dcl.json',
+    },
+    firstBuy: FIRST_BUY_SOL,
+  })
+  if (!launched.ok) throw new Error(`launch failed: ${launched.reason}`)
+  launched.launch.transaction.partialSign(owner)
+  const launchSig = await connection.sendRawTransaction(
+    launched.launch.transaction.serialize(),
   )
+  await connection.confirmTransaction(launchSig, 'confirmed')
+  const poolAddress = new PublicKey(launched.launch.summary.poolAddress)
+  console.log('pool', poolAddress.toBase58(), 'tx', launchSig)
 
   const trades: Trade[] = []
   const chainStates: Array<{ quoteReserve: BN; sqrtPrice: BN }> = []
+  const recordChainState = async () => {
+    const pool = await client.state.getPool(poolAddress)
+    if (!pool) throw new Error('pool account not found on chain')
+    chainStates.push({
+      quoteReserve: pool.poolState.quoteReserve,
+      sqrtPrice: pool.poolState.sqrtPrice,
+    })
+  }
+  trades.push({
+    at: 0,
+    side: TradeSide.Buy,
+    amountIn: quoteUnitsFromSol(FIRST_BUY_SOL, QuoteToken.Sol),
+    trader: 'owner',
+  })
+  await recordChainState()
   const swap = async (side: TradeSide.Buy | TradeSide.Sell, amountIn: BN) => {
     const tx = await client.pool.swap({
       owner: owner.publicKey,
@@ -181,12 +200,7 @@ const main = async () => {
     })
     await send(connection, tx, [owner])
     trades.push({ at: trades.length, side, amountIn, trader: 'owner' })
-    const pool = await client.state.getPool(poolAddress)
-    if (!pool) throw new Error('pool account not found on chain')
-    chainStates.push({
-      quoteReserve: pool.poolState.quoteReserve,
-      sqrtPrice: pool.poolState.sqrtPrice,
-    })
+    await recordChainState()
   }
 
   for (const sol of BUYS_SOL)

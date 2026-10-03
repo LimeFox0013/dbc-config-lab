@@ -11,6 +11,7 @@ import {
   sanitizeScenario,
   SCENARIO_LIMITS,
 } from '.'
+import { QuoteToken } from '../../core/quote-token'
 
 describe('compareConfigs', () => {
   it('returns one row per preset, in order', () => {
@@ -85,12 +86,34 @@ describe('pricePath', () => {
   it('starts at the opening price and follows every executed trade', () => {
     const compiled = compileLaunchConfig(DEFAULT_LAUNCH_CONFIG)
     if (!compiled.ok) throw new Error(compiled.reason)
-    const { simulation } = runScenario(compiled.parameters, DEFAULT_SCENARIO)
+    const { simulation } = runScenario(
+      compiled.parameters,
+      DEFAULT_SCENARIO,
+      QuoteToken.Sol,
+    )
     const path = pricePath(compiled.parameters, simulation)
 
     expect(path[0]).toEqual({ at: 0, multiple: 1 })
     expect(path).toHaveLength(simulation.outcomes.length + 1)
     // The first buy moves the price up from the opening price.
     expect(path[1]?.multiple).toBeGreaterThan(1)
+  })
+})
+
+describe('sanitizeScenario arbitrage cap', () => {
+  it('spreads arbitrage checks out instead of letting them freeze the page', () => {
+    const spec = sanitizeScenario({
+      ...DEFAULT_SCENARIO,
+      arbitrageurs: {
+        ...DEFAULT_SCENARIO.arbitrageurs,
+        count: 500,
+        checkEverySeconds: 1,
+        untilSeconds: 86_400,
+      },
+    })
+    const { count, untilSeconds, checkEverySeconds } = spec.arbitrageurs
+    expect((count * untilSeconds) / checkEverySeconds).toBeLessThanOrEqual(
+      SCENARIO_LIMITS.maxArbitrageChecks,
+    )
   })
 })

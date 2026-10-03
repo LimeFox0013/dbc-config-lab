@@ -9,7 +9,7 @@ test.describe('comparison', () => {
     page,
   }) => {
     const rows = page.locator('tbody tr')
-    await expect(rows).toHaveCount(4)
+    await expect(rows).toHaveCount(5)
     await expect(rows.nth(0)).toContainText('Flat 1%')
     await expect(rows.nth(0)).toContainText('Baseline')
   })
@@ -44,7 +44,7 @@ test.describe('comparison', () => {
     await snipers.fill('999999999')
     await snipers.press('Enter')
     await expect(snipers).toHaveValue('500')
-    await expect(page.locator('tbody tr')).toHaveCount(4)
+    await expect(page.locator('tbody tr')).toHaveCount(5)
   })
 
   test('shows patient-bot profit next to sniper profit', async ({ page }) => {
@@ -99,5 +99,21 @@ test.describe('comparison', () => {
 
     await situation.selectOption('slow-burn')
     await expect(pulled).toBeChecked()
+  })
+
+  test('a tokenized stock listing shows how far each config ends from the outside price', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('combobox', { name: 'Launch situation' })
+      .selectOption('stock-listing')
+    await expect(
+      page.getByRole('spinbutton', { name: 'Outside market cap (SOL)' }),
+    ).toHaveValue('300')
+    const rows = page.locator('tbody tr')
+    await expect(rows.first()).toContainText('from the outside price')
+    await expect(
+      page.getByRole('row', { name: /Stock listing/ }),
+    ).toContainText('Priced in USDC')
   })
 })

@@ -12,8 +12,8 @@ test.describe('price chart', () => {
     await expect(
       chart.getByRole('img', { name: /multiple of its opening price/ }),
     ).toBeVisible()
-    await expect(chart.locator('polyline')).toHaveCount(4)
-    await expect(chart.getByRole('listitem')).toHaveCount(4)
+    await expect(chart.locator('polyline')).toHaveCount(5)
+    await expect(chart.getByRole('listitem')).toHaveCount(5)
     await expect(chart.getByRole('listitem').first()).toContainText(
       'did not graduate',
     )
@@ -24,7 +24,7 @@ test.describe('price chart', () => {
       .getByRole('combobox', { name: 'Launch situation' })
       .selectOption('hype')
     const chart = page.locator('.price-chart')
-    await expect(chart.locator('circle')).toHaveCount(4)
+    await expect(chart.locator('circle')).toHaveCount(5)
     await expect(chart.getByRole('listitem').first()).toContainText(
       /graduated after \d+s/,
     )

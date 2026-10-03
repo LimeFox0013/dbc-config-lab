@@ -35,6 +35,23 @@ test.describe('config editor', () => {
     ).toBeDisabled()
   })
 
+  test('prices the launch in USDC at the reference rate and warns below the keepers’ minimum', async ({
+    page,
+  }) => {
+    await editor(page)
+      .getByRole('combobox', { name: 'Priced in' })
+      .selectOption({ label: 'USDC' })
+    const threshold = editor(page).getByRole('spinbutton', {
+      name: 'Graduates at (USDC)',
+    })
+    await expect(threshold).toHaveValue('12750')
+    await expect(editor(page).getByText(/below the 750 USDC/)).toHaveCount(0)
+
+    await threshold.fill('700')
+    await threshold.press('Enter')
+    await expect(editor(page).getByText(/below the 750 USDC/)).toBeVisible()
+  })
+
   test('a falling fee reveals its opening fee and window', async ({ page }) => {
     await expect(
       editor(page).getByRole('spinbutton', { name: /Falls over/ }),

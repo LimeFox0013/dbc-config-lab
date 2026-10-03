@@ -22,7 +22,7 @@ export const CURVE_SEARCH_FEE_SPACE: SearchSpace = {
   windowSeconds: [5, 10, 30],
 }
 
-/** Curves tried besides the user's own: other graduation thresholds and every shape. */
+/** Curves tried besides the user's own: other graduation thresholds and every shape, in SOL. */
 export const DEFAULT_CURVE_VARIANTS: CurveSpec[] = [
   {
     curveShape: CurveShape.Standard,
