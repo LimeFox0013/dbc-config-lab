@@ -2,6 +2,7 @@ import {
   BaseFeeMode,
   CollectFeeMode,
   DammV2DynamicFeeMode,
+  MAX_LOCK_DURATION_IN_SECONDS,
   MigratedCollectFeeMode,
   MigrationFeeOption,
   TokenDecimal,
@@ -131,6 +132,28 @@ const percentField = (
 })
 
 const liquidity = (config: LaunchConfig) => config.liquidityDistribution
+
+/** A whole-number field of the creator's locked vesting; unlock times are capped like the program's locks. */
+const vestingField = (
+  id: EditorFieldId,
+  unit: FieldUnit,
+  key: keyof LaunchConfig['lockedVesting'],
+  max: number,
+): EditorField => ({
+  id,
+  group: FieldGroup.Vesting,
+  kind: FieldKind.Number,
+  unit,
+  min: 0,
+  max,
+  step: 1,
+  read: (c) => c.lockedVesting[key],
+  write: (c, v) => ({
+    ...c,
+    lockedVesting: { ...c.lockedVesting, [key]: Math.trunc(v) },
+  }),
+  visible: always,
+})
 
 /** Applies a change to the curve part of a config. */
 const patchCurve = (
@@ -613,5 +636,35 @@ export const EDITOR_FIELDS: EditorField[] = [
         creatorPermanentLockedLiquidityPercentage: Math.trunc(v),
       },
     }),
+  ),
+  vestingField(
+    EditorFieldId.VestedTokens,
+    FieldUnit.Tokens,
+    'totalLockedVestingAmount',
+    LIMITS.maxTokens,
+  ),
+  vestingField(
+    EditorFieldId.VestingCliffTokens,
+    FieldUnit.Tokens,
+    'cliffUnlockAmount',
+    LIMITS.maxTokens,
+  ),
+  vestingField(
+    EditorFieldId.VestingCliffDelay,
+    FieldUnit.Seconds,
+    'cliffDurationFromMigrationTime',
+    MAX_LOCK_DURATION_IN_SECONDS,
+  ),
+  vestingField(
+    EditorFieldId.VestingPeriods,
+    FieldUnit.None,
+    'numberOfVestingPeriod',
+    MAX_LOCK_DURATION_IN_SECONDS,
+  ),
+  vestingField(
+    EditorFieldId.VestingDuration,
+    FieldUnit.Seconds,
+    'totalVestingDuration',
+    MAX_LOCK_DURATION_IN_SECONDS,
   ),
 ]

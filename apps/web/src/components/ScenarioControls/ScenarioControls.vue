@@ -104,6 +104,20 @@
       />
       {{ t('components.scenarioControls.liquidityPulled') }}
     </label>
+    <label class="scenario-controls__toggle">
+      <input
+        type="checkbox"
+        :checked="modelValue.vestedTokensSold"
+        @change="update({ vestedTokensSold: readChecked($event) })"
+      />
+      {{ t('components.scenarioControls.vestedTokensSold') }}
+    </label>
+    <p
+      v-if="modelValue.vestedTokensSold"
+      class="scenario-controls__summary"
+    >
+      {{ t('components.scenarioControls.vestedTokensSoldNote') }}
+    </p>
     <p
       v-if="presetId !== CUSTOM"
       class="scenario-controls__summary"
@@ -168,9 +182,9 @@ const update = (patch: Partial<ScenarioSpec>): void => {
 const presetIds = Object.values(ScenarioPresetId)
 const isPresetId = (value: string): value is ScenarioPresetId => presetIds.some((id) => id === value)
 
-/** Compares the traders only: the seed and the liquidity option apply to any preset. */
+/** Compares the traders only: the seed and the after-graduation options apply to any preset. */
 const tradersOf = (spec: ScenarioSpec): string =>
-  JSON.stringify({ ...spec, seed: 0, unlockedLiquidityPulled: false })
+  JSON.stringify({ ...spec, seed: 0, unlockedLiquidityPulled: false, vestedTokensSold: false })
 
 const presetId = computed<ScenarioPresetId | typeof CUSTOM>(
   () => presetIds.find((id) => tradersOf(SCENARIO_PRESETS[id]) === tradersOf(props.modelValue)) ?? CUSTOM,
@@ -182,6 +196,7 @@ const selectPreset = (event: Event): void => {
     ...SCENARIO_PRESETS[event.target.value],
     seed: props.modelValue.seed,
     unlockedLiquidityPulled: props.modelValue.unlockedLiquidityPulled,
+    vestedTokensSold: props.modelValue.vestedTokensSold,
   })
 }
 </script>

@@ -38,6 +38,7 @@ import {
   addFeeShares,
   emptyFeeShares,
   feeValueInQuote,
+  lockedVestingAmount,
   nextQuoteReserve,
   pointAt,
   splitTradingFee,
@@ -427,6 +428,27 @@ const applyTrade =
   }
 
 /**
+ * The creator's vested tokens sold into the graduated pool at `at`, as one sale: nobody
+ * trades between unlocks here, so selling each unlock as it releases would end the same.
+ */
+const withVestedTokensSold = (
+  parameters: ConfigParameters,
+  replay: Replay,
+  seller: Trade['trader'] | null,
+  at: number,
+): Replay => {
+  const vested = lockedVestingAmount(parameters)
+  if (!seller || !replay.migrated || vested.isZero()) return replay
+  return applyMigratedTrade(
+    parameters,
+    { ...replay, holdings: withHolding(replay.holdings, seller, vested) },
+    replay.migrated,
+    { at, trader: seller, side: TradeSide.SellAll },
+    vested,
+  )
+}
+
+/**
  * Replays trades, in time order, against a fresh pool for these config parameters using
  * the SDK's own swap math. Offline and deterministic.
  */
@@ -457,9 +479,16 @@ export const simulateLaunch = (
     migrated: null,
   }
   const ordered = [...trades].sort((a, b) => a.at - b.at)
-  const { pool, migrated, ...result } = ordered.reduce(
+  const replayed = ordered.reduce(
     applyTrade(parameters, toPoolConfig(parameters), options),
     initial,
+  )
+  const lastAt = ordered.at(-1)?.at ?? 0
+  const { pool, migrated, ...result } = withVestedTokensSold(
+    parameters,
+    replayed,
+    options.vestedTokensSeller,
+    lastAt + 1,
   )
   return { ...result, finalPool: pool, migratedPool: migrated }
 }

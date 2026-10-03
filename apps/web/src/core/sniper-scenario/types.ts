@@ -53,6 +53,8 @@ export interface ScenarioSpec {
   }
   /** Unlocked liquidity in the migrated pool is withdrawn right after graduation. */
   unlockedLiquidityPulled: boolean
+  /** The creator sells every token the config vests to them into the graduated pool after the last trade. */
+  vestedTokensSold: boolean
 }
 
 /** The program's base fee in bps for a buy of `amountIn` at second `at`. */
@@ -110,6 +112,8 @@ export interface ScenarioMetrics {
   botShareOfEarlyBuys: number | null
   /** SOL worth of liquidity withdrawn right after graduation; null when none was. */
   liquidityPulled: number | null
+  /** SOL the creator got for their vested tokens; null when none were sold. */
+  vestedTokensSold: number | null
   arbitrageProfit: number
   /** How far the final price sits from the outside price, in percent; null without one. */
   fairValueGapPercent: number | null

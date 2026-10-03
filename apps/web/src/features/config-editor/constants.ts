@@ -20,6 +20,7 @@ export enum FieldGroup {
   Fees = 'fees',
   Migration = 'migration',
   Liquidity = 'liquidity',
+  Vesting = 'vesting',
 }
 
 export enum EditorFieldId {
@@ -50,6 +51,11 @@ export enum EditorFieldId {
   PartnerLockedLiquidity = 'partner-locked-liquidity',
   CreatorLiquidity = 'creator-liquidity',
   CreatorLockedLiquidity = 'creator-locked-liquidity',
+  VestedTokens = 'vested-tokens',
+  VestingCliffTokens = 'vesting-cliff-tokens',
+  VestingCliffDelay = 'vesting-cliff-delay',
+  VestingPeriods = 'vesting-periods',
+  VestingDuration = 'vesting-duration',
 }
 
 /** Whether the program adds its volatility fee on top of the base fee. */
@@ -81,6 +87,8 @@ export const LIMITS = {
   minMigratedPoolFeePercent: 0.1,
   maxMigratedPoolFeePercent: 10,
   maxMigrationFeePercent: 99,
+  /** Token amounts never exceed the largest supply the editor accepts. */
+  maxTokens: 1_000_000_000_000,
 } as const
 
 /** Applied to a customizable migrated pool when the user first picks that option. */

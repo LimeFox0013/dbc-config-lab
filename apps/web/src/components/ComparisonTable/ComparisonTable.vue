@@ -103,6 +103,9 @@
                 v-if="row.metrics.liquidityPulled !== null && row.metrics.liquidityPulled > 0"
                 class="comparison-table__detail"
               >{{ t('components.comparisonTable.liquidityPulled', { sol: formatSol(row.metrics.liquidityPulled) }) }}</span><span
+                v-if="row.metrics.vestedTokensSold !== null"
+                class="comparison-table__detail"
+              >{{ t('components.comparisonTable.vestedTokensSold', { sol: formatSol(row.metrics.vestedTokensSold) }) }}</span><span
                 v-if="row.metrics.fairValueGapPercent !== null"
                 class="comparison-table__detail"
               >{{

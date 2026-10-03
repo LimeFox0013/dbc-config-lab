@@ -85,6 +85,11 @@ export interface SimulationResult {
 export interface SimulationOptions {
   /** Whoever holds unlocked liquidity in the migrated pool withdraws it right after graduation. */
   unlockedLiquidityPulled: boolean
+  /**
+   * The trader who, after the last trade, sells every token the config vests to the creator
+   * into the graduated pool; null when nobody does. Vested tokens exist only after graduation.
+   */
+  vestedTokensSeller: Trade['trader'] | null
 }
 
 export interface FirstBuyQuote {

@@ -8,10 +8,15 @@ export enum TraderGroup {
   AdaptiveSniper = 'adaptive-sniper',
   Human = 'human',
   Arbitrageur = 'arbitrageur',
+  /** The token's creator, selling the tokens the config vests to them. */
+  Creator = 'creator',
 }
 
 /** Separates group and index in a trader id, e.g. `adaptive-sniper:3`. */
 export const TRADER_ID_SEPARATOR = ':'
+
+/** The one creator who may sell vested tokens. */
+export const CREATOR_ID = `${TraderGroup.Creator}${TRADER_ID_SEPARATOR}0`
 
 /** Five bots buying in the first two seconds and dumping 30s later; sixty humans over ten minutes. */
 export const DEFAULT_SCENARIO: ScenarioSpec = {
@@ -44,6 +49,7 @@ export const DEFAULT_SCENARIO: ScenarioSpec = {
     solPerTrade: { min: 1, max: 3 },
   },
   unlockedLiquidityPulled: false,
+  vestedTokensSold: false,
 }
 
 export enum ScenarioPresetId {
@@ -74,6 +80,7 @@ export const SCENARIO_PRESETS: Record<ScenarioPresetId, ScenarioSpec> = {
     adaptiveSnipers: { ...DEFAULT_SCENARIO.adaptiveSnipers, count: 5 },
     arbitrageurs: DEFAULT_SCENARIO.arbitrageurs,
     unlockedLiquidityPulled: false,
+    vestedTokensSold: false,
   },
   [ScenarioPresetId.SlowBurn]: {
     seed: 42,
@@ -92,6 +99,7 @@ export const SCENARIO_PRESETS: Record<ScenarioPresetId, ScenarioSpec> = {
     adaptiveSnipers: { ...DEFAULT_SCENARIO.adaptiveSnipers, count: 2 },
     arbitrageurs: DEFAULT_SCENARIO.arbitrageurs,
     unlockedLiquidityPulled: false,
+    vestedTokensSold: false,
   },
   [ScenarioPresetId.PatientBots]: {
     ...DEFAULT_SCENARIO,

@@ -38,9 +38,10 @@ export const MS_PER_SECOND = 1000
 /** Solana's target slot time, used to turn scenario seconds into slots for slot-activated configs. */
 export const SLOT_DURATION_MS = 400
 
-/** By default nobody withdraws liquidity from the migrated pool. */
+/** By default nobody withdraws liquidity from the migrated pool or sells vested tokens. */
 export const DEFAULT_SIMULATION_OPTIONS: SimulationOptions = {
   unlockedLiquidityPulled: false,
+  vestedTokensSeller: null,
 }
 
 /** sqrtPrice is Q64: this many fractional bits. */

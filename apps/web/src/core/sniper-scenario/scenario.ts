@@ -7,7 +7,7 @@ import {
   Venue,
 } from '../launch-simulator'
 import type { SimulationResult } from '../launch-simulator'
-import { TraderGroup } from './constants'
+import { CREATOR_ID, TraderGroup } from './constants'
 import type {
   GroupOutcome,
   ScenarioMetrics,
@@ -59,6 +59,7 @@ export const runScenario = (
   })
   const simulation = simulateLaunch(parameters, trades, {
     unlockedLiquidityPulled: spec.unlockedLiquidityPulled,
+    vestedTokensSeller: spec.vestedTokensSold ? CREATOR_ID : null,
   })
   const exitAt = Math.max(0, ...trades.map((t) => t.at)) + 1
 
@@ -69,6 +70,7 @@ export const runScenario = (
     [TraderGroup.AdaptiveSniper]: make(TraderGroup.AdaptiveSniper),
     [TraderGroup.Human]: make(TraderGroup.Human),
     [TraderGroup.Arbitrageur]: make(TraderGroup.Arbitrageur),
+    [TraderGroup.Creator]: make(TraderGroup.Creator),
   })
 
   const totals = simulation.outcomes.reduce((acc, outcome) => {
@@ -89,6 +91,7 @@ export const runScenario = (
     [TraderGroup.AdaptiveSniper]: spec.adaptiveSnipers.count,
     [TraderGroup.Human]: spec.humans.count,
     [TraderGroup.Arbitrageur]: fairPriceX128 ? spec.arbitrageurs.count : 0,
+    [TraderGroup.Creator]: spec.vestedTokensSold ? 1 : 0,
   }
 
   // With an outside market, held tokens can be sold there; otherwise only into this pool.
@@ -149,6 +152,9 @@ export const metricsOf = (
     liquidityPulled: simulation.liquidityPulled
       ? toSol(simulation.liquidityPulled.value)
       : null,
+    vestedTokensSold: groups[TraderGroup.Creator].received.isZero()
+      ? null
+      : toSol(groups[TraderGroup.Creator].received),
     arbitrageProfit: toSol(groups[TraderGroup.Arbitrageur].profit),
     fairValueGapPercent: fairPriceX128
       ? fairValueGapPercent(simulation, fairPriceX128)

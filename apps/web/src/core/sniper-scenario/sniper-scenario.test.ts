@@ -295,6 +295,49 @@ describe('liquidity pulled after graduation', () => {
   })
 })
 
+describe('vested tokens sold after graduation', () => {
+  const hype = SCENARIO_PRESETS[ScenarioPresetId.Hype]
+  const sold = { ...hype, vestedTokensSold: true }
+  const vesting: LaunchConfig = {
+    ...DEFAULT_LAUNCH_CONFIG,
+    lockedVesting: {
+      totalLockedVestingAmount: 100_000_000,
+      numberOfVestingPeriod: 12,
+      cliffUnlockAmount: 10_000_000,
+      totalVestingDuration: 31_536_000,
+      cliffDurationFromMigrationTime: 2_592_000,
+    },
+  }
+
+  it('changes nothing for a config that vests nothing', () => {
+    const parameters = compile(DEFAULT_LAUNCH_CONFIG)
+    expect(scenarioMetrics(parameters, sold, QuoteToken.Sol)).toEqual(
+      scenarioMetrics(parameters, hype, QuoteToken.Sol),
+    )
+  })
+
+  it('lets the creator sell into the graduated pool, at holders\u2019 expense', () => {
+    const parameters = compile(vesting)
+    const kept = scenarioMetrics(parameters, hype, QuoteToken.Sol)
+    const dumped = scenarioMetrics(parameters, sold, QuoteToken.Sol)
+    expect(kept.vestedTokensSold).toBeNull()
+    expect(dumped.graduated).toBe(true)
+    expect(dumped.vestedTokensSold).toBeGreaterThan(0)
+    expect(dumped.humanProfit).toBeLessThan(kept.humanProfit)
+  })
+
+  it('sells nothing when the launch never graduates', () => {
+    const parameters = compile(vesting)
+    const quiet = scenarioMetrics(
+      parameters,
+      { ...DEFAULT_SCENARIO, vestedTokensSold: true },
+      QuoteToken.Sol,
+    )
+    expect(quiet.graduated).toBe(false)
+    expect(quiet.vestedTokensSold).toBeNull()
+  })
+})
+
 describe('quote tokens', () => {
   it('gives the same SOL figures for a launch and the same launch priced in USDC', () => {
     const usdc = compileLaunchConfig(

@@ -96,6 +96,7 @@ export const sanitizeScenario = (spec: ScenarioSpec): ScenarioSpec => ({
     ),
   }),
   unlockedLiquidityPulled: spec.unlockedLiquidityPulled === true,
+  vestedTokensSold: spec.vestedTokensSold === true,
 })
 
 /** A preset as a comparison entry, compiled once. */

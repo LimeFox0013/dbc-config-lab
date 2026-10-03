@@ -193,7 +193,9 @@
           "name": "Tokenized stock listing",
           "description": "A newly tokenized name with an outside price: thin human demand over half an hour, and traders who know that price trading the launch toward it."
         }
-      }
+      },
+      "vestedTokensSold": "The creator sells their vested tokens after graduation",
+      "vestedTokensSoldNote": "They sell everything the config vests to them right after the last trade. Nobody else trades between unlocks here, so selling each unlock as it releases would end the same; configs without vesting are unaffected."
     },
     "comparisonTable": {
       "caption": "Outcome per config, in SOL. Profit counts tokens still held at what they would fetch if each group sold them all at the end.",
@@ -211,7 +213,8 @@
       "pricedIn": "Priced in {symbol}: budgets and results converted at 1 SOL = {rate} {symbol}.",
       "keepersWontMigrate": "Threshold below the {minimum} {symbol} Meteora’s migration keepers act on: real pools on it would not graduate automatically.",
       "fairValue": "ends {gap} from the outside price · arbitrage traders {arbitrage} SOL",
-      "compounded": "{sol} compounded into the pool"
+      "compounded": "{sol} compounded into the pool",
+      "vestedTokensSold": "{sol} SOL from vested tokens sold"
     },
     "deployPanel": {
       "title": "Deploy a config",
@@ -385,7 +388,8 @@
         "curve": "Curve and graduation",
         "fees": "Trading fee",
         "migration": "Graduation pool",
-        "liquidity": "Liquidity after graduation"
+        "liquidity": "Liquidity after graduation",
+        "vesting": "Creator's locked tokens"
       },
       "fields": {
         "quote-token": "Priced in",
@@ -414,7 +418,12 @@
         "curve-shape": "Curve shape",
         "initial-market-cap": "Starting market cap",
         "migration-market-cap": "Graduates at market cap",
-        "weight-growth": "Liquidity growth per segment"
+        "weight-growth": "Liquidity growth per segment",
+        "vested-tokens": "Tokens locked for the creator",
+        "vesting-cliff-tokens": "Unlocked at the cliff",
+        "vesting-cliff-delay": "Cliff after graduation",
+        "vesting-periods": "Then unlocking in periods",
+        "vesting-duration": "Over (total)"
       },
       "units": {
         "tokens": "tokens",

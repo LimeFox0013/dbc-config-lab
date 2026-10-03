@@ -333,3 +333,10 @@ export const trackerAfterSwap = (
       : timestamp,
   }
 }
+
+/** Base units the config vests to the creator: the cliff unlock plus every period's release. */
+export const lockedVestingAmount = (parameters: ConfigParameters): BN => {
+  const { cliffUnlockAmount, amountPerPeriod, numberOfPeriod } =
+    parameters.lockedVesting
+  return cliffUnlockAmount.add(amountPerPeriod.mul(numberOfPeriod))
+}
