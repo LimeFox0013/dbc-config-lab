@@ -113,6 +113,7 @@ const main = async () => {
     config: DEFAULT_LAUNCH_CONFIG,
     network: SolanaNetwork.Devnet,
     owner: owner.publicKey,
+    royalty: null,
   })
   if (!prepared.ok) throw new Error(`prepare failed: ${prepared.reason}`)
   const { transaction, summary } = prepared.deployment

@@ -43,6 +43,3 @@ export const DEFAULT_SIMULATION_OPTIONS: SimulationOptions = {
   unlockedLiquidityPulled: false,
   vestedTokensSeller: null,
 }
-
-/** sqrtPrice is Q64: this many fractional bits. */
-export const Q64_SHIFT = 64

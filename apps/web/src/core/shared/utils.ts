@@ -30,3 +30,19 @@ export const shortAddress = (address: string): string =>
 /** A plain object, as untrusted JSON may or may not contain one. */
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/** Up to `limit` items spread evenly over `items`, first one included; all of them if fewer. */
+export const evenSample = <T>(items: readonly T[], limit: number): T[] => {
+  if (items.length <= limit) return [...items]
+  const step = items.length / limit
+  return Array.from(
+    { length: limit },
+    (_, i) => items[Math.floor(i * step)],
+  ).filter((item): item is T => item !== undefined)
+}
+
+/** `items` in consecutive groups of at most `size`. */
+export const chunks = <T>(items: readonly T[], size: number): T[][] =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
+    items.slice(i * size, (i + 1) * size),
+  )

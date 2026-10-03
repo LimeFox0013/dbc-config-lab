@@ -9,10 +9,10 @@ import {
 describe('replayTotals', () => {
   it('adds up the recorded replays', () => {
     expect(replayTotals(REPLAYED_LAUNCHES)).toEqual({
-      launches: 5,
-      curveSwaps: 335,
-      migrations: 4,
-      migratedSwaps: 919,
+      launches: 8,
+      curveSwaps: 386,
+      migrations: 7,
+      migratedSwaps: 970,
     })
   })
 })

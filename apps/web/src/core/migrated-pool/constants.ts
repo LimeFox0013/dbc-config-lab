@@ -21,3 +21,12 @@ export const PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS = 20
 /** DAMM v2 protocol and referral shares of a trading fee, in percent. */
 export const MIGRATED_PROTOCOL_FEE_PERCENT = 20
 export const MIGRATED_REFERRAL_FEE_PERCENT = 20
+
+/*
+ * The dynamic fee the DBC program gives a graduated pool when the config enables it
+ * (damm_v2_utils.rs, calculate_dynamic_fee_params; constants.rs, dynamic_fee): up to this
+ * share of the pool's lowest base fee, on the DAMM v2 SDK's default volatility settings.
+ */
+export const MIGRATED_MAX_DYNAMIC_FEE_PERCENT = 20
+export const MIGRATED_MAX_VOLATILITY_ACCUMULATOR = 14_460_000
+export const MIGRATED_SQUARE_VFA_BIN = '209091600000000'

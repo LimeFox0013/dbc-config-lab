@@ -1,4 +1,6 @@
+import { Keypair } from '@solana/web3.js'
 import { describe, expect, it } from 'vitest'
+import { RoyaltyRejection } from '../../core/preset-royalty'
 import {
   compileLaunchConfig,
   CurveShape,
@@ -209,5 +211,33 @@ describe('toTypeScript', () => {
     expect(code).toContain('"tokenQuoteDecimal": 6')
     expect(code).toContain('"migrationQuoteThreshold": 12750')
     expect(code).not.toContain('quoteToken')
+  })
+})
+
+describe('royalty in a share link', () => {
+  const author = Keypair.generate().publicKey.toBase58()
+  const config = DEFAULT_LAUNCH_CONFIG
+
+  it('travels with the preset', () => {
+    expect(
+      decodeSharedConfig(
+        encodeSharedConfig({ config, royalty: { author, sharePercent: 10 } }),
+      ),
+    ).toEqual({
+      ok: true,
+      shared: { config, royalty: { author, sharePercent: 10 } },
+    })
+  })
+
+  it('refuses a royalty that cannot be paid, naming why', () => {
+    expect(
+      decodeSharedConfig(
+        encodeSharedConfig({ config, royalty: { author, sharePercent: 90 } }),
+      ),
+    ).toEqual({
+      ok: false,
+      rejection: ShareRejection.RoyaltyRefused,
+      detail: RoyaltyRejection.ShareOutOfRange,
+    })
   })
 })

@@ -102,6 +102,32 @@
       })
     }}
   </dd>
+  <dt>{{ t('components.configTermsRows.graduatedDynamicFee') }}</dt>
+  <dd class="config-terms__value">
+    {{
+      terms.graduatedDynamicFee ?
+        t('components.configTermsRows.dynamicFeeOn') :
+        t('components.configTermsRows.dynamicFeeOff')
+    }}
+  </dd>
+  <dt>{{ t('components.configTermsRows.graduatedFeeSchedule') }}</dt>
+  <dd class="config-terms__value">
+    {{
+      terms.graduatedFeeSchedule === null ?
+        t('components.configTermsRows.graduatedFeeFlat') :
+        t(
+          terms.graduatedFeeSchedule.exponential ?
+            'components.configTermsRows.graduatedFeeFallsExponentially' :
+            'components.configTermsRows.graduatedFeeFallsLinearly',
+          {
+            ending: percentFromBps(terms.graduatedFeeSchedule.endingFeeBps),
+            steps: terms.graduatedFeeSchedule.steps,
+            multiple: formatMultiple(terms.graduatedFeeSchedule.priceMultiple),
+            duration: duration(terms.graduatedFeeSchedule.durationSeconds),
+          },
+        )
+    }}
+  </dd>
   <dt>{{ t('components.configTermsRows.migrationFee') }}</dt>
   <dd class="config-terms__value">
     {{
@@ -141,7 +167,7 @@ import { LiquidityHolder } from './constants'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { QUOTE_TOKENS } from '../../core/quote-token'
-import { formatAmount, percentFromBps } from '../../core/shared'
+import { formatAmount, formatMultiple, percentFromBps } from '../../core/shared'
 import type { ConfigTermsRowsProps } from './types'
 import { durationParts } from './utils'
 

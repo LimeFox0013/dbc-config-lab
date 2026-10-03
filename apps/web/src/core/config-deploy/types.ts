@@ -8,6 +8,8 @@ import type {
   TokenType,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { LaunchConfig } from '../launch-config'
+import type { PresetRoyalty, RoyaltySplit } from '../preset-royalty'
+import type { MigratedFeeSchedule } from '../migrated-pool'
 import type { QuoteToken } from '../quote-token'
 import type { SolanaNetwork } from '../shared'
 
@@ -16,6 +18,7 @@ export interface DeployRequest {
   network: SolanaNetwork
   /** The connected wallet: pays, claims fees and receives leftovers. */
   owner: PublicKey
+  royalty: PresetRoyalty | null
 }
 
 /** Deploying already-compiled parameters — a built config or a clone of one on chain. */
@@ -24,6 +27,8 @@ export interface ParametersDeployRequest {
   quoteToken: QuoteToken
   network: SolanaNetwork
   owner: PublicKey
+  /** The preset author's share of the launchpad's fees; null when the preset has none. */
+  royalty: PresetRoyalty | null
 }
 
 /**
@@ -58,6 +63,10 @@ export interface ConfigTerms {
   /** How the graduated pool collects fees, and the share of LP fees it compounds into its reserves. */
   graduatedFeesCollectedIn: MigratedCollectFeeMode
   compoundingFeeBps: number
+  /** The graduated pool adds a volatility fee after sharp price moves. */
+  graduatedDynamicFee: boolean
+  /** The graduated pool's fee falling as the price rises; null when it is flat. */
+  graduatedFeeSchedule: MigratedFeeSchedule | null
   /** A fixed token supply, before and after graduation, in whole tokens; null when not fixed. */
   fixedSupply: { preMigration: number; postMigration: number } | null
   tokenType: TokenType
@@ -79,6 +88,8 @@ export interface DeploySummary extends ConfigTerms {
   startingFeeBps: number
   endingFeeBps: number
   feeWindowSeconds: number
+  /** How the launchpad's fees are split with the preset's author; null when they are not. */
+  royalty: RoyaltySplit | null
 }
 
 /** A share of graduation liquidity that unlocks after a cliff, then in equal periods. */

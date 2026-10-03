@@ -23,4 +23,25 @@ export interface MigratedSwap {
   feesOnBaseToken: boolean
   feeMode: FeeMode
   direction: TradeDirection
+  /** The pool as the swap saw it, its dynamic-fee tracker refreshed. */
+  pool: PoolState
+  /** When the swap ran, in unix seconds. */
+  timestamp: BN
+}
+
+/** A graduated pool fee that falls as the price rises above the graduation price. */
+export interface MigratedFeeSchedule {
+  exponential: boolean
+  /** The fee once the price has risen by `priceMultiple`, in whole bps. */
+  endingFeeBps: number
+  steps: number
+  priceMultiple: number
+  /** After this long from graduation the pool charges the ending fee whatever the price. */
+  durationSeconds: number
+}
+
+/** The graduated pool's packed base-fee record and the lowest fee it can charge. */
+export interface MigratedBaseFee {
+  data: number[]
+  minFeeNumerator: BN
 }

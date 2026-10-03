@@ -51,9 +51,36 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e
 
+  container:
+    name: Container smoke test
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -f apps/web/Dockerfile -t dbc-config-lab-web:ci .
+      - name: Serves the site and proxies mainnet RPC, keeping the key out of the page
+        run: |
+          docker run -d --name web -p 8080:8080 -e HELIUS_API_KEY=ci-placeholder-key dbc-config-lab-web:ci
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:8080/ && break; sleep 1; done
+          curl -sf -o page.html -D headers.txt http://127.0.0.1:8080/
+          grep -qi '^content-security-policy:' headers.txt
+          ! grep -q ci-placeholder-key page.html
+          docker exec web grep -q 'api-key=ci-placeholder-key' /etc/nginx/conf.d/default.conf
+          # The placeholder key is refused by the provider; any answer from it shows the
+          # proxy reached it, where a gateway error or a 404 would not.
+          code=$(curl -s -o rpc.txt -w '%{http_code}' -X POST \
+            -H 'content-type: application/json' -H 'Origin: http://127.0.0.1:8080' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' http://127.0.0.1:8080/rpc/mainnet)
+          echo "proxy answered $code: $(head -c 200 rpc.txt)"
+          case "$code" in 404|500|502|503|504) exit 1 ;; esac
+      - if: failure()
+        run: docker logs web
+
   image:
     name: Build and push image
-    needs: [check, e2e]
+    needs: [check, e2e, container]
     # Only main is ever published. Skipped until the registry and deploy credentials are
     # configured for this repo.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.REGISTRY_URL != ''
@@ -99,3 +126,5 @@ jobs:
           LFI_KEYCLOAK_REALM: limefox
           LFI_DEPLOY_CLIENT_ID: ${{ secrets.LFI_DEPLOY_CLIENT_ID }}
           LFI_DEPLOY_CLIENT_SECRET: ${{ secrets.LFI_DEPLOY_CLIENT_SECRET }}
+          # The site's mainnet RPC proxy key; handed to the container, never to the page.
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}

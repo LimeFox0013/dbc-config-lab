@@ -3,7 +3,7 @@ import BN from 'bn.js'
 import { FeeRole } from '../../core/fee-claim'
 import { QUOTE_TOKENS, QuoteToken } from '../../core/quote-token'
 import { SolanaNetwork } from '../../core/shared'
-import { earningsRows } from '.'
+import { earningsRows, vaultShareRow } from '.'
 
 const SOL_MINT = QUOTE_TOKENS[QuoteToken.Sol].mints[SolanaNetwork.Devnet]
 /** sqrtPrice of 2^64: one quote base unit per base unit. */
@@ -73,5 +73,42 @@ describe('earningsRows', () => {
         SolanaNetwork.Devnet,
       ),
     ).toEqual([])
+  })
+})
+
+describe('royalty vault rows', () => {
+  it('offers to collect a pool\u2019s launchpad fees into the vault, naming vault and config', () => {
+    const [row] = earningsRows(
+      [pool('p1', { pq: 500, cq: 9 })],
+      FeeRole.VaultCollect,
+      () => SOL_MINT,
+      SolanaNetwork.Devnet,
+      () => 'vault',
+    )
+    expect(row).toMatchObject({
+      role: FeeRole.VaultCollect,
+      unclaimedQuote: new BN(500),
+      vault: 'vault',
+      config: 'config',
+    })
+  })
+
+  it('shows a recipient\u2019s unclaimed share, and nothing when none is owed', () => {
+    expect(
+      vaultShareRow('vault', SOL_MINT, new BN(0), SolanaNetwork.Devnet),
+    ).toEqual([])
+    const [row] = vaultShareRow(
+      'vault',
+      SOL_MINT,
+      new BN(1_000_000_000),
+      SolanaNetwork.Devnet,
+    )
+    expect(row).toMatchObject({
+      role: FeeRole.VaultShare,
+      pool: 'vault',
+      vault: 'vault',
+      config: null,
+      valueSol: 1,
+    })
   })
 })

@@ -43,7 +43,12 @@ import type {
   VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { connectionFor } from '../src/core/config-deploy'
-import { afterMigratedSwap, toMigratedPool } from '../src/core/migrated-pool'
+import {
+  afterMigratedSwap,
+  toMigratedPool,
+  withTrackerAfterSwap,
+  withTrackerBeforeSwap,
+} from '../src/core/migrated-pool'
 import type { MigratedPool } from '../src/core/migrated-pool'
 import { readOnChainConfig } from '../src/features/onchain-config'
 import { errorMessage, isRecord, SolanaNetwork } from '../src/core/shared'
@@ -52,9 +57,11 @@ import {
   nextQuoteReserve,
   toInitialPool,
   toPoolConfig,
+} from '../src/core/launch-simulator'
+import {
   trackerAfterSwap,
   trackerBeforeSwap,
-} from '../src/core/launch-simulator'
+} from '../src/core/volatility-tracker'
 
 const SIGNATURE_PAGE = 1000
 const MAX_SIGNATURES = 5000
@@ -71,6 +78,7 @@ const SWAP_EVENTS = new Set([
   'evtSwap2',
   'evtSwap2WithTransferHook',
 ])
+const POOL_INIT_EVENT = 'evtInitializePool'
 const REPORTED_MISMATCHES = 12
 /** Newest transaction format the RPC returns when asked. */
 const MAX_TRANSACTION_VERSION = 1
@@ -242,6 +250,7 @@ const quoteFor = (
   config: ReturnType<typeof toPoolConfig>,
   event: SwapEvent,
   point: BN,
+  firstSwapAtMinFee: boolean,
 ): SwapQuote2Result => {
   const baseForQuote =
     numberField(event.data, 'tradeDirection') === TradeDirection.BaseToQuote
@@ -256,7 +265,7 @@ const quoteFor = (
       0,
       hasReferral,
       point,
-      false,
+      firstSwapAtMinFee,
     )
   }
   const parameters = field(event.data, 'swapParameters')
@@ -271,7 +280,7 @@ const quoteFor = (
         0,
         hasReferral,
         point,
-        false,
+        firstSwapAtMinFee,
       )
     case SwapMode.PartialFill:
       return swapQuotePartialFill(
@@ -282,7 +291,7 @@ const quoteFor = (
         0,
         hasReferral,
         point,
-        false,
+        firstSwapAtMinFee,
       )
     case SwapMode.ExactOut:
       return swapQuoteExactOut(
@@ -293,7 +302,7 @@ const quoteFor = (
         0,
         hasReferral,
         point,
-        false,
+        firstSwapAtMinFee,
       )
     default:
       throw new Error('Unknown swap mode')
@@ -504,8 +513,9 @@ const replayMigratedPool = async (
       swaps++
       const point = bnField(event.data, 'current_timestamp')
       const recorded = field(event.data, 'swap_result')
+      const before = withTrackerBeforeSwap(state, point)
       try {
-        const quote = migratedQuoteFor(state, event.data, point)
+        const quote = migratedQuoteFor(before, event.data, point)
         const pairs: Array<[string, BN, BN]> = [
           ['claimingFee', quote.claimingFee, bnField(recorded, 'claiming_fee')],
           ['protocolFee', quote.protocolFee, bnField(recorded, 'protocol_fee')],
@@ -544,13 +554,13 @@ const replayMigratedPool = async (
       ]
       if (compounding) {
         try {
-          const quote = migratedQuoteFor(state, event.data, point)
+          const quote = migratedQuoteFor(before, event.data, point)
           const direction =
             numberField(event.data, 'trade_direction') ===
             MigratedTradeDirection.AtoB
               ? MigratedTradeDirection.AtoB
               : MigratedTradeDirection.BtoA
-          const after = afterMigratedSwap(state, {
+          const after = afterMigratedSwap({
             quote,
             feesOnBaseToken: false,
             feeMode: getMigratedFeeMode(
@@ -559,6 +569,8 @@ const replayMigratedPool = async (
               field(event.data, 'has_referral') === true,
             ),
             direction,
+            pool: before,
+            timestamp: point,
           })
           const reserves: Array<[string, BN, BN]> = [
             ['reserveA', after.tokenAAmount, reservesAfter[0]],
@@ -577,8 +589,11 @@ const replayMigratedPool = async (
       }
       // Continue from the chain's own state so one mismatch cannot cascade.
       state = {
-        ...state,
-        sqrtPrice: bnField(recorded, 'next_sqrt_price'),
+        ...withTrackerAfterSwap(
+          before,
+          bnField(recorded, 'next_sqrt_price'),
+          point,
+        ),
         ...(compounding
           ? { tokenAAmount: reservesAfter[0], tokenBAmount: reservesAfter[1] }
           : {}),
@@ -644,14 +659,16 @@ const main = async () => {
   for (const signature of signatures) {
     await sleep(REQUEST_GAP_MS)
     const transaction = await transactionOf(connection.rpcEndpoint, signature)
-    const poolEvents = eventsOf(
+    const ownEvents = eventsOf(
       transaction,
       DYNAMIC_BONDING_CURVE_PROGRAM_ID,
       decode,
-    ).filter(
-      (event) =>
-        SWAP_EVENTS.has(event.name) &&
-        String(field(event.data, 'pool')) === address,
+    ).filter((event) => String(field(event.data, 'pool')) === address)
+    const poolEvents = ownEvents.filter((event) => SWAP_EVENTS.has(event.name))
+    // The program charges the minimum fee on a pool's first swap when the config allows it
+    // and the same transaction creates the pool (process_swap.rs).
+    const createdHere = ownEvents.some(
+      (event) => event.name === POOL_INIT_EVENT,
     )
     // Current program versions emit the legacy EvtSwap alongside EvtSwap2 for each swap.
     const hasSwap2 = poolEvents.some(
@@ -683,7 +700,13 @@ const main = async () => {
       let quoteReserve = state.quoteReserve
       let quote: SwapQuote2Result | null = null
       try {
-        quote = quoteFor(before, config, event, point)
+        quote = quoteFor(
+          before,
+          config,
+          event,
+          point,
+          config.enableFirstSwapWithMinFee !== 0 && createdHere && swaps === 1,
+        )
       } catch (error) {
         mismatches.push(
           `swap ${swaps} (${signature.slice(0, 12)}…) ${event.name}: quote failed (${errorMessage(error)}) at simulated sqrt price ${state.sqrtPrice}`,
@@ -767,7 +790,8 @@ const main = async () => {
     ? await replayMigratedPool(
         connection.rpcEndpoint,
         migratedAddress,
-        toMigratedPool(parameters, config),
+        // Opened at the time the migration records, read from the pool's history.
+        toMigratedPool(parameters, config, new BN(0)),
       )
     : { swaps: 0, liquidityChanges: 0, mismatches: [] }
   if (migratedAddress)

@@ -20,3 +20,6 @@ export const BPS_PRECISION = 6
 
 /** Characters kept at each end of an address when it is shortened for display. */
 export const ADDRESS_EDGE = 4
+
+/** Accounts per `getMultipleAccountsInfo` call — the RPC's own maximum. */
+export const ACCOUNTS_PER_READ = 100

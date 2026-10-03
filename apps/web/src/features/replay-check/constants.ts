@@ -7,11 +7,19 @@ export enum FeeSetup {
   FeesInSol = 'fees-in-sol',
 }
 
+/** What a replayed graduated pool charged or kept beyond a flat fee. */
+export enum GraduatedFeature {
+  Compounding = 'compounding',
+  VolatilityFee = 'volatility-fee',
+  FallingFee = 'falling-fee',
+}
+
 /**
  * Results of `scripts/mainnet-replay-verify.ts` (latest runs 2026-10-02/03): every swap of
  * these mainnet launches, replayed from a fresh pool, matched the program's recorded fees,
  * output and price exactly, as did each migrated pool's opening liquidity (and, for
- * compounding pools, its reserves before and after every swap) and the liquidity its
+ * compounding pools, its reserves before and after every swap — including pools charging a
+ * volatility fee or a fee falling as the price rises) and the liquidity its
  * creator later withdrew.
  */
 export const REPLAYED_LAUNCHES: readonly ReplayedLaunch[] = [
@@ -45,7 +53,7 @@ export const REPLAYED_LAUNCHES: readonly ReplayedLaunch[] = [
     migrated: {
       pool: 'F8Zd3TEBZtDHL7YoQAznWL3AyAbuhNaEybZELh1fuVZj',
       swaps: 26,
-      compounding: true,
+      features: [GraduatedFeature.Compounding],
     },
   },
   {
@@ -55,7 +63,41 @@ export const REPLAYED_LAUNCHES: readonly ReplayedLaunch[] = [
     migrated: {
       pool: 'Esab82WjLvX58JrtEwASdppVcfB3fWF9rN3J6D2kmUxm',
       swaps: 4,
-      compounding: true,
+      features: [GraduatedFeature.Compounding],
+    },
+  },
+  {
+    curvePool: 'F7jZU2RSk4Ua2KJZEUPFVvdg5pPQAxJEVE3oJy15Ech',
+    curveSwaps: 17,
+    feeSetup: FeeSetup.VolatilityFee,
+    migrated: {
+      pool: '4tar3zNMmnBFwzQzM5JYr6LEXnB3qNbQ9PekGQ112H5m',
+      swaps: 23,
+      features: [GraduatedFeature.VolatilityFee, GraduatedFeature.Compounding],
+    },
+  },
+  {
+    curvePool: '8jDa3RDs1P7ec4N5Gb3fKAAL5pVECnUPsoVB5tzGrmf2',
+    curveSwaps: 1,
+    feeSetup: FeeSetup.VolatilityFee,
+    migrated: {
+      pool: 'FQuBxW2C9Tp5m9ETaihMbL7sCU3nE5BPD212fyJ7Mo4q',
+      swaps: 25,
+      features: [GraduatedFeature.VolatilityFee, GraduatedFeature.FallingFee],
+    },
+  },
+  {
+    curvePool: '895pYRYhfS4mcS7z2r1Mm4PkFqbVZJDCPh5PwuZqdzun',
+    curveSwaps: 33,
+    feeSetup: FeeSetup.VolatilityFee,
+    migrated: {
+      pool: 'HJbDALFNfK46YHsQh6YhxjTsmbqr9c1o6zD5VNMGU9TF',
+      swaps: 3,
+      features: [
+        GraduatedFeature.VolatilityFee,
+        GraduatedFeature.FallingFee,
+        GraduatedFeature.Compounding,
+      ],
     },
   },
 ]

@@ -7,12 +7,15 @@ test.describe('replay check', () => {
     await page.goto('/')
     const check = page.locator('.replay-check')
     await expect(check.locator('summary')).toContainText(
-      '5 mainnet launches, 335 bonding-curve swaps, 4 graduations and 919 swaps after graduation',
+      '8 mainnet launches, 386 bonding-curve swaps, 7 graduations and 970 swaps after graduation',
     )
     await check.locator('summary').click()
     const links = check.getByRole('link')
-    await expect(links).toHaveCount(9)
+    await expect(links).toHaveCount(15)
     await expect(check).toContainText('1 curve swap ·')
+    await expect(check).toContainText(
+      '(volatility fee, fee falling as the price rises, compounding pool)',
+    )
     await expect(links.first()).toHaveAttribute(
       'href',
       'https://explorer.solana.com/address/8EeVgd9m2fvNRQ9DSqpKonfubzkkwFkPcAJQPWCvuR37',

@@ -76,6 +76,12 @@
                 scope="col"
                 class="launchpad-economics__number"
               >
+                {{ t('components.launchpadEconomics.columns.afterGraduation') }}
+              </th>
+              <th
+                scope="col"
+                class="launchpad-economics__number"
+              >
                 {{ t('components.launchpadEconomics.columns.launches') }}
               </th>
               <th
@@ -107,6 +113,9 @@
               </th>
               <td class="launchpad-economics__number">
                 {{ t('components.launchpadEconomics.income', { median: formatSol(record.partnerIncomeMedian), p75: formatSol(record.partnerIncomeP75) }) }}
+              </td>
+              <td class="launchpad-economics__number">
+                {{ afterText(record) }}
               </td>
               <td class="launchpad-economics__number">
                 {{ formatCount(record.launches) }}
@@ -149,12 +158,7 @@ import { explorerAddressUrl } from '../../core/config-deploy'
 import { migratedUnsupportedReason, pullableLiquidityPercent } from '../../core/migrated-pool'
 import { QUOTE_TOKENS, wholeQuoteTokens } from '../../core/quote-token'
 import { formatAmount, formatCount, formatShare, formatSol, shortAddress } from '../../core/shared'
-import {
-  graduationRate,
-  LaunchpadSort,
-  useLaunchpadSnapshot,
-  rankLaunchpads,
-} from '../../features/launchpad-economics'
+import { AfterGraduationBasis, graduationRate, LaunchpadSort, rankLaunchpads, useLaunchpadSnapshot } from '../../features/launchpad-economics'
 import type { LaunchpadFilter, LaunchpadRecord } from '../../features/launchpad-economics'
 import type { OnChainConfig } from '../../features/onchain-config'
 import { ANY, FILTER_KEYS, FILTER_VALUES, SHOWN_LAUNCHPADS } from './constants'
@@ -178,6 +182,24 @@ const ranked = computed(() =>
   records.value ? rankLaunchpads(records.value, { sort: sort.value, filter: filter.value }) : [],
 )
 const shown = computed(() => ranked.value.slice(0, SHOWN_LAUNCHPADS))
+
+/** Income after graduation per launch, or why there is none to show. */
+const afterText = (record: LaunchpadRecord): string => {
+  const after = record.afterGraduation
+  if (!after) return t('components.launchpadEconomics.after.unknown')
+  switch (after.basis) {
+    case AfterGraduationBasis.NoShare:
+      return t('components.launchpadEconomics.after.noShare')
+    case AfterGraduationBasis.NotHeld:
+      return t('components.launchpadEconomics.after.notHeld')
+    case AfterGraduationBasis.Positions:
+      return t('components.launchpadEconomics.after.positions', {
+        median: formatSol(after.median),
+        p75: formatSol(after.p75),
+        positions: formatCount(after.sampledPositions),
+      })
+  }
+}
 
 const termsText = (record: LaunchpadRecord): string => {
   const { parameters, quoteToken } = record.config

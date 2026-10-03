@@ -20,7 +20,7 @@ import {
   solFromQuoteUnits,
 } from '../../core/quote-token'
 import { poolAccountData } from '../../testing/dbc-accounts'
-import { evenSample, fetchRealLaunches, RealLaunchesRejection } from '.'
+import { fetchRealLaunches, RealLaunchesRejection } from '.'
 import { SolanaNetwork } from '../../core/shared'
 
 const compiled = compileLaunchConfig({
@@ -71,14 +71,6 @@ const account = (data: Buffer): AccountInfo<Buffer> => ({
 
 afterEach(() => {
   vi.restoreAllMocks()
-})
-
-describe('evenSample', () => {
-  it('keeps everything up to the limit, then spreads evenly from the first item', () => {
-    const items = Array.from({ length: 10 }, (_, i) => i)
-    expect(evenSample(items, 20)).toEqual(items)
-    expect(evenSample(items, 5)).toEqual([0, 2, 4, 6, 8])
-  })
 })
 
 describe('fetchRealLaunches', () => {

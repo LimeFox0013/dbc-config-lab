@@ -21,8 +21,6 @@ export {
   nextQuoteReserve,
   toInitialPool,
   toPoolConfig,
-  trackerAfterSwap,
-  trackerBeforeSwap,
 } from './utils'
 export {
   baseFeeBpsAt,

@@ -1,4 +1,4 @@
-import type { FeeSetup } from './constants'
+import type { FeeSetup, GraduatedFeature } from './constants'
 
 /** One real launch whose on-chain history the simulator reproduced exactly. */
 export interface ReplayedLaunch {
@@ -10,8 +10,8 @@ export interface ReplayedLaunch {
   migrated?: {
     pool: string
     swaps: number
-    /** The graduated pool compounds part of its fees into its own liquidity. */
-    compounding?: boolean
+    /** What the graduated pool's terms exercised beyond a flat fee, if anything. */
+    features?: GraduatedFeature[]
   }
 }
 

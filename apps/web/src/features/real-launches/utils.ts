@@ -13,16 +13,6 @@ import type { QuoteToken } from '../../core/quote-token'
 import { P75, TRACTION_SHARE } from './constants'
 import type { PoolRecord, RealLaunches } from './types'
 
-/** Up to `limit` items spread evenly over `items`, first one included; all of them if fewer. */
-export const evenSample = <T>(items: readonly T[], limit: number): T[] => {
-  if (items.length <= limit) return [...items]
-  const step = items.length / limit
-  return Array.from(
-    { length: limit },
-    (_, i) => items[Math.floor(i * step)],
-  ).filter((item): item is T => item !== undefined)
-}
-
 /** Base tokens the whole curve sells before graduation. */
 export const curveTokensOf = (parameters: ConfigParameters): BN =>
   getBaseTokenForSwap(

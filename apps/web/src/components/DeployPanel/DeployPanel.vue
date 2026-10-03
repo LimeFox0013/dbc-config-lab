@@ -63,6 +63,22 @@
       <dd class="deploy-panel__value">
         {{ prepared.summary.feeClaimer }}
       </dd>
+      <template v-if="prepared.summary.royalty">
+        <dt>{{ t('components.deployPanel.summary.royalty') }}</dt>
+        <dd class="deploy-panel__value">
+          {{
+            t('components.deployPanel.summary.royaltyValue', {
+              you: prepared.summary.royalty.deployerPercent,
+              author: prepared.summary.royalty.authorPercent,
+              address: prepared.summary.royalty.author,
+            })
+          }}
+        </dd>
+        <dt>{{ t('components.deployPanel.summary.royaltyLiquidity') }}</dt>
+        <dd class="deploy-panel__value deploy-panel__value--warning">
+          {{ t('components.deployPanel.summary.royaltyLiquidityValue') }}
+        </dd>
+      </template>
       <dt>{{ t('components.deployPanel.summary.leftoverReceiver') }}</dt>
       <dd class="deploy-panel__value">
         {{ prepared.summary.leftoverReceiver }}
@@ -284,6 +300,10 @@ watch(step, (current) => {
 .deploy-panel__value--network {
   color: var(--color-loss);
   font-weight: var(--font-weight-strong);
+}
+
+.deploy-panel__value--warning {
+  color: var(--color-loss);
 }
 
 .deploy-panel__done {

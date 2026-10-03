@@ -56,6 +56,8 @@ export const useEarnings = (session: WalletSessionRefs) => {
         owner,
         maxQuoteAmount: row.unclaimedQuote,
         maxBaseAmount: row.unclaimedBase,
+        vault: row.vault ? new PublicKey(row.vault) : null,
+        config: row.config ? new PublicKey(row.config) : null,
       })
       return claim.ok
         ? { ok: true, prepared: claim.claim }

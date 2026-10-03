@@ -13,3 +13,11 @@ export const VIRTUAL_POOL_LAYOUT = {
   creator: 104,
   isMigrated: 305,
 } as const
+
+/** Byte offsets inside a config's packed market-cap fee schedule for the graduated pool (little-endian). */
+export const MARKET_CAP_SCHEDULER_LAYOUT = {
+  numberOfPeriod: 0,
+  sqrtPriceStepBps: 2,
+  schedulerExpirationDuration: 4,
+  reductionFactor: 8,
+} as const

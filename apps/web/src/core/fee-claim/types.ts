@@ -13,6 +13,9 @@ export interface ClaimRequest {
   /** The unclaimed amounts, in base units; the claim takes at most these. */
   maxQuoteAmount: BN
   maxBaseAmount: BN
+  /** For the vault roles: the royalty vault, and the config whose fees it collects. */
+  vault: PublicKey | null
+  config: PublicKey | null
 }
 
 export interface ClaimSummary {

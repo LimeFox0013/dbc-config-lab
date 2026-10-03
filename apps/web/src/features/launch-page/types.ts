@@ -3,6 +3,7 @@ import type { OnChainConfig } from '../onchain-config'
 import type { LoadRejection } from '../onchain-config'
 import type { LaunchPageStatus } from './constants'
 
+import type { RoyaltySplit } from '../../core/preset-royalty'
 export type LaunchPageState =
   | { status: LaunchPageStatus.Loading }
   | {
@@ -15,4 +16,6 @@ export type LaunchPageState =
       config: OnChainConfig
       /** Null when the launchpad's operator has published none. */
       branding: PartnerBranding | null
+      /** When a royalty vault claims the fees: who it pays, and how much. */
+      royalty: RoyaltySplit | null
     }

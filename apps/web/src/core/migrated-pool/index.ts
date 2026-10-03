@@ -1,10 +1,21 @@
-export type { MigratedPool, MigratedSwap, PulledLiquidity } from './types'
+export type {
+  MigratedFeeSchedule,
+  MigratedPool,
+  MigratedSwap,
+  PulledLiquidity,
+} from './types'
 export {
   lockedLiquidity,
   migratedFeeBps,
+  migratedFeeSchedule,
   migratedUnsupportedReason,
   pullableLiquidityPercent,
   toMigratedPool,
   withUnlockedLiquidityPulled,
 } from './utils'
-export { afterMigratedSwap, quoteMigratedSwap } from './swap'
+export {
+  afterMigratedSwap,
+  quoteMigratedSwap,
+  withTrackerAfterSwap,
+  withTrackerBeforeSwap,
+} from './swap'

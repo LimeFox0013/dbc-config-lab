@@ -46,6 +46,12 @@ export enum EditorFieldId {
   MigratedPoolFee = 'migrated-pool-fee',
   MigratedFeeCollection = 'migrated-fee-collection',
   CompoundingShare = 'compounding-share',
+  MigratedDynamicFee = 'migrated-dynamic-fee',
+  MigratedFeeCurve = 'migrated-fee-curve',
+  MigratedEndingFee = 'migrated-ending-fee',
+  MigratedFeePeriods = 'migrated-fee-periods',
+  MigratedPriceMultiple = 'migrated-price-multiple',
+  MigratedFeeScheduleDuration = 'migrated-fee-schedule-duration',
   MigrationFee = 'migration-fee',
   PartnerLiquidity = 'partner-liquidity',
   PartnerLockedLiquidity = 'partner-locked-liquidity',
@@ -93,6 +99,26 @@ export const LIMITS = {
 
 /** Applied to a customizable migrated pool when the user first picks that option. */
 export const DEFAULT_CUSTOM_MIGRATED_POOL_FEE_BPS = 100
+
+/**
+ * The graduated pool's falling fee when the user first picks one: it steps down to the
+ * ending fee as the price rises by `priceMultiple`, for `durationSeconds` after graduation.
+ */
+export const MIGRATED_FALLING_FEE_DEFAULTS = {
+  endingFeeBps: 25,
+  numberOfPeriod: 10,
+  priceMultiple: 10,
+  durationSeconds: 86_400,
+} as const
+
+/** Editor bounds of the graduated pool's falling fee (program types: u16 periods, u32 seconds). */
+export const MIGRATED_FALLING_FEE_LIMITS = {
+  maxPeriods: 1000,
+  minPriceMultiple: 1.1,
+  maxPriceMultiple: 1000,
+  priceMultipleStep: 0.1,
+  maxDurationSeconds: 31_536_000,
+} as const
 
 /** Why an edit was not applied. */
 export enum EditRejection {

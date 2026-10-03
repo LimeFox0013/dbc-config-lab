@@ -1,4 +1,9 @@
-export { CHAIN_BY_NETWORK, COMMITMENT, SolanaChain } from './constants'
+export {
+  CHAIN_BY_NETWORK,
+  COMMITMENT,
+  MAINNET_RPC_PROXY_PATH,
+  SolanaChain,
+} from './constants'
 export type {
   ConfigTerms,
   DeployRequest,
@@ -15,6 +20,8 @@ export {
   configTerms,
   explorerAddressUrl,
   explorerTransactionUrl,
+  rpcEndpointFor,
+  websocketEndpointFor,
 } from './utils'
 export {
   connectionFor,

@@ -1,13 +1,21 @@
 import BN from 'bn.js'
 import { PublicKey } from '@solana/web3.js'
-import Decimal from 'decimal.js'
 import {
   BaseFeeMode as DammBaseFeeMode,
+  BIN_STEP_BPS_DEFAULT,
+  BIN_STEP_BPS_U128_DEFAULT,
   bpsToFeeNumerator,
   CollectFeeMode as DammCollectFeeMode,
   cpAmmCoder,
   CURRENT_POOL_VERSION,
   DEAD_LIQUIDITY,
+  DYNAMIC_FEE_DECAY_PERIOD_DEFAULT,
+  DYNAMIC_FEE_FILTER_PERIOD_DEFAULT,
+  DYNAMIC_FEE_REDUCTION_FACTOR_DEFAULT,
+  DYNAMIC_FEE_ROUNDING_OFFSET,
+  DYNAMIC_FEE_SCALING_FACTOR,
+  feeNumeratorToBps,
+  getFeeMarketCapMinBaseFeeNumerator,
   getAmountsForModifyForCompoundingLiquidity,
   getPoolCreationAmountAFromLiquidityDeltaForCompoundingLiquidity,
   getPoolCreationAmountBFromLiquidityDeltaForCompoundingLiquidity,
@@ -23,9 +31,9 @@ import {
 } from '@meteora-ag/cp-amm-sdk'
 import {
   ActivationType,
+  DammV2BaseFeeMode,
   getInitialLiquidityFromDeltaQuote,
   getMigrationBaseToken,
-  getMigrationQuoteAmountFromMigrationQuoteThreshold,
   MAX_BASIS_POINT,
   MigratedCollectFeeMode,
   MigrationFeeOption,
@@ -38,23 +46,40 @@ import type {
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   FIXED_MIGRATED_FEE_BPS,
+  MIGRATED_MAX_DYNAMIC_FEE_PERCENT,
+  MIGRATED_MAX_VOLATILITY_ACCUMULATOR,
   MIGRATED_PROTOCOL_FEE_PERCENT,
+  MIGRATED_SQUARE_VFA_BIN,
   MIGRATED_REFERRAL_FEE_PERCENT,
   PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS,
 } from './constants'
 import {
+  BPS_SCALE,
   isEnumValue,
   PERCENT,
   PRICE_X128_SHIFT,
   quoteValueAtSqrtPrice,
 } from '../shared'
-import type { MigratedPool, PulledLiquidity } from './types'
+import type {
+  MigratedBaseFee,
+  MigratedFeeSchedule,
+  MigratedPool,
+  PulledLiquidity,
+} from './types'
 
 const zero = (): BN => new BN(0)
 
 const isMigrationFeeOption = isEnumValue<MigrationFeeOption>(
   Object.values(MigrationFeeOption),
 )
+const isMarketCapScheduler = (mode: DammV2BaseFeeMode): boolean =>
+  mode === DammV2BaseFeeMode.FeeMarketCapSchedulerLinear ||
+  mode === DammV2BaseFeeMode.FeeMarketCapSchedulerExponential
+
+const isKnownBaseFeeMode = (mode: DammV2BaseFeeMode): boolean =>
+  mode === DammV2BaseFeeMode.FeeTimeSchedulerLinear ||
+  mode === DammV2BaseFeeMode.FeeTimeSchedulerExponential ||
+  isMarketCapScheduler(mode)
 const isMigratedCollectFeeMode = isEnumValue<MigratedCollectFeeMode>(
   Object.values(MigratedCollectFeeMode),
 )
@@ -74,35 +99,151 @@ const COLLECT_FEE_MODE: Record<MigratedCollectFeeMode, DammCollectFeeMode> = {
   [MigratedCollectFeeMode.Compounding]: DammCollectFeeMode.Compounding,
 }
 
-/** The pool's packed base-fee record: a flat fee, encoded with the SDK's own codec. */
-const flatBaseFeeData = (feeBps: number): number[] => [
-  ...cpAmmCoder.types.encode('PodAlignedFeeTimeScheduler', {
-    cliff_fee_numerator: bpsToFeeNumerator(feeBps),
-    base_fee_mode: DammBaseFeeMode.FeeTimeSchedulerLinear,
-    padding: [0, 0, 0, 0, 0],
-    number_of_period: 0,
-    period_frequency: zero(),
-    reduction_factor: zero(),
-  }),
-]
+/**
+ * The pool's packed base-fee record and its lowest fee, encoded with the SDK's own codec as
+ * the DBC program builds it (config.rs, build_damm_v2_base_fee_params): a flat fee, or a
+ * fee that steps down as the price rises — the config's market-cap schedule.
+ */
+const migratedBaseFee = (
+  parameters: ConfigParameters,
+  feeBps: number,
+): MigratedBaseFee => {
+  const cliffFeeNumerator = bpsToFeeNumerator(feeBps)
+  const mode = parameters.migratedPoolBaseFeeMode
+  if (!isMarketCapScheduler(mode))
+    return {
+      data: [
+        ...cpAmmCoder.types.encode('PodAlignedFeeTimeScheduler', {
+          cliff_fee_numerator: cliffFeeNumerator,
+          base_fee_mode: DammBaseFeeMode.FeeTimeSchedulerLinear,
+          padding: [0, 0, 0, 0, 0],
+          number_of_period: 0,
+          period_frequency: zero(),
+          reduction_factor: zero(),
+        }),
+      ],
+      minFeeNumerator: cliffFeeNumerator,
+    }
+  const schedule = parameters.migratedPoolMarketCapFeeSchedulerParams
+  const dammMode =
+    mode === DammV2BaseFeeMode.FeeMarketCapSchedulerLinear
+      ? DammBaseFeeMode.FeeMarketCapSchedulerLinear
+      : DammBaseFeeMode.FeeMarketCapSchedulerExponential
+  return {
+    data: [
+      ...cpAmmCoder.types.encode('PodAlignedFeeMarketCapScheduler', {
+        cliff_fee_numerator: cliffFeeNumerator,
+        base_fee_mode: dammMode,
+        padding: [0, 0, 0, 0, 0],
+        number_of_period: schedule.numberOfPeriod,
+        sqrt_price_step_bps: schedule.sqrtPriceStepBps,
+        scheduler_expiration_duration: schedule.schedulerExpirationDuration,
+        reduction_factor: schedule.reductionFactor,
+      }),
+    ],
+    minFeeNumerator: getFeeMarketCapMinBaseFeeNumerator(
+      cliffFeeNumerator,
+      schedule.numberOfPeriod,
+      schedule.reductionFactor,
+      dammMode,
+    ),
+  }
+}
+
+/**
+ * The graduated pool's falling fee, or null for a flat one. Its price steps are in sqrt
+ * price (each `sqrtPriceStepBps` above the graduation price), so the price multiple at the
+ * last step is the square of the sqrt-price multiple.
+ */
+export const migratedFeeSchedule = (
+  parameters: ConfigParameters,
+): MigratedFeeSchedule | null => {
+  const feeBps = migratedFeeBps(parameters)
+  if (
+    feeBps === null ||
+    !isMarketCapScheduler(parameters.migratedPoolBaseFeeMode)
+  )
+    return null
+  const schedule = parameters.migratedPoolMarketCapFeeSchedulerParams
+  const sqrtMultiple =
+    1 + (schedule.numberOfPeriod * schedule.sqrtPriceStepBps) / BPS_SCALE
+  return {
+    exponential:
+      parameters.migratedPoolBaseFeeMode ===
+      DammV2BaseFeeMode.FeeMarketCapSchedulerExponential,
+    endingFeeBps: feeNumeratorToBps(
+      migratedBaseFee(parameters, feeBps).minFeeNumerator,
+    ),
+    steps: schedule.numberOfPeriod,
+    priceMultiple: sqrtMultiple ** 2,
+    durationSeconds: schedule.schedulerExpirationDuration,
+  }
+}
+
+/**
+ * The pool's dynamic fee: off, or on with the settings the DBC program derives from the
+ * lowest base fee (damm_v2_utils.rs, calculate_dynamic_fee_params). The tracker starts empty.
+ */
+const migratedDynamicFee = (
+  parameters: ConfigParameters,
+  minFeeNumerator: BN,
+): MigratedPool['poolFees']['dynamicFee'] => {
+  const tracker = {
+    padding: [0, 0, 0, 0, 0, 0, 0],
+    lastUpdateTimestamp: zero(),
+    sqrtPriceReference: zero(),
+    volatilityAccumulator: zero(),
+    volatilityReference: zero(),
+  }
+  if (parameters.migratedPoolFee.dynamicFee !== DammV2DynamicFeeMode.Enabled)
+    return {
+      ...tracker,
+      initialized: 0,
+      maxVolatilityAccumulator: 0,
+      variableFeeControl: 0,
+      binStep: 0,
+      filterPeriod: 0,
+      decayPeriod: 0,
+      reductionFactor: 0,
+      binStepU128: zero(),
+    }
+  return {
+    ...tracker,
+    initialized: 1,
+    maxVolatilityAccumulator: MIGRATED_MAX_VOLATILITY_ACCUMULATOR,
+    variableFeeControl: minFeeNumerator
+      .muln(MIGRATED_MAX_DYNAMIC_FEE_PERCENT)
+      .divn(PERCENT)
+      .mul(DYNAMIC_FEE_SCALING_FACTOR)
+      .sub(DYNAMIC_FEE_ROUNDING_OFFSET)
+      .div(new BN(MIGRATED_SQUARE_VFA_BIN))
+      .toNumber(),
+    binStep: BIN_STEP_BPS_DEFAULT,
+    filterPeriod: DYNAMIC_FEE_FILTER_PERIOD_DEFAULT,
+    decayPeriod: DYNAMIC_FEE_DECAY_PERIOD_DEFAULT,
+    reductionFactor: DYNAMIC_FEE_REDUCTION_FACTOR_DEFAULT,
+    binStepU128: BIN_STEP_BPS_U128_DEFAULT,
+  }
+}
 
 const ceilDiv = (numerator: BN, denominator: BN): BN => {
   const { div, mod } = numerator.divmod(denominator)
   return mod.isZero() ? div : div.addn(1)
 }
 
-/** The quote the curve hands over at graduation: the threshold less the migration fee. */
+/**
+ * The quote the curve hands over at graduation: the threshold less the migration fee, the
+ * kept share rounded up as the program rounds it (config.rs, get_migration_quote_amount).
+ */
 const migratedQuoteOf = (
   parameters: ConfigParameters,
   config: PoolConfig,
 ): BN =>
-  new BN(
-    getMigrationQuoteAmountFromMigrationQuoteThreshold(
-      new Decimal(config.migrationQuoteThreshold.toString()),
-      parameters.migrationFee.feePercentage,
-    )
-      .floor()
-      .toFixed(),
+  ceilDiv(
+    config.migrationQuoteThreshold.muln(
+      PERCENT - parameters.migrationFee.feePercentage,
+    ),
+    new BN(PERCENT),
   )
 
 /** The program's protocol share of a migrated amount, rounded down. */
@@ -216,13 +357,15 @@ const concentratedMigratedState = (
 }
 
 /**
- * The DAMM v2 pool the DBC program opens at graduation: full price range, priced at the
- * migration price, with liquidity from the migrated quote — the threshold minus the
- * config's migration fee, minus the program's protocol share of what is migrated.
+ * The DAMM v2 pool the DBC program opens at graduation (`openedAt`, unix seconds): full
+ * price range, priced at the migration price, with liquidity from the migrated quote — the
+ * threshold minus the config's migration fee, minus the program's protocol share of what is
+ * migrated.
  */
 export const toMigratedPool = (
   parameters: ConfigParameters,
   config: PoolConfig,
+  openedAt: BN,
 ): MigratedPool => {
   const mode = parameters.migratedPoolFee.collectFeeMode
   const feeBps = migratedFeeBps(parameters)
@@ -233,11 +376,12 @@ export const toMigratedPool = (
   const opened = compounding
     ? compoundingMigratedState(parameters, config)
     : concentratedMigratedState(parameters, config)
+  const baseFee = migratedBaseFee(parameters, feeBps)
 
   return {
     poolFees: {
       baseFee: {
-        baseFeeInfo: { data: flatBaseFeeData(feeBps) },
+        baseFeeInfo: { data: baseFee.data },
         padding1: zero(),
       },
       protocolFeePercent: MIGRATED_PROTOCOL_FEE_PERCENT,
@@ -245,21 +389,7 @@ export const toMigratedPool = (
       referralFeePercent: MIGRATED_REFERRAL_FEE_PERCENT,
       padding1: [0, 0, 0],
       compoundingFeeBps: compounding ? parameters.compoundingFeeBps : 0,
-      dynamicFee: {
-        initialized: 0,
-        padding: [0, 0, 0, 0, 0, 0, 0],
-        maxVolatilityAccumulator: 0,
-        variableFeeControl: 0,
-        binStep: 0,
-        filterPeriod: 0,
-        decayPeriod: 0,
-        reductionFactor: 0,
-        lastUpdateTimestamp: zero(),
-        binStepU128: zero(),
-        sqrtPriceReference: zero(),
-        volatilityAccumulator: zero(),
-        volatilityReference: zero(),
-      },
+      dynamicFee: migratedDynamicFee(parameters, baseFee.minFeeNumerator),
       initSqrtPrice: opened.sqrtPrice,
     },
     tokenAMint: PublicKey.default,
@@ -278,7 +408,7 @@ export const toMigratedPool = (
     sqrtMinPrice: compounding ? zero() : MIN_SQRT_PRICE,
     sqrtMaxPrice: compounding ? U128_MAX : MAX_SQRT_PRICE,
     sqrtPrice: opened.sqrtPrice,
-    activationPoint: zero(),
+    activationPoint: openedAt,
     activationType: ActivationType.Timestamp,
     poolStatus: PoolStatus.Enable,
     tokenAFlag: 0,
@@ -392,17 +522,14 @@ export const withUnlockedLiquidityPulled = (
   }
 }
 
-/**
- * Why the post-graduation pool cannot be simulated exactly, or null. The DAMM v2 dynamic
- * fee changes pool state in a way this model does not replay.
- */
+/** Why the post-graduation pool cannot be simulated exactly, or null. */
 export const migratedUnsupportedReason = (
   parameters: ConfigParameters,
 ): string | null => {
   if (parameters.migrationOption !== MigrationOption.MET_DAMM_V2)
     return 'Only DAMM v2 migration is simulated'
-  if (parameters.migratedPoolFee.dynamicFee !== DammV2DynamicFeeMode.Disabled)
-    return 'Dynamic fee on the migrated pool is not simulated'
+  if (!isKnownBaseFeeMode(parameters.migratedPoolBaseFeeMode))
+    return 'Unknown graduated pool fee schedule'
   if (migratedFeeBps(parameters) === null) return 'Unknown migration fee option'
   return null
 }

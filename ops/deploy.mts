@@ -13,12 +13,16 @@ const requireEnv = (name: string): string => {
   return value
 }
 
+// The nginx mainnet RPC proxy's provider key. Optional: without it the site serves, but
+// mainnet reads in the page fail.
+const heliusApiKey = process.env['HELIUS_API_KEY']
+
 const result = await deployArbitraryPod(
   loadArbitraryPodDeployConfig({
     name: 'web',
     image: `${requireEnv('REGISTRY_URL')}/limefox0013/dbc-config-lab-web:${requireEnv('IMAGE_TAG')}`,
     ports: [8080],
-    env: {},
+    env: heliusApiKey ? { HELIUS_API_KEY: heliusApiKey } : {},
     // Static site: nothing persisted. The platform only accepts DATABASE/VOLUME and
     // provisions no database for it — it is a label on the declaration.
     persistenceKind: 'DATABASE',

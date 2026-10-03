@@ -3,17 +3,20 @@ import type { LaunchConfig } from '../../core/launch-config'
 import { QUOTE_TOKENS } from '../../core/quote-token'
 import { SolanaNetwork } from '../../core/shared'
 import {
+  ADDRESS_MAX_LENGTH,
   BUILDER_BY_SHAPE,
   MAX_SHARE_LENGTH,
-  NON_BUILDER_KEYS,
   NAME_MAX_LENGTH,
+  NON_BUILDER_KEYS,
   SHARE_PARAM,
   SHARE_VERSION,
   ShareRejection,
 } from './constants'
 import { readLaunchConfig, ReadError } from './document'
-import { record, text } from './readers'
-import type { DecodeResult, SharedConfig } from './types'
+import { finiteNumber, record, text } from './readers'
+import type { DecodeResult, Reader, SharedConfig } from './types'
+import { royaltyRejection } from '../../core/preset-royalty'
+import type { PresetRoyalty } from '../../core/preset-royalty'
 
 const toBase64Url = (bytes: Uint8Array): string =>
   btoa(String.fromCharCode(...bytes))
@@ -77,7 +80,15 @@ export const decodeSharedConfig = (encoded: string): DecodeResult => {
       fields['name'] === undefined
         ? undefined
         : text(NAME_MAX_LENGTH)(fields['name'], 'name')
-    shared = name === undefined ? { config } : { config, name }
+    const royalty =
+      fields['royalty'] === undefined
+        ? undefined
+        : readRoyalty(fields['royalty'], 'royalty')
+    shared = {
+      config,
+      ...(name === undefined ? {} : { name }),
+      ...(royalty === undefined ? {} : { royalty }),
+    }
   } catch (error) {
     if (error instanceof ReadError)
       return {
@@ -95,7 +106,23 @@ export const decodeSharedConfig = (encoded: string): DecodeResult => {
       rejection: ShareRejection.RejectedByProgram,
       detail: compiled.reason,
     }
+  const refused =
+    shared.royalty && royaltyRejection(shared.royalty, compiled.parameters)
+  if (refused)
+    return {
+      ok: false,
+      rejection: ShareRejection.RoyaltyRefused,
+      detail: refused,
+    }
   return { ok: true, shared }
+}
+
+const readRoyalty: Reader<PresetRoyalty> = (value, path) => {
+  const fields = record(value, path)
+  return {
+    author: text(ADDRESS_MAX_LENGTH)(fields['author'], `${path}.author`),
+    sharePercent: finiteNumber(fields['sharePercent'], `${path}.sharePercent`),
+  }
 }
 
 /** The builder's own parameters: everything but the tool's `curveShape` selector. */

@@ -9,21 +9,17 @@ import type {
   VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { QuoteToken } from '../../core/quote-token'
-import { errorMessage } from '../../core/shared'
-import { DbcAccount } from '../onchain-config'
 import {
   ACCOUNTS_PER_READ,
-  POOL_SAMPLE_LIMIT,
-  RealLaunchesRejection,
-} from './constants'
+  chunks,
+  errorMessage,
+  evenSample,
+} from '../../core/shared'
+import { DbcAccount } from '../onchain-config'
+import { POOL_SAMPLE_LIMIT, RealLaunchesRejection } from './constants'
 import type { RealLaunchesResult } from './types'
-import { curveTokensOf, evenSample, poolRecord, summarizePools } from './utils'
+import { curveTokensOf, poolRecord, summarizePools } from './utils'
 import { VIRTUAL_POOL_LAYOUT } from '../../core/onchain-config'
-
-const chunks = <T>(items: readonly T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
-    items.slice(i * size, (i + 1) * size),
-  )
 
 /**
  * How the real launches on a config went: finds every pool created with it (addresses

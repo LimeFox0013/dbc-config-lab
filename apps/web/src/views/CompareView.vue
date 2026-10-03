@@ -24,9 +24,11 @@
     <PresetCatalog
       :scenario="scenario"
       @adopt="editCopy"
+      @use="addUserPreset"
       @compare="addOnChain"
     />
     <LaunchpadEconomics @compare="addOnChain" />
+    <OperatorDashboard />
     <ConfigEditor
       ref="editor"
       :presets="presets"
@@ -51,6 +53,7 @@
 </template>
 
 <script setup lang="ts">
+import type { DeployTarget } from '../features/deployment'
 import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ClonePanel } from '../components/ClonePanel'
@@ -60,6 +63,7 @@ import { DeployPanel } from '../components/DeployPanel'
 import { IncomeForecast } from '../components/IncomeForecast'
 import { LaunchpadEconomics } from '../components/LaunchpadEconomics'
 import { OnChainLoader } from '../components/OnChainLoader'
+import { OperatorDashboard } from '../components/OperatorDashboard'
 import { PresetCatalog } from '../components/PresetCatalog'
 import { PriceChart } from '../components/PriceChart'
 import { RecommenderPanel } from '../components/RecommenderPanel'
@@ -107,8 +111,11 @@ const openShared = (): void => {
   addUserPreset({
     id: UserPresetId.Shared,
     name: t('views.compare.sharedName', { name: result.shared.name ?? t('views.compare.sharedDefaultName') }),
-    intent: t('views.compare.sharedIntent'),
+    intent: result.shared.royalty ?
+        t('views.compare.sharedIntentRoyalty', { percent: result.shared.royalty.sharePercent }) :
+        t('views.compare.sharedIntent'),
     config: result.shared.config,
+    ...(result.shared.royalty ? { royalty: result.shared.royalty } : {}),
   })
 }
 openShared()
@@ -142,7 +149,11 @@ const addClone = (entry: ComparisonEntry): void => {
   clones.value = [entry, ...clones.value.filter((c) => c.id !== entry.id)]
 }
 
-const deployTargets = computed(() => [...clones.value, ...presets.value.map(presetEntry)])
+/** Clones pay no royalty; a preset carries its author's, if it has one. */
+const deployTargets = computed<DeployTarget[]>(() => [
+  ...clones.value.map((clone) => ({ ...clone, royalty: null })),
+  ...presets.value.map((preset) => ({ ...presetEntry(preset), royalty: preset.royalty ?? null })),
+])
 const entries = computed(() => [...deployTargets.value, ...onChain.value.map(onChainEntry)])
 const rows = computed(() => compareConfigs(entries.value, scenario.value))
 </script>

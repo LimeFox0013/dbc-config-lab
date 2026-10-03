@@ -104,6 +104,43 @@
       }}
     </p>
 
+    <fieldset class="config-editor__group">
+      <legend class="config-editor__label">
+        {{ t('components.configEditor.royalty.title') }}
+      </legend>
+      <p class="config-editor__notice">
+        {{ t('components.configEditor.royalty.intro') }}
+      </p>
+      <label class="config-editor__field">
+        <span class="config-editor__label">{{ t('components.configEditor.royalty.author') }}</span>
+        <input
+          v-model.trim="royaltyAuthor"
+          class="config-editor__control"
+          type="text"
+          spellcheck="false"
+          :maxlength="MAX_ADDRESS_LENGTH"
+        />
+      </label>
+      <label class="config-editor__field">
+        <span class="config-editor__label">{{ t('components.configEditor.royalty.share') }}</span>
+        <input
+          v-model.number="royaltyPercent"
+          class="config-editor__control"
+          type="number"
+          :min="ROYALTY_PERCENT_LIMITS.min"
+          :max="ROYALTY_PERCENT_LIMITS.max"
+          step="1"
+        />
+      </label>
+      <p
+        v-if="royaltyProblem"
+        class="config-editor__status config-editor__status--problem"
+        role="alert"
+      >
+        {{ t('components.configEditor.royalty.refused', { reason: t(`common.royaltyRejections.${royaltyProblem}`) }) }}
+      </p>
+    </fieldset>
+
     <div class="config-editor__actions">
       <button
         type="button"
@@ -116,7 +153,7 @@
       <button
         type="button"
         class="config-editor__secondary"
-        :disabled="!status.valid"
+        :disabled="!status.valid || royaltyProblem !== null"
         @click="copyShareLink"
       >
         {{ t('components.configEditor.copyLink') }}
@@ -166,9 +203,12 @@
 </template>
 
 <script setup lang="ts">
+import { MAX_ADDRESS_LENGTH } from '../../features/onchain-config'
+import type { PresetRoyalty } from '../../core/preset-royalty'
+import { ROYALTY_PERCENT_LIMITS, royaltyRejection } from '../../core/preset-royalty'
 import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { DEFAULT_LAUNCH_CONFIG, parseLaunchConfig, serializeLaunchConfig, UserPresetId } from '../../core/launch-config'
+import { compileLaunchConfig, DEFAULT_LAUNCH_CONFIG, parseLaunchConfig, serializeLaunchConfig, UserPresetId } from '../../core/launch-config'
 import type { LaunchConfig, LaunchPreset } from '../../core/launch-config'
 import { QUOTE_TOKENS } from '../../core/quote-token'
 import {
@@ -180,7 +220,7 @@ import {
   FieldUnit,
 } from '../../features/config-editor'
 import type { EditorField } from '../../features/config-editor'
-import { NAME_MAX_LENGTH } from './constants'
+import { DEFAULT_ROYALTY_PERCENT, NAME_MAX_LENGTH } from './constants'
 import { shareLink, toTypeScript } from '../../features/config-sharing'
 import type { ConfigEditorProps } from './types'
 
@@ -253,7 +293,19 @@ const editCopyOf = (id: LaunchPreset['id']): void => {
 defineExpose({ editCopyOf })
 
 const status = computed(() => editorStatus(config.value))
-const canAdd = computed(() => status.value.valid && status.value.simulatable && name.value.length > 0)
+/** An optional royalty the preset carries to whoever deploys it; set by giving the author's wallet. */
+const royaltyAuthor = ref('')
+const royaltyPercent = ref(DEFAULT_ROYALTY_PERCENT)
+const royalty = computed<PresetRoyalty | null>(() =>
+  royaltyAuthor.value ? { author: royaltyAuthor.value, sharePercent: royaltyPercent.value } : null,
+)
+const royaltyProblem = computed(() => {
+  const compiled = compileLaunchConfig(config.value)
+  return royalty.value && compiled.ok ? royaltyRejection(royalty.value, compiled.parameters) : null
+})
+const canAdd = computed(
+  () => status.value.valid && status.value.simulatable && name.value.length > 0 && royaltyProblem.value === null,
+)
 
 const statusText = computed(() => {
   if (lastRejection.value) return lastRejection.value
@@ -285,7 +337,13 @@ const copy = async (value: string, copiedKey: string): Promise<void> => {
 }
 
 const copyShareLink = (): Promise<void> =>
-  copy(shareLink({ config: config.value, name: name.value }, window.location.href), 'components.configEditor.linkCopied')
+  copy(
+    shareLink(
+      { config: config.value, name: name.value, ...(royalty.value ? { royalty: royalty.value } : {}) },
+      window.location.href,
+    ),
+    'components.configEditor.linkCopied',
+  )
 
 const copyCode = (): Promise<void> => copy(code.value, 'components.configEditor.codeCopied')
 
@@ -300,6 +358,7 @@ const add = (): void => {
     name: name.value,
     intent: t('components.configEditor.intent'),
     config: copyOf(config.value),
+    ...(royalty.value ? { royalty: { ...royalty.value } } : {}),
   })
 }
 </script>

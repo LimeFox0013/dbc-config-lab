@@ -160,5 +160,9 @@ test.describe('deploy with a wallet', () => {
     await expect(summary).toContainText('Creator can update metadata')
     await expect(summary).toContainText('Creator’s share of trading fees100%')
     await expect(summary).toContainText('Launchpad 0% + 50% locked')
+    await expect(summary).toContainText('Graduation pool volatility feeOff')
+    await expect(summary).toContainText(
+      'Graduation pool fee as the price risesStays the same',
+    )
   })
 })

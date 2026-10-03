@@ -45,9 +45,8 @@ import {
   timestampAt,
   toInitialPool,
   toPoolConfig,
-  trackerAfterSwap,
-  trackerBeforeSwap,
 } from './utils'
+import { trackerAfterSwap, trackerBeforeSwap } from '../volatility-tracker'
 import {
   BPS_SCALE,
   errorMessage,
@@ -163,7 +162,7 @@ const applyMigratedTrade = (
   const isSell = trade.side !== TradeSide.Buy
   let swap: MigratedSwap
   try {
-    swap = quoteMigratedSwap(migrated, isSell, amountIn, trade.at)
+    swap = quoteMigratedSwap(migrated, isSell, amountIn, timestampAt(trade.at))
   } catch (error) {
     return {
       ...replay,
@@ -202,7 +201,7 @@ const applyMigratedTrade = (
   }
   return {
     ...replay,
-    migrated: afterMigratedSwap(migrated, swap),
+    migrated: afterMigratedSwap(swap),
     // A compounding pool always takes its fee in the quote token.
     compounded: replay.compounded.add(quote.compoundingFee),
     outcomes: appended(replay.outcomes, outcome),
@@ -227,13 +226,14 @@ const applyMigratedTrade = (
   }
 }
 
-/** The pool the program opens at graduation, less any liquidity withdrawn right after. */
+/** The pool the program opens at graduation (`at`), less any liquidity withdrawn right after. */
 const openMigratedPool = (
   parameters: ConfigParameters,
   config: PoolConfig,
   options: SimulationOptions,
+  at: number,
 ): { pool: MigratedPool; pulled: PulledLiquidity | null } => {
-  const pool = toMigratedPool(parameters, config)
+  const pool = toMigratedPool(parameters, config, timestampAt(at))
   return options.unlockedLiquidityPulled
     ? withUnlockedLiquidityPulled(parameters, pool)
     : { pool, pulled: null }
@@ -381,7 +381,7 @@ const applyTrade =
       quoteReserveAfter.gte(config.migrationQuoteThreshold)
     const opened =
       graduatesNow && migratedUnsupportedReason(parameters) === null
-        ? openMigratedPool(parameters, config, options)
+        ? openMigratedPool(parameters, config, options, trade.at)
         : null
 
     return {
@@ -512,8 +512,12 @@ export const exitValue = (
   if (tokens.isZero()) return new BN(0)
   if (simulation.migratedPool?.liquidity.isZero()) return new BN(0)
   if (simulation.migratedPool)
-    return quoteMigratedSwap(simulation.migratedPool, true, tokens, at).quote
-      .outputAmount
+    return quoteMigratedSwap(
+      simulation.migratedPool,
+      true,
+      tokens,
+      timestampAt(at),
+    ).quote.outputAmount
   if (simulation.graduatedAt !== null)
     return spotValue(tokens, simulation.finalPool)
   return swapQuotePartialFill(

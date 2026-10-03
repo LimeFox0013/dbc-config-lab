@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  chunks,
   clamp,
   errorMessage,
+  evenSample,
   formatAmount,
   formatCount,
   formatMultiple,
@@ -54,5 +56,20 @@ describe('number formatting', () => {
     expect(formatCount(21045)).toBe('21,045')
     expect(formatAmount(85.5432)).toBe('85.54')
     expect(formatMultiple(1.23456)).toBe('1.23')
+  })
+})
+
+describe('evenSample', () => {
+  it('keeps everything up to the limit, then spreads evenly from the first item', () => {
+    const items = Array.from({ length: 10 }, (_, i) => i)
+    expect(evenSample(items, 20)).toEqual(items)
+    expect(evenSample(items, 5)).toEqual([0, 2, 4, 6, 8])
+  })
+})
+
+describe('chunks', () => {
+  it('groups items in order, the last group holding the rest', () => {
+    expect(chunks([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]])
+    expect(chunks([], 2)).toEqual([])
   })
 })

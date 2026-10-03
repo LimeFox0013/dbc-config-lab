@@ -1,6 +1,7 @@
 import {
   BaseFeeMode,
   CollectFeeMode,
+  DammV2BaseFeeMode,
   DammV2DynamicFeeMode,
   MAX_LOCK_DURATION_IN_SECONDS,
   MigratedCollectFeeMode,
@@ -38,6 +39,8 @@ import {
   FieldUnit,
   FirstBuyFeeChoice,
   LIMITS,
+  MIGRATED_FALLING_FEE_DEFAULTS,
+  MIGRATED_FALLING_FEE_LIMITS,
   WEIGHT_GROWTH_LIMITS,
 } from './constants'
 import type { EditorField } from './types'
@@ -194,12 +197,12 @@ const marketCapField = (
 const isCustomMigratedFee = (config: LaunchConfig): boolean =>
   config.migration.migrationFeeOption === MigrationFeeOption.Customizable
 
+type MigratedPoolFee = NonNullable<LaunchConfig['migration']['migratedPoolFee']>
+
 /** Applies a change to the graduated pool's custom fee; other configs are left as they are. */
 const patchMigratedPoolFee = (
   config: LaunchConfig,
-  patch: (
-    fee: NonNullable<LaunchConfig['migration']['migratedPoolFee']>,
-  ) => NonNullable<LaunchConfig['migration']['migratedPoolFee']>,
+  patch: (fee: MigratedPoolFee) => MigratedPoolFee,
 ): LaunchConfig =>
   config.migration.migratedPoolFee
     ? {
@@ -210,6 +213,65 @@ const patchMigratedPoolFee = (
         },
       }
     : config
+
+type MarketCapSchedule = NonNullable<
+  MigratedPoolFee['marketCapFeeSchedulerParams']
+>
+
+/** The graduated pool's fee schedule: flat, or falling as the price rises. */
+const migratedFeeCurveOf = (config: LaunchConfig): FeeCurve => {
+  const fee = config.migration.migratedPoolFee
+  if (!fee?.marketCapFeeSchedulerParams) return FeeCurve.Flat
+  return fee.baseFeeMode === DammV2BaseFeeMode.FeeMarketCapSchedulerExponential
+    ? FeeCurve.Exponential
+    : FeeCurve.Linear
+}
+
+const isMigratedFeeFalling = (config: LaunchConfig): boolean =>
+  isCustomMigratedFee(config) && migratedFeeCurveOf(config) !== FeeCurve.Flat
+
+const toMigratedFeeCurve = (
+  fee: MigratedPoolFee,
+  curve: FeeCurve,
+): MigratedPoolFee => {
+  if (curve === FeeCurve.Flat)
+    return {
+      ...fee,
+      baseFeeMode: DammV2BaseFeeMode.FeeTimeSchedulerLinear,
+      marketCapFeeSchedulerParams: undefined,
+    }
+  return {
+    ...fee,
+    baseFeeMode:
+      curve === FeeCurve.Exponential
+        ? DammV2BaseFeeMode.FeeMarketCapSchedulerExponential
+        : DammV2BaseFeeMode.FeeMarketCapSchedulerLinear,
+    marketCapFeeSchedulerParams: fee.marketCapFeeSchedulerParams ?? {
+      endingBaseFeeBps: MIGRATED_FALLING_FEE_DEFAULTS.endingFeeBps,
+      numberOfPeriod: MIGRATED_FALLING_FEE_DEFAULTS.numberOfPeriod,
+      priceMultiple: MIGRATED_FALLING_FEE_DEFAULTS.priceMultiple,
+      schedulerExpirationDuration:
+        MIGRATED_FALLING_FEE_DEFAULTS.durationSeconds,
+    },
+  }
+}
+
+/** Applies a change to the graduated pool's falling fee; a flat one is left as it is. */
+const patchMarketCapSchedule = (
+  config: LaunchConfig,
+  patch: (schedule: MarketCapSchedule) => MarketCapSchedule,
+): LaunchConfig =>
+  patchMigratedPoolFee(config, (fee) =>
+    fee.marketCapFeeSchedulerParams
+      ? {
+          ...fee,
+          marketCapFeeSchedulerParams: patch(fee.marketCapFeeSchedulerParams),
+        }
+      : fee,
+  )
+
+const marketCapScheduleOf = (config: LaunchConfig): MarketCapSchedule | null =>
+  config.migration.migratedPoolFee?.marketCapFeeSchedulerParams ?? null
 
 const isCompounding = (config: LaunchConfig): boolean =>
   isCustomMigratedFee(config) &&
@@ -573,6 +635,110 @@ export const EDITOR_FIELDS: EditorField[] = [
     100,
     isCompounding,
   ),
+  {
+    id: EditorFieldId.MigratedDynamicFee,
+    group: FieldGroup.Migration,
+    kind: FieldKind.Select,
+    unit: FieldUnit.None,
+    options: [DynamicFeeChoice.Off, DynamicFeeChoice.On].map((value) => ({
+      value,
+      labelKey: `dynamicFee.${value}`,
+    })),
+    read: (c) =>
+      c.migration.migratedPoolFee?.dynamicFee === DammV2DynamicFeeMode.Enabled
+        ? DynamicFeeChoice.On
+        : DynamicFeeChoice.Off,
+    write: (c, v) =>
+      isDynamicFeeChoice(v)
+        ? patchMigratedPoolFee(c, (fee) => ({
+            ...fee,
+            dynamicFee:
+              v === DynamicFeeChoice.On
+                ? DammV2DynamicFeeMode.Enabled
+                : DammV2DynamicFeeMode.Disabled,
+          }))
+        : c,
+    visible: isCustomMigratedFee,
+  },
+  {
+    id: EditorFieldId.MigratedFeeCurve,
+    group: FieldGroup.Migration,
+    kind: FieldKind.Select,
+    unit: FieldUnit.None,
+    options: [FeeCurve.Flat, FeeCurve.Linear, FeeCurve.Exponential].map(
+      (value) => ({ value, labelKey: `migratedFeeCurve.${value}` }),
+    ),
+    read: migratedFeeCurveOf,
+    write: (c, v) =>
+      isFeeCurve(v)
+        ? patchMigratedPoolFee(c, (fee) => toMigratedFeeCurve(fee, v))
+        : c,
+    visible: isCustomMigratedFee,
+  },
+  {
+    id: EditorFieldId.MigratedEndingFee,
+    group: FieldGroup.Migration,
+    kind: FieldKind.Number,
+    unit: FieldUnit.Percent,
+    min: LIMITS.minMigratedPoolFeePercent,
+    max: LIMITS.maxMigratedPoolFeePercent,
+    step: 0.05,
+    read: (c) => percentFromBps(marketCapScheduleOf(c)?.endingBaseFeeBps ?? 0),
+    write: (c, v) =>
+      patchMarketCapSchedule(c, (schedule) => ({
+        ...schedule,
+        endingBaseFeeBps: Math.round(bpsFromPercent(v)),
+      })),
+    visible: isMigratedFeeFalling,
+  },
+  {
+    id: EditorFieldId.MigratedFeePeriods,
+    group: FieldGroup.Migration,
+    kind: FieldKind.Number,
+    unit: FieldUnit.None,
+    min: 1,
+    max: MIGRATED_FALLING_FEE_LIMITS.maxPeriods,
+    step: 1,
+    read: (c) => marketCapScheduleOf(c)?.numberOfPeriod ?? 0,
+    write: (c, v) =>
+      patchMarketCapSchedule(c, (schedule) => ({
+        ...schedule,
+        numberOfPeriod: Math.trunc(v),
+      })),
+    visible: isMigratedFeeFalling,
+  },
+  {
+    id: EditorFieldId.MigratedPriceMultiple,
+    group: FieldGroup.Migration,
+    kind: FieldKind.Number,
+    unit: FieldUnit.None,
+    min: MIGRATED_FALLING_FEE_LIMITS.minPriceMultiple,
+    max: MIGRATED_FALLING_FEE_LIMITS.maxPriceMultiple,
+    step: MIGRATED_FALLING_FEE_LIMITS.priceMultipleStep,
+    read: (c) => marketCapScheduleOf(c)?.priceMultiple ?? 0,
+    write: (c, v) =>
+      patchMarketCapSchedule(c, (schedule) => ({
+        ...schedule,
+        priceMultiple: v,
+      })),
+    visible: isMigratedFeeFalling,
+  },
+  {
+    id: EditorFieldId.MigratedFeeScheduleDuration,
+    group: FieldGroup.Migration,
+    kind: FieldKind.Number,
+    unit: FieldUnit.Seconds,
+    min: 1,
+    max: MIGRATED_FALLING_FEE_LIMITS.maxDurationSeconds,
+    step: 1,
+    read: (c) => marketCapScheduleOf(c)?.schedulerExpirationDuration ?? 0,
+    write: (c, v) =>
+      patchMarketCapSchedule(c, (schedule) => ({
+        ...schedule,
+        schedulerExpirationDuration: Math.trunc(v),
+      })),
+    visible: isMigratedFeeFalling,
+  },
   percentField(
     EditorFieldId.MigrationFee,
     FieldGroup.Migration,

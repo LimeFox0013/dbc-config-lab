@@ -49,10 +49,30 @@
           {{ t('components.incomeForecast.terms', archetypeText) }}
         </p>
         <p
+          v-if="forecast.ok && forecast.relaxed.length > 0"
+          class="income-forecast__hint"
+        >
+          {{ t('components.incomeForecast.relaxed', { terms: forecast.relaxed.map((term) => t(`components.incomeForecast.termNames.${term}`)).join(', ') }) }}
+        </p>
+        <p
           v-if="forecast.ok"
           class="income-forecast__result"
         >
           {{ t('components.incomeForecast.range', { low: formatSol(forecast.low), high: formatSol(forecast.high), launches: formatCount(launchCount) }) }}
+        </p>
+        <p
+          v-if="forecast.ok"
+          class="income-forecast__hint"
+        >
+          {{
+            forecast.afterGraduation ?
+              t('components.incomeForecast.after', {
+                low: formatSol(forecast.afterGraduation.low),
+                high: formatSol(forecast.afterGraduation.high),
+                launchpads: forecast.afterGraduation.launchpads,
+              }) :
+              t('components.incomeForecast.afterUnknown')
+          }}
         </p>
         <p
           v-if="forecast.ok"

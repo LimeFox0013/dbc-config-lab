@@ -30,6 +30,39 @@
         </button>
       </li>
       <li
+        v-for="preset in COMMUNITY_PRESETS"
+        :key="preset.id"
+        class="preset-catalog__entry"
+      >
+        <span class="preset-catalog__name">{{ preset.name }}</span>
+        <span class="preset-catalog__text">{{ preset.intent }}</span>
+        <span
+          v-if="preset.royalty"
+          class="preset-catalog__text"
+        >{{ t('components.presetCatalog.royalty', { percent: preset.royalty.sharePercent }) }}</span>
+        <span class="preset-catalog__outcome">{{ outcomeText(preset.id) }}</span>
+        <button
+          type="button"
+          class="preset-catalog__button"
+          @click="emit('use', preset)"
+        >
+          {{ t('components.presetCatalog.use') }}
+        </button>
+      </li>
+      <li
+        v-if="COMMUNITY_PRESETS.length === 0"
+        class="preset-catalog__entry"
+      >
+        <span class="preset-catalog__name">{{ t('components.presetCatalog.communityTitle') }}</span>
+        <span class="preset-catalog__text">{{ t('components.presetCatalog.communityEmpty') }}</span>
+        <a
+          :href="COMMUNITY_REGISTRY_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="preset-catalog__link"
+        >{{ t('components.presetCatalog.communityHow') }}</a>
+      </li>
+      <li
         v-for="launchpad in launchpads"
         :key="launchpad.config.configAddress"
         class="preset-catalog__entry"
@@ -71,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { communityPresets } from '../../features/community-presets'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { explorerAddressUrl } from '../../core/config-deploy'
@@ -84,11 +118,13 @@ import type { ComparisonEntry } from '../../features/comparison'
 import type { OnChainConfig } from '../../features/onchain-config'
 import { useLaunchpadSnapshot } from '../../features/launchpad-economics'
 import type { LaunchpadRecord } from '../../features/launchpad-economics'
-import { CATALOG_LAUNCHPADS } from './constants'
+import { CATALOG_LAUNCHPADS, COMMUNITY_REGISTRY_URL } from './constants'
 import type { PresetCatalogProps } from './types'
 
 const props = defineProps<PresetCatalogProps>()
-const emit = defineEmits<{ adopt: [preset: LaunchPreset], compare: [config: OnChainConfig] }>()
+/** Read once: the registry ships with the app. */
+const COMMUNITY_PRESETS = communityPresets()
+const emit = defineEmits<{ adopt: [preset: LaunchPreset], use: [preset: LaunchPreset], compare: [config: OnChainConfig] }>()
 const { t } = useI18n()
 
 /** Entries are only loaded and simulated while the catalogue is open. */
@@ -110,7 +146,7 @@ const launchpadEntry = (launchpad: LaunchpadRecord): ComparisonEntry =>
 
 const rows = computed(() =>
   open.value ?
-      compareConfigs([...LAUNCH_PRESETS.map(presetEntry), ...launchpads.value.map(launchpadEntry)], props.scenario) :
+      compareConfigs([...LAUNCH_PRESETS.map(presetEntry), ...COMMUNITY_PRESETS.map(presetEntry), ...launchpads.value.map(launchpadEntry)], props.scenario) :
       [],
 )
 

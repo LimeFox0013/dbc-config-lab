@@ -4,7 +4,35 @@ import type {
   PoolConfig,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 
+import { MARKET_CAP_SCHEDULER_LAYOUT } from './constants'
+
 type VestingInfo = PoolConfig['partnerLiquidityVestingInfo']
+
+/** The graduated pool's market-cap fee schedule, unpacked from the bytes the config stores it as. */
+const marketCapScheduler = (
+  bytes: number[],
+): ConfigParameters['migratedPoolMarketCapFeeSchedulerParams'] => {
+  const view = new DataView(Uint8Array.from(bytes).buffer)
+  return {
+    numberOfPeriod: view.getUint16(
+      MARKET_CAP_SCHEDULER_LAYOUT.numberOfPeriod,
+      true,
+    ),
+    sqrtPriceStepBps: view.getUint16(
+      MARKET_CAP_SCHEDULER_LAYOUT.sqrtPriceStepBps,
+      true,
+    ),
+    schedulerExpirationDuration: view.getUint32(
+      MARKET_CAP_SCHEDULER_LAYOUT.schedulerExpirationDuration,
+      true,
+    ),
+    reductionFactor: new BN(
+      view
+        .getBigUint64(MARKET_CAP_SCHEDULER_LAYOUT.reductionFactor, true)
+        .toString(),
+    ),
+  }
+}
 
 const vestingParams = (
   info: VestingInfo,
@@ -27,8 +55,7 @@ const curvePoints = (config: PoolConfig): ConfigParameters['curve'] =>
 
 /**
  * The config parameters an on-chain PoolConfig account was created from, as far as the
- * simulator reads them. The migrated pool's market-cap fee scheduler is stored only as
- * packed bytes and is not reconstructed (the simulator does not model it).
+ * simulator reads them.
  */
 export const fromPoolConfig = (config: PoolConfig): ConfigParameters => ({
   poolFees: {
@@ -99,12 +126,9 @@ export const fromPoolConfig = (config: PoolConfig): ConfigParameters => ({
     config.creatorLiquidityVestingInfo,
   ),
   migratedPoolBaseFeeMode: config.migratedPoolBaseFeeMode,
-  migratedPoolMarketCapFeeSchedulerParams: {
-    numberOfPeriod: 0,
-    sqrtPriceStepBps: 0,
-    schedulerExpirationDuration: 0,
-    reductionFactor: new BN(0),
-  },
+  migratedPoolMarketCapFeeSchedulerParams: marketCapScheduler(
+    config.migratedPoolBaseFeeBytes,
+  ),
   enableFirstSwapWithMinFee: config.enableFirstSwapWithMinFee !== 0,
   compoundingFeeBps: config.migratedCompoundingFeeBps,
   padding: [0, 0],

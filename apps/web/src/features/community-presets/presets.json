@@ -1,0 +1,4 @@
+{
+  "note": "Community presets: each entry is a share link's encoded config (the part after #config=), with a name and what it is for. Add yours by pull request. A preset with a royalty pays its author a share of every launchpad deployed from it, through Meteora's fee-sharing program.",
+  "presets": []
+}

@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { DYNAMIC_FEE_SHARING_PROGRAM_ID } from '@meteora-ag/dynamic-fee-sharing-sdk'
+import { RoyaltyRejection } from '../preset-royalty'
 import { Keypair } from '@solana/web3.js'
 import type { Connection } from '@solana/web3.js'
 import BN from 'bn.js'
@@ -20,7 +22,11 @@ import {
   connectionFor,
   explorerAddressUrl,
   explorerTransactionUrl,
+  MAINNET_RPC_PROXY_PATH,
   prepareDeployment,
+  prepareParametersDeployment,
+  rpcEndpointFor,
+  websocketEndpointFor,
 } from '.'
 import { SolanaNetwork } from '../shared'
 
@@ -66,6 +72,7 @@ describe('prepareDeployment', () => {
       },
       network: SolanaNetwork.Devnet,
       owner,
+      royalty: null,
     })
 
     expect(result.ok).toBe(false)
@@ -93,6 +100,7 @@ describe('prepareDeployment', () => {
       config: DEFAULT_LAUNCH_CONFIG,
       network: SolanaNetwork.Devnet,
       owner,
+      royalty: null,
     })
 
     expect(result).toMatchObject({ ok: false })
@@ -107,6 +115,7 @@ describe('prepareDeployment', () => {
       config: DEFAULT_LAUNCH_CONFIG,
       network: SolanaNetwork.Devnet,
       owner,
+      royalty: null,
     })
     if (!result.ok) throw new Error(result.reason)
     const { transaction, summary } = result.deployment
@@ -146,6 +155,7 @@ describe('prepareDeployment', () => {
       },
       network: SolanaNetwork.Devnet,
       owner,
+      royalty: null,
     })
     if (!result.ok) throw new Error(result.reason)
 
@@ -178,6 +188,7 @@ describe('prepareDeployment', () => {
       config: withQuoteToken(DEFAULT_LAUNCH_CONFIG, QuoteToken.Usdc),
       network: SolanaNetwork.Devnet,
       owner,
+      royalty: null,
     })
     if (!result.ok) throw new Error(result.reason)
 
@@ -273,5 +284,81 @@ describe('configTerms', () => {
         periodSeconds: DAY,
       },
     })
+  })
+})
+
+describe('deploying a preset with a royalty', () => {
+  const owner = Keypair.generate().publicKey
+  const author = Keypair.generate().publicKey.toBase58()
+  const compiled = compileLaunchConfig(DEFAULT_LAUNCH_CONFIG)
+  if (!compiled.ok) throw new Error(compiled.reason)
+
+  it('creates the splitting vault and the config in one transaction, the vault claiming the fees', async () => {
+    const connection = connectionFor(SolanaNetwork.Devnet)
+    mockPassingDryRun(connection)
+    const result = await prepareParametersDeployment(connection, {
+      parameters: compiled.parameters,
+      quoteToken: QuoteToken.Sol,
+      network: SolanaNetwork.Devnet,
+      owner,
+      royalty: { author, sharePercent: 10 },
+    })
+    if (!result.ok) throw new Error(result.reason)
+    const { transaction, summary } = result.deployment
+    expect(transaction.instructions).toHaveLength(2)
+    expect(
+      transaction.instructions[0]?.programId.equals(
+        DYNAMIC_FEE_SHARING_PROGRAM_ID,
+      ),
+    ).toBe(true)
+    expect(summary.royalty).toMatchObject({
+      deployer: owner.toBase58(),
+      author,
+      authorPercent: 10,
+      deployerPercent: 90,
+    })
+    expect(summary.feeClaimer).toBe(summary.royalty?.vault)
+    expect(summary.leftoverReceiver).toBe(owner.toBase58())
+  })
+
+  it('refuses a royalty on a config that takes fees in the launched token', async () => {
+    const connection = connectionFor(SolanaNetwork.Devnet)
+    const blockhash = vi.spyOn(connection, 'getLatestBlockhash')
+    expect(
+      await prepareParametersDeployment(connection, {
+        parameters: {
+          ...compiled.parameters,
+          collectFeeMode: CollectFeeMode.OutputToken,
+        },
+        quoteToken: QuoteToken.Sol,
+        network: SolanaNetwork.Devnet,
+        owner,
+        royalty: { author, sharePercent: 10 },
+      }),
+    ).toEqual({ ok: false, reason: RoyaltyRejection.FeesInLaunchedToken })
+    expect(blockhash).not.toHaveBeenCalled()
+  })
+})
+
+describe('rpcEndpointFor', () => {
+  it('sends a page to its own mainnet proxy and scripts to the public endpoints', () => {
+    expect(rpcEndpointFor(SolanaNetwork.Mainnet, 'https://lab.example')).toBe(
+      `https://lab.example${MAINNET_RPC_PROXY_PATH}`,
+    )
+    expect(rpcEndpointFor(SolanaNetwork.Devnet, 'https://lab.example')).toBe(
+      'https://api.devnet.solana.com',
+    )
+    expect(rpcEndpointFor(SolanaNetwork.Mainnet, null)).toBe(
+      'https://api.mainnet-beta.solana.com',
+    )
+  })
+
+  it('keeps the websocket at the same address, port included', () => {
+    expect(websocketEndpointFor('http://localhost:5180/rpc/mainnet')).toBe(
+      'ws://localhost:5180/rpc/mainnet',
+    )
+    expect(websocketEndpointFor('https://api.devnet.solana.com')).toBe(
+      'wss://api.devnet.solana.com',
+    )
   })
 })

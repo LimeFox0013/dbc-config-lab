@@ -21,6 +21,15 @@ test.describe('launchpad economics', () => {
     )
   })
 
+  test('says what each launchpad earns after graduation, or why it cannot be read', async ({
+    page,
+  }) => {
+    await expect(panel(page).locator('thead')).toContainText('After graduation')
+    await expect(rows(page).first()).toContainText(
+      /none — keeps no liquidity|per graduated launch|not measurable — positions moved/,
+    )
+  })
+
   test('narrows the list by the terms a builder picks', async ({ page }) => {
     await expect(rows(page).first()).toBeVisible()
     await panel(page)

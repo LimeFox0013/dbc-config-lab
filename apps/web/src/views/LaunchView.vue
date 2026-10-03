@@ -65,6 +65,19 @@
                 class="launch-view__link launch-view__link--plain"
               >{{ state.config.feeClaimer }}</a>
             </dd>
+            <template v-if="state.royalty">
+              <dt>{{ t('views.launch.royalty') }}</dt>
+              <dd class="launch-view__value launch-view__address">
+                {{
+                  t('views.launch.royaltyValue', {
+                    operator: state.royalty.deployerPercent,
+                    operatorAddress: state.royalty.deployer,
+                    author: state.royalty.authorPercent,
+                    authorAddress: state.royalty.author,
+                  })
+                }}
+              </dd>
+            </template>
             <dt>{{ t('views.launch.config') }}</dt>
             <dd class="launch-view__value launch-view__address">
               <a

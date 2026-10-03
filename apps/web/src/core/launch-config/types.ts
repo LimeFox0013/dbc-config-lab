@@ -5,6 +5,7 @@ import type {
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { QuoteToken } from '../quote-token'
 import type { CurveShape } from './constants'
+import type { PresetRoyalty } from '../preset-royalty'
 
 /** The curve part of a config: one SDK builder's own parameters, named by its shape. */
 export type CurveSpec =
@@ -50,6 +51,8 @@ export interface LaunchPreset {
   /** What the preset is for, in plain language. */
   intent: string
   config: LaunchConfig
+  /** The author's share of the fees of every launchpad deployed from this preset. */
+  royalty?: PresetRoyalty
 }
 
 export type ScheduleMode =

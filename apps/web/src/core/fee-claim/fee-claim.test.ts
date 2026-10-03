@@ -55,6 +55,8 @@ describe('prepareFeeClaim', () => {
     owner,
     maxQuoteAmount: new BN(1_197_380),
     maxBaseAmount: new BN(0),
+    vault: null,
+    config: null,
   })
 
   it('claims as partner with the wallet as fee claimer and payer, capped at the unclaimed amounts', async () => {

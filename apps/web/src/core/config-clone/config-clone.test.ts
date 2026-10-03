@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import {
   ActivationType,
   BaseFeeMode,
-  DammV2BaseFeeMode,
   MigrationOption,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { PoolConfig } from '@meteora-ag/dynamic-bonding-curve-sdk'
@@ -191,14 +190,5 @@ describe('cloneRefusal', () => {
     expect(
       cloneRefusal({ ...flat, migrationOption: MigrationOption.MET_DAMM }),
     ).toMatch(/deprecated/)
-  })
-
-  it('refuses a graduated-pool fee schedule the config does not store in full', () => {
-    expect(
-      cloneRefusal({
-        ...flat,
-        migratedPoolBaseFeeMode: DammV2BaseFeeMode.FeeMarketCapSchedulerLinear,
-      }),
-    ).toMatch(/market-cap/)
   })
 })

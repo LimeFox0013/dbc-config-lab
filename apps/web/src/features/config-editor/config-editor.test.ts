@@ -59,6 +59,12 @@ const compoundingMigration = edit(
   MigratedCollectFeeMode.Compounding,
 )
 
+const fallingMigration = edit(
+  customMigration,
+  EditorFieldId.MigratedFeeCurve,
+  FeeCurve.Linear,
+)
+
 /** A config on which the field is visible. */
 const weighted = withCurve(
   DEFAULT_LAUNCH_CONFIG,
@@ -71,6 +77,7 @@ const configFor = (f: EditorField): LaunchConfig =>
     shield,
     customMigration,
     compoundingMigration,
+    fallingMigration,
     weighted,
   ].find((c) => f.visible(c)) ?? DEFAULT_LAUNCH_CONFIG
 

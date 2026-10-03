@@ -96,7 +96,19 @@
         "0": "Paid to LPs in the quote token",
         "1": "Paid to LPs in the token bought",
         "2": "Partly compounded into the pool"
+      },
+      "migratedFeeCurve": {
+        "0": "Flat",
+        "1": "Falls linearly as the price rises",
+        "2": "Falls exponentially as the price rises"
       }
+    },
+    "royaltyRejections": {
+      "author-invalid": "the author is not a valid address",
+      "author-is-deployer": "you are the author — a royalty to yourself has no effect",
+      "share-out-of-range": "the author's share must be a whole 1–50%",
+      "fees-in-launched-token": "the config takes fees in the launched token, and the fee-sharing vault holds one token only",
+      "too-large": "the config and its fee-sharing vault do not fit in one transaction"
     }
   },
   "views": {
@@ -113,12 +125,14 @@
         "not-json": "This share link is damaged, so it was not opened.",
         "wrong-version": "This share link was made by a different version of the tool, so it was not opened.",
         "invalid-field": "This share link has an invalid value at {detail}, so it was not opened.",
-        "rejected-by-program": "This shared config would be rejected by Meteora ({detail}), so it was not opened."
+        "rejected-by-program": "This shared config would be rejected by Meteora ({detail}), so it was not opened.",
+        "royalty-refused": "This shared preset's royalty cannot be paid ({detail}), so it was not opened."
       },
       "onChainName": "On-chain: {address} ({network})",
       "onChainIntent": "Read from chain; compared as-is, not editable.",
       "onChainFromPool": "Found via pool {pool}.",
-      "onChainSlots": "This config counts time in slots; scenario seconds are converted at {ms} ms per slot."
+      "onChainSlots": "This config counts time in slots; scenario seconds are converted at {ms} ms per slot.",
+      "sharedIntentRoyalty": "Opened from a share link. Its author takes {percent}% of the fees of any launchpad deployed from it — shown again before you sign."
     },
     "launch": {
       "loading": "Reading this launchpad from chain…",
@@ -134,7 +148,9 @@
       "unverified": "This name, website and logo were published by the fee wallet below and are not verified by this site — check the addresses before you launch.",
       "feeWallet": "Fee wallet",
       "config": "Config",
-      "network": "Network"
+      "network": "Network",
+      "royalty": "Fee split",
+      "royaltyValue": "The fee wallet is a Meteora fee-sharing vault: {operator}% to the operator ({operatorAddress}), {author}% to the preset's author ({authorAddress})"
     }
   },
   "components": {
@@ -152,7 +168,11 @@
       "explanation": "Each launch was rebuilt from a fresh pool by replaying its own on-chain swap history through this simulator; every swap's fees, output and resulting price, each graduation pool's opening liquidity and the liquidity its creator later withdrew, matched what the programs recorded. Run the command to check it yourself — read-only, over the public RPC.",
       "curveSwaps": "{n} curve swap | {n} curve swaps",
       "migratedSwaps": "{n} swap after graduation | {n} swaps after graduation",
-      "compounding": "(compounding pool)",
+      "features": {
+        "compounding": "compounding pool",
+        "volatility-fee": "volatility fee",
+        "falling-fee": "fee falling as the price rises"
+      },
       "feeSetup": {
         "volatility-fee": "Volatility fee",
         "fees-in-token": "Fees taken in the token",
@@ -230,11 +250,15 @@
         "leftoverReceiver": "Leftover tokens go to",
         "quoteMint": "Quote token",
         "quoteMintValue": "{symbol} · {mint}",
-        "fee": "Trading fee"
+        "fee": "Trading fee",
+        "royalty": "Fee split",
+        "royaltyValue": "You {you}% · preset author {author}% ({address}), split by Meteora's fee-sharing vault above; each claims their own share",
+        "royaltyLiquidity": "Your graduation liquidity",
+        "royaltyLiquidityValue": "Held by the same vault after graduation: its fees are split the same way, and it cannot be withdrawn"
       },
       "earnings": {
         "title": "Your earnings",
-        "intro": "Trading fees you can claim: as the fee claimer of configs you deployed (partner), and on pools you created (creator). Read from chain for the connected wallet.",
+        "intro": "Trading fees you can claim: as the fee claimer of configs you deployed (partner), on pools you created (creator), and as a recipient of a royalty vault — first collect a pool's fees into the vault, then claim your share. Read from chain for the connected wallet.",
         "find": "Find my earnings",
         "finding": "Reading your configs and pools…",
         "none": "Nothing to claim on this network.",
@@ -248,7 +272,9 @@
         "receiver": "Paid to",
         "roles": {
           "partner": "partner (config fee claimer)",
-          "creator": "creator"
+          "creator": "creator",
+          "vault-collect": "royalty vault — collect this pool's fees into the vault",
+          "vault-share": "royalty vault — your share"
         },
         "quoteAmount": "{amount} {symbol}",
         "rawAmount": "{amount} base units of {mint}",
@@ -409,6 +435,12 @@
         "migrated-pool-fee": "Custom pool fee",
         "migrated-fee-collection": "Graduation pool fees",
         "compounding-share": "Share of LP fees compounded",
+        "migrated-dynamic-fee": "Graduation pool volatility fee",
+        "migrated-fee-curve": "Graduation pool fee as the price rises",
+        "migrated-ending-fee": "Lowest graduation pool fee",
+        "migrated-fee-periods": "Steps down to the lowest fee",
+        "migrated-price-multiple": "Price rise that reaches the lowest fee (×)",
+        "migrated-fee-schedule-duration": "Falling fee applies for",
         "migration-fee": "Migration fee taken at graduation",
         "partner-liquidity": "Partner LP",
         "partner-locked-liquidity": "Partner LP, locked",
@@ -448,7 +480,14 @@
       "linkCopied": "Link copied. The config travels in the link itself and is never sent to a server.",
       "codeCopied": "Code copied.",
       "copyFailed": "Copying is not allowed here; select the text below and copy it.",
-      "manualCopy": "Text to copy"
+      "manualCopy": "Text to copy",
+      "royalty": {
+        "title": "Earn from this preset (optional)",
+        "intro": "Give your wallet and a share, and every launchpad deployed from this preset — from your share link or the catalogue — splits its fees with you through Meteora's fee-sharing program. You claim your share yourself; nobody holds it for you.",
+        "author": "Author wallet",
+        "share": "Author's share of fees (%)",
+        "refused": "This royalty cannot be paid: {reason}."
+      }
     },
     "onChainLoader": {
       "title": "Load an existing config",
@@ -492,7 +531,12 @@
       "terms": "Graduates at {threshold} {symbol} · creator takes {creator}% of trading fees",
       "outcome": "Here: bots {snipers} SOL · humans {humans} SOL · {graduation}",
       "graduatedAfter": "graduates after {seconds}s",
-      "notGraduated": "does not graduate"
+      "notGraduated": "does not graduate",
+      "royalty": "Its author takes {percent}% of the fees of any launchpad deployed from it, split on chain.",
+      "use": "Use this preset",
+      "communityTitle": "Community presets",
+      "communityEmpty": "None yet. Build a preset in the editor, set your royalty, copy its link and add it to the registry by pull request — every launchpad deployed from it then pays you your share.",
+      "communityHow": "How to add one"
     },
     "launchpadEconomics": {
       "title": "Launchpad economics — what real launchpads earn",
@@ -518,12 +562,19 @@
         "launches": "Launches",
         "graduated": "Graduated",
         "terms": "Terms",
-        "actions": "Actions"
+        "actions": "Actions",
+        "afterGraduation": "After graduation"
       },
       "income": "{median} SOL median · {p75} SOL top quarter",
       "terms": "Graduates at {threshold} {symbol} · fee {fee} · creator takes {creator}%",
       "compare": "Compare",
-      "curveOnly": "Income counts bonding-curve fees only — fees after graduation are not included. Fees taken in the launched token are valued at the curve's average price (what it raises ÷ the tokens it sells). USDC launchpads are converted at 1 SOL = 150 USDC."
+      "curveOnly": "Curve income is bonding-curve fees. After graduation a launchpad earns only from the liquidity position the program gives its fee wallet: none when it keeps no liquidity, and not measurable when its fee wallet no longer holds those positions. After-graduation figures count fees in the quote token only (claimed plus pending). Fees taken in the launched token are valued at the curve's average price. USDC launchpads are converted at 1 SOL = 150 USDC.",
+      "after": {
+        "noShare": "none — keeps no liquidity",
+        "notHeld": "not measurable — positions moved",
+        "unknown": "not read",
+        "positions": "{median} SOL median · {p75} SOL top quarter per graduated launch ({positions} positions)"
+      }
     },
     "clonePanel": {
       "title": "Clone a launchpad config",
@@ -563,8 +614,16 @@
       "terms": "Comparable terms: priced in {quote} · graduates at {threshold} · fee {fee} · creator's share {creator}.",
       "range": "{low}–{high} SOL from {launches} launches",
       "basis": "The middle half of {launchpads} real launchpads with these terms ({launches} launches between them), read from mainnet on {date}.",
-      "tooFew": "Only {found} real launchpads share these terms; a range needs at least {minimum}, so none is given.",
-      "caveat": "What comparable launchpads earned, not a promise of what yours will. Bonding-curve fees only — income after graduation is not counted."
+      "tooFew": "Only {found} real launchpads share these terms, and setting terms aside did not reach the {minimum} a range needs, so none is given.",
+      "relaxed": "Too few real launchpads share every term, so this range sets aside: {terms}.",
+      "termNames": {
+        "creatorShare": "creator's share",
+        "feeShape": "fee shape",
+        "thresholdBand": "graduation threshold"
+      },
+      "caveat": "What comparable launchpads earned, not a promise of what yours will.",
+      "after": "Plus {low}–{high} SOL after graduation, from the {launchpads} comparable launchpads where it could be measured (quote-token fees only).",
+      "afterUnknown": "Income after graduation could not be measured for these launchpads."
     },
     "configTermsRows": {
       "creatorShare": "Creator’s share of trading fees",
@@ -604,6 +663,11 @@
       "migrationFee": "Migration fee",
       "migrationFeeValue": "{fee}% of graduation liquidity, {creator}% of it to the creator",
       "migrationPoolFee": "Graduation pool fee",
+      "graduatedDynamicFee": "Graduation pool volatility fee",
+      "graduatedFeeSchedule": "Graduation pool fee as the price rises",
+      "graduatedFeeFlat": "Stays the same",
+      "graduatedFeeFallsLinearly": "Falls linearly to {ending}% in {steps} steps by the time the price is {multiple}× the graduation price; {ending}% after {duration}",
+      "graduatedFeeFallsExponentially": "Falls exponentially to {ending}% in {steps} steps by the time the price is {multiple}× the graduation price; {ending}% after {duration}",
       "percentValue": "{value}%",
       "poolCreationFee": "Pool creation fee",
       "poolCreationFeeValue": "{sol} SOL",
@@ -626,6 +690,42 @@
         "1": "Token-2022"
       },
       "firstBuy": "Creator’s first buy"
+    },
+    "operatorDashboard": {
+      "title": "Your launchpad, live",
+      "intro": "Paste the wallet that collects your launchpad's fees to watch every config it is fee claimer of: launches, graduations, the curve fees it has earned and not yet claimed, and what its graduated-pool positions have earned. Read-only — nothing is signed here.",
+      "network": "Network",
+      "mainnet": "Mainnet",
+      "devnet": "Devnet",
+      "address": "Fee wallet address",
+      "watch": "Watch",
+      "reading": "Reading the wallet's configs and pools…",
+      "readAt": "Read at {time}; refreshes every minute while open.",
+      "sol": "{sol} SOL",
+      "unpriced": "unpriced token",
+      "noPositions": "none — its configs keep no graduation liquidity",
+      "positionsNone": "After graduation: it holds no positions in {symbol} pools yet.",
+      "positionsAll": "After graduation: all {held} positions it holds in {symbol} pools, fees claimed plus pending, quote token only.",
+      "positionsSampled": "After graduation: {read} of the {held} positions it holds in {symbol} pools, read evenly and scaled to all of them; fees claimed plus pending, quote token only.",
+      "totals": {
+        "launches": "Launches",
+        "launchesValue": "{launches} launched · {graduated} graduated",
+        "curveFees": "Curve fees earned",
+        "unclaimed": "Not yet claimed",
+        "afterGraduation": "Earned after graduation"
+      },
+      "columns": {
+        "config": "Config",
+        "launches": "Launches",
+        "graduated": "Graduated",
+        "curveFees": "Curve fees earned",
+        "unclaimed": "Not yet claimed"
+      },
+      "rejections": {
+        "invalid-address": "That is not a Solana address.",
+        "no-configs": "This wallet is not the fee claimer of any DBC config on this network.",
+        "network-error": "Could not read the wallet: {detail}. The figures above are from the last successful read."
+      }
     }
   }
 }

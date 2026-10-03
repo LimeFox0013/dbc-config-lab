@@ -4,10 +4,12 @@ import {
   CollectFeeMode,
   DEAD_LIQUIDITY,
   decodePodAlignedFeeTimeScheduler,
+  getDynamicFeeParams,
   getPriceFromSqrtPrice,
 } from '@meteora-ag/cp-amm-sdk'
 import {
   createDbcProgram,
+  DammV2BaseFeeMode,
   DammV2DynamicFeeMode,
   MigratedCollectFeeMode,
   MigrationFeeOption,
@@ -22,12 +24,14 @@ import {
   afterMigratedSwap,
   lockedLiquidity,
   migratedFeeBps,
+  migratedFeeSchedule,
   migratedUnsupportedReason,
   pullableLiquidityPercent,
   quoteMigratedSwap,
   toMigratedPool,
   withUnlockedLiquidityPulled,
 } from '.'
+import type { MigratedPool, MigratedSwap } from '.'
 import { SolanaNetwork } from '../shared'
 import { toPoolConfig } from '../launch-simulator'
 
@@ -37,8 +41,10 @@ const compile = (config: LaunchConfig) => {
   return compiled.parameters
 }
 
+/** Graduation time, in unix seconds; swaps in these tests run then. */
+const OPENED_AT = new BN(1_767_225_600)
 const parameters = compile(DEFAULT_LAUNCH_CONFIG)
-const pool = toMigratedPool(parameters, toPoolConfig(parameters))
+const pool = toMigratedPool(parameters, toPoolConfig(parameters), OPENED_AT)
 const BASE_DECIMALS = DEFAULT_LAUNCH_CONFIG.token.tokenBaseDecimal
 
 const compoundingConfig: LaunchConfig = {
@@ -56,7 +62,48 @@ const compoundingConfig: LaunchConfig = {
 }
 const compoundingParameters = compile(compoundingConfig)
 
-const compoundingFixture: {
+const customMigration = (
+  migratedPoolFee: NonNullable<LaunchConfig['migration']['migratedPoolFee']>,
+): LaunchConfig => ({
+  ...DEFAULT_LAUNCH_CONFIG,
+  migration: {
+    ...DEFAULT_LAUNCH_CONFIG.migration,
+    migrationFeeOption: MigrationFeeOption.Customizable,
+    migratedPoolFee,
+  },
+})
+const dynamicParameters = compile(
+  customMigration({
+    collectFeeMode: MigratedCollectFeeMode.QuoteToken,
+    dynamicFee: DammV2DynamicFeeMode.Enabled,
+    poolFeeBps: 100,
+  }),
+)
+const FALLING_SCHEDULE = {
+  endingBaseFeeBps: 25,
+  numberOfPeriod: 10,
+  priceMultiple: 10,
+  schedulerExpirationDuration: 86_400,
+}
+const fallingParameters = compile(
+  customMigration({
+    collectFeeMode: MigratedCollectFeeMode.QuoteToken,
+    dynamicFee: DammV2DynamicFeeMode.Disabled,
+    poolFeeBps: 100,
+    baseFeeMode: DammV2BaseFeeMode.FeeMarketCapSchedulerLinear,
+    marketCapFeeSchedulerParams: FALLING_SCHEDULE,
+  }),
+)
+/** The fee a swap paid, as a share of its input in bps. */
+const feeBpsOf = (swap: MigratedSwap): number =>
+  swap.quote.claimingFee
+    .add(swap.quote.protocolFee)
+    .add(swap.quote.referralFee)
+    .muln(10_000)
+    .div(swap.quote.includedFeeInputAmount)
+    .toNumber()
+
+interface MigrationFixture {
   configBase64: string
   opening: {
     liquidity: string
@@ -64,12 +111,33 @@ const compoundingFixture: {
     reserveA: string
     reserveB: string
   }
-} = JSON.parse(
-  readFileSync(
-    join(__dirname, 'fixtures', 'compounding-migration.json'),
-    'utf8',
-  ),
-)
+}
+const readFixture = (name: string): MigrationFixture =>
+  JSON.parse(readFileSync(join(__dirname, 'fixtures', name), 'utf8'))
+const compoundingFixture = readFixture('compounding-migration.json')
+const feeScheduledFixture = readFixture('fee-scheduled-migration.json')
+
+/** A real migration's config, and the pool the simulator opens for it. */
+const openedFor = (fixture: MigrationFixture) => {
+  const parameters = fromPoolConfig(
+    createDbcProgram(
+      connectionFor(SolanaNetwork.Mainnet),
+    ).program.coder.accounts.decode(
+      'poolConfig',
+      Buffer.from(fixture.configBase64, 'base64'),
+    ),
+  )
+  return {
+    parameters,
+    opened: toMigratedPool(parameters, toPoolConfig(parameters), OPENED_AT),
+  }
+}
+const openingOf = (pool: MigratedPool) => ({
+  liquidity: pool.liquidity.toString(),
+  sqrtPrice: pool.sqrtPrice.toString(),
+  reserveA: pool.tokenAAmount.toString(),
+  reserveB: pool.tokenBAmount.toString(),
+})
 
 describe('toMigratedPool', () => {
   it('stores the flat fee in a record the SDK decodes back', () => {
@@ -97,7 +165,7 @@ describe('quoteMigratedSwap', () => {
   it('sells a small amount at spot price minus the 1% fee (price impact negligible)', () => {
     const tokenCount = 10_000
     const tokens = new BN(tokenCount).mul(new BN(10 ** BASE_DECIMALS))
-    const { quote } = quoteMigratedSwap(pool, true, tokens, 0)
+    const { quote } = quoteMigratedSwap(pool, true, tokens, OPENED_AT)
     const price = getPriceFromSqrtPrice(
       pool.sqrtPrice,
       BASE_DECIMALS,
@@ -109,8 +177,13 @@ describe('quoteMigratedSwap', () => {
   })
 
   it('moves the price down on a sell and up on a buy', () => {
-    const sell = quoteMigratedSwap(pool, true, new BN(10).pow(new BN(13)), 0)
-    const buy = quoteMigratedSwap(pool, false, new BN(1_000_000_000), 0)
+    const sell = quoteMigratedSwap(
+      pool,
+      true,
+      new BN(10).pow(new BN(13)),
+      OPENED_AT,
+    )
+    const buy = quoteMigratedSwap(pool, false, new BN(1_000_000_000), OPENED_AT)
     expect(sell.quote.nextSqrtPrice.lt(pool.sqrtPrice)).toBe(true)
     expect(buy.quote.nextSqrtPrice.gt(pool.sqrtPrice)).toBe(true)
   })
@@ -121,28 +194,93 @@ describe('migratedUnsupportedReason', () => {
     expect(migratedUnsupportedReason(parameters)).toBeNull()
   })
 
-  it('refuses the dynamic fee on the migrated pool', () => {
-    const customizable = {
-      ...DEFAULT_LAUNCH_CONFIG,
-      migration: {
-        ...DEFAULT_LAUNCH_CONFIG.migration,
-        migrationFeeOption: MigrationFeeOption.Customizable,
-      },
-    }
-    expect(
-      migratedUnsupportedReason({
-        ...compile(customizable),
-        migratedPoolFee: {
-          collectFeeMode: 0,
-          dynamicFee: DammV2DynamicFeeMode.Enabled,
-          poolFeeBps: 100,
-        },
-      }),
-    ).not.toBeNull()
+  it('accepts the dynamic fee and a falling fee on the graduated pool', () => {
+    expect(migratedUnsupportedReason(dynamicParameters)).toBeNull()
+    expect(migratedUnsupportedReason(fallingParameters)).toBeNull()
   })
 
   it('accepts a compounding graduation pool', () => {
     expect(migratedUnsupportedReason(compoundingParameters)).toBeNull()
+  })
+})
+
+describe('the graduated pool dynamic fee', () => {
+  const opened = toMigratedPool(
+    dynamicParameters,
+    toPoolConfig(dynamicParameters),
+    OPENED_AT,
+  )
+  const BUY = new BN(10).pow(new BN(11))
+
+  it('takes the settings the program derives from the pool fee', () => {
+    const expected = getDynamicFeeParams(100)
+    expect(opened.poolFees.dynamicFee.initialized).toBe(1)
+    expect(opened.poolFees.dynamicFee.variableFeeControl).toBe(
+      expected.variableFeeControl,
+    )
+    expect(opened.poolFees.dynamicFee.maxVolatilityAccumulator).toBe(
+      expected.maxVolatilityAccumulator,
+    )
+  })
+
+  it('charges more after a sharp move, up to a fifth of the pool fee, until a pause resets it', () => {
+    const first = quoteMigratedSwap(opened, false, BUY, OPENED_AT)
+    expect(feeBpsOf(first)).toBe(100)
+    const moved = afterMigratedSwap(first)
+    expect(moved.poolFees.dynamicFee.volatilityAccumulator.gtn(0)).toBe(true)
+    // The fee comes from the volatility the previous swap left; a pause only decays what
+    // the next swap accumulates from.
+    const next = quoteMigratedSwap(moved, false, BUY, OPENED_AT.addn(1))
+    expect(feeBpsOf(next)).toBeGreaterThan(100)
+    expect(feeBpsOf(next)).toBeLessThanOrEqual(120)
+    const afterPause = afterMigratedSwap(
+      quoteMigratedSwap(moved, false, new BN(1000), OPENED_AT.addn(3600)),
+    )
+    expect(
+      feeBpsOf(quoteMigratedSwap(afterPause, false, BUY, OPENED_AT.addn(3601))),
+    ).toBe(100)
+  })
+})
+
+describe('the graduated pool falling fee', () => {
+  const opened = toMigratedPool(
+    fallingParameters,
+    toPoolConfig(fallingParameters),
+    OPENED_AT,
+  )
+
+  it('describes the schedule the config stores', () => {
+    const schedule = migratedFeeSchedule(fallingParameters)
+    expect(schedule).toMatchObject({
+      exponential: false,
+      endingFeeBps: FALLING_SCHEDULE.endingBaseFeeBps,
+      steps: FALLING_SCHEDULE.numberOfPeriod,
+      durationSeconds: FALLING_SCHEDULE.schedulerExpirationDuration,
+    })
+    expect(schedule?.priceMultiple).toBeCloseTo(
+      FALLING_SCHEDULE.priceMultiple,
+      0,
+    )
+    expect(migratedFeeSchedule(parameters)).toBeNull()
+  })
+
+  it('charges the pool fee at graduation, less as the price rises, and the ending fee once it expires', () => {
+    const small = new BN(1_000_000_000)
+    const atOpening = quoteMigratedSwap(opened, false, small, OPENED_AT)
+    expect(feeBpsOf(atOpening)).toBe(100)
+    const risen = afterMigratedSwap(
+      quoteMigratedSwap(opened, false, new BN(10).pow(new BN(12)), OPENED_AT),
+    )
+    expect(risen.sqrtPrice.gt(opened.sqrtPrice)).toBe(true)
+    expect(
+      feeBpsOf(quoteMigratedSwap(risen, false, small, OPENED_AT)),
+    ).toBeLessThan(100)
+    const expired = OPENED_AT.addn(
+      FALLING_SCHEDULE.schedulerExpirationDuration + 1,
+    )
+    expect(feeBpsOf(quoteMigratedSwap(opened, false, small, expired))).toBe(
+      FALLING_SCHEDULE.endingBaseFeeBps,
+    )
   })
 })
 
@@ -210,39 +348,35 @@ describe('pullableLiquidityPercent', () => {
 
 describe('compounding graduation pool', () => {
   it('opens exactly as a real compounding migration did', () => {
-    const chain = compoundingFixture.opening
-    const parameters = fromPoolConfig(
-      createDbcProgram(
-        connectionFor(SolanaNetwork.Mainnet),
-      ).program.coder.accounts.decode(
-        'poolConfig',
-        Buffer.from(compoundingFixture.configBase64, 'base64'),
-      ),
-    )
-    const opened = toMigratedPool(parameters, toPoolConfig(parameters))
+    const { opened } = openedFor(compoundingFixture)
     expect(opened.collectFeeMode).toBe(CollectFeeMode.Compounding)
     expect(opened.poolFees.compoundingFeeBps).toBe(1000)
-    expect({
-      liquidity: opened.liquidity.toString(),
-      sqrtPrice: opened.sqrtPrice.toString(),
-      reserveA: opened.tokenAAmount.toString(),
-      reserveB: opened.tokenBAmount.toString(),
-    }).toEqual({
-      liquidity: chain.liquidity,
-      sqrtPrice: chain.sqrtPrice,
-      reserveA: chain.reserveA,
-      reserveB: chain.reserveB,
-    })
+    expect(compoundingFixture.opening).toMatchObject(openingOf(opened))
+  })
+
+  it('opens exactly as a real migration with a migration fee and a falling fee did', () => {
+    // A 6% migration fee leaves a quote amount the program rounds up.
+    const { parameters, opened } = openedFor(feeScheduledFixture)
+    expect(parameters.migrationFee.feePercentage).toBe(6)
+    expect(opened.poolFees.dynamicFee.initialized).toBe(1)
+    expect(migratedFeeSchedule(parameters)?.exponential).toBe(true)
+    expect(feeScheduledFixture.opening).toMatchObject(openingOf(opened))
   })
 
   const opened = toMigratedPool(
     compoundingParameters,
     toPoolConfig(compoundingParameters),
+    OPENED_AT,
   )
 
   it('keeps the compounding share of a buy in its quote reserve', () => {
-    const swap = quoteMigratedSwap(opened, false, new BN(1_000_000_000), 0)
-    const after = afterMigratedSwap(opened, swap)
+    const swap = quoteMigratedSwap(
+      opened,
+      false,
+      new BN(1_000_000_000),
+      OPENED_AT,
+    )
+    const after = afterMigratedSwap(swap)
     expect(swap.quote.compoundingFee.gtn(0)).toBe(true)
     expect(after.tokenBAmount.toString()).toBe(
       opened.tokenBAmount
@@ -266,7 +400,7 @@ describe('compounding graduation pool', () => {
         creatorPermanentLockedLiquidityPercentage: 0,
       },
     })
-    const pool = toMigratedPool(unlocked, toPoolConfig(unlocked))
+    const pool = toMigratedPool(unlocked, toPoolConfig(unlocked), OPENED_AT)
     const { pool: left, pulled } = withUnlockedLiquidityPulled(unlocked, pool)
     expect(left.liquidity.gt(DEAD_LIQUIDITY)).toBe(true)
     expect(left.tokenBAmount.add(pulled.quote).toString()).toBe(

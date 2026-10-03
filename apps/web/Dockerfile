@@ -15,7 +15,13 @@ FROM nginxinc/nginx-unprivileged:stable-alpine@sha256:ed04ec1ff34502c339ee5c3ae3
 # trade-off: two builds from the same digest can differ in OS patch level.
 USER root
 RUN apk upgrade --no-cache
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+# The server config is a template: the image's entrypoint fills in HELIUS_API_KEY from the
+# container's environment at start (a runtime secret, never baked into the image) and
+# substitutes nothing else. Without it the site still serves; only mainnet reads fail.
+COPY apps/web/nginx.conf /etc/nginx/templates/default.conf.template
+RUN rm -f /etc/nginx/conf.d/default.conf
+ENV NGINX_ENVSUBST_FILTER=HELIUS_ \
+    HELIUS_API_KEY=""
 COPY apps/web/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
 # Back to the base image's unprivileged nginx user.

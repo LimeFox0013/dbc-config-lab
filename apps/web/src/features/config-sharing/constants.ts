@@ -14,6 +14,7 @@ export enum ShareRejection {
   WrongVersion = 'wrong-version',
   InvalidField = 'invalid-field',
   RejectedByProgram = 'rejected-by-program',
+  RoyaltyRefused = 'royalty-refused',
 }
 
 /** The SDK builder that creates each curve shape. */
@@ -29,3 +30,6 @@ export const NON_BUILDER_KEYS: ReadonlySet<string> = new Set([
   'curveShape',
   'quoteToken',
 ])
+
+/** A base58 address is at most this long. */
+export const ADDRESS_MAX_LENGTH = 44

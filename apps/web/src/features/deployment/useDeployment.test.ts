@@ -92,7 +92,10 @@ const heldPreparation = async () => {
   return release
 }
 
-const [first, second] = LAUNCH_PRESETS.map(presetEntry)
+const [first, second] = LAUNCH_PRESETS.map((preset) => ({
+  ...presetEntry(preset),
+  royalty: null,
+}))
 if (!first || !second) throw new Error('needs two built-in presets')
 
 const setUp = async (network: SolanaNetwork) => {

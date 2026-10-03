@@ -71,6 +71,36 @@ test.describe('config editor', () => {
     ).toBeVisible()
   })
 
+  test('a custom graduation pool can add a volatility fee and fall as the price rises', async ({
+    page,
+  }) => {
+    await editor(page)
+      .getByRole('combobox', { name: 'Graduation pool fee' })
+      .selectOption({ label: 'Custom' })
+    await editor(page)
+      .getByRole('combobox', { name: 'Graduation pool volatility fee' })
+      .selectOption({ label: 'On — rises after sharp price moves' })
+    await expect(
+      editor(page).getByRole('spinbutton', {
+        name: /Lowest graduation pool fee/,
+      }),
+    ).toHaveCount(0)
+    await editor(page)
+      .getByRole('combobox', { name: 'Graduation pool fee as the price rises' })
+      .selectOption({ label: 'Falls linearly as the price rises' })
+    await expect(
+      editor(page).getByRole('spinbutton', {
+        name: /Lowest graduation pool fee/,
+      }),
+    ).toHaveValue('0.25')
+    await expect(
+      editor(page).getByRole('spinbutton', { name: /Price rise that reaches/ }),
+    ).toHaveValue('10')
+    await expect(
+      editor(page).getByText('Meteora would accept this config.'),
+    ).toBeVisible()
+  })
+
   test('a falling fee reveals its opening fee and window', async ({ page }) => {
     await expect(
       editor(page).getByRole('spinbutton', { name: /Falls over/ }),

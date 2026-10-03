@@ -14,6 +14,9 @@ export interface EarningsRow {
   unclaimedBase: BN
   /** Both amounts in SOL at the reference rate (base valued at the pool's price); null when unpriced. */
   valueSol: number | null
+  /** For royalty rows: the vault, and the config whose fees it collects (a share row has none). */
+  vault: string | null
+  config: string | null
 }
 
 export interface Earnings {

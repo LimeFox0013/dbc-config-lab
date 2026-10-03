@@ -38,6 +38,7 @@ export const useDeployment = (
           quoteToken: compiled.quoteToken,
           network: network.value,
           owner,
+          royalty: target.value.royalty,
         },
       )
       return result.ok

@@ -28,8 +28,8 @@
               rel="noopener noreferrer"
               class="replay-check__link"
             >{{ t('components.replayCheck.migratedSwaps', launch.migrated.swaps) }}</a>
-            <template v-if="launch.migrated.compounding">
-              {{ t('components.replayCheck.compounding') }}
+            <template v-if="launch.migrated.features">
+              ({{ launch.migrated.features.map((feature) => t(`components.replayCheck.features.${feature}`)).join(', ') }})
             </template>
           </template>
         </span>

@@ -5,6 +5,8 @@ import { QuoteToken } from '../../core/quote-token'
 import { SolanaNetwork } from '../../core/shared'
 import snapshot from './launchpads.json'
 import {
+  afterGraduationPerLaunch,
+  AfterGraduationBasis,
   archetypeOf,
   CreatorShareBand,
   FeeShape,
@@ -14,6 +16,7 @@ import {
   launchpadRecords,
   LaunchpadSort,
   rankLaunchpads,
+  readAfterGraduation,
 } from '.'
 import type { Archetype } from '.'
 
@@ -48,6 +51,54 @@ describe('launchpadRecords', () => {
         record.partnerIncomeMedian,
       )
     })
+  })
+})
+
+describe('income after graduation', () => {
+  const [record] = records
+  if (!record) throw new Error('expected a snapshot record')
+  const withAfter = (afterGraduation: unknown) => ({
+    ...record,
+    afterGraduation: readAfterGraduation(afterGraduation),
+    launches: 10,
+    graduated: 4,
+  })
+
+  it('reads only entries it recognises', () => {
+    expect(readAfterGraduation({ basis: 'no-share' })).toEqual({
+      basis: AfterGraduationBasis.NoShare,
+    })
+    expect(readAfterGraduation({ basis: 'positions', median: 1 })).toBeNull()
+    expect(readAfterGraduation({ basis: 'other' })).toBeNull()
+    expect(readAfterGraduation(undefined)).toBeNull()
+  })
+
+  it('counts a held position once per graduated launch', () => {
+    const measured = withAfter({
+      basis: AfterGraduationBasis.Positions,
+      sampledPositions: 500,
+      median: 2,
+      p75: 3,
+    })
+    expect(afterGraduationPerLaunch(measured)).toBeCloseTo(0.8)
+  })
+
+  it('is zero without a liquidity share and unknown when positions moved', () => {
+    expect(
+      afterGraduationPerLaunch(
+        withAfter({ basis: AfterGraduationBasis.NoShare }),
+      ),
+    ).toBe(0)
+    expect(
+      afterGraduationPerLaunch(
+        withAfter({ basis: AfterGraduationBasis.NotHeld }),
+      ),
+    ).toBeNull()
+    expect(afterGraduationPerLaunch(withAfter(undefined))).toBeNull()
+  })
+
+  it('reads every snapshot launchpad', () => {
+    records.forEach((r) => expect(r.afterGraduation).not.toBeNull())
   })
 })
 
@@ -152,13 +203,64 @@ describe('incomeForecast', () => {
     })
   })
 
-  it('gives no range when too few launchpads share the terms', () => {
+  it('adds what the comparable launchpads earned after graduation, where it was measured', () => {
+    const comparables = records.filter((r) => sameTerms(r.archetype, common))
+    const measured = comparables.flatMap((r) => {
+      const after = afterGraduationPerLaunch(r)
+      return after === null ? [] : [after]
+    })
+    const forecast = incomeForecast(records, common, 100)
+    if (!forecast.ok) throw new Error('expected a range')
+    if (measured.length === 0) {
+      expect(forecast.afterGraduation).toBeNull()
+      return
+    }
+    expect(forecast.afterGraduation?.launchpads).toBe(measured.length)
+    expect(forecast.afterGraduation?.low).toBeGreaterThanOrEqual(
+      Math.min(...measured) * 100,
+    )
+    expect(forecast.afterGraduation?.high).toBeLessThanOrEqual(
+      Math.max(...measured) * 100,
+    )
+  })
+
+  it('sets terms aside in order until enough launchpads match, never the quote token', () => {
     const rare: Archetype = {
-      quoteToken: QuoteToken.Usdc,
+      quoteToken: QuoteToken.Sol,
       thresholdBand: ThresholdBand.Huge,
       feeShape: FeeShape.RateLimiter,
       creatorShare: CreatorShareBand.Majority,
     }
-    expect(incomeForecast(records, rare, 100)).toMatchObject({ ok: false })
+    const forecast = incomeForecast(records, rare, 100)
+    if (!forecast.ok) throw new Error('expected a range from SOL launchpads')
+    expect(forecast.relaxed[0]).toBe('creatorShare')
+    expect(forecast.relaxed).not.toContain('quoteToken')
+    expect(
+      records.filter(
+        (r) =>
+          r.archetype.quoteToken === QuoteToken.Sol &&
+          r.archetype.creatorShare === CreatorShareBand.Majority &&
+          r.archetype.feeShape === FeeShape.RateLimiter &&
+          r.archetype.thresholdBand === ThresholdBand.Huge,
+      ).length,
+    ).toBeLessThan(3)
+    expect(incomeForecast(records, common, 100)).toMatchObject({ relaxed: [] })
+  })
+
+  it('gives no range when even every term set aside leaves too few', () => {
+    const usdc = records
+      .filter((r) => r.archetype.quoteToken === QuoteToken.Usdc)
+      .slice(0, 2)
+    const forecast = incomeForecast(
+      usdc,
+      {
+        quoteToken: QuoteToken.Usdc,
+        thresholdBand: ThresholdBand.Huge,
+        feeShape: FeeShape.RateLimiter,
+        creatorShare: CreatorShareBand.Majority,
+      },
+      100,
+    )
+    expect(forecast).toMatchObject({ ok: false, minimum: 3 })
   })
 })

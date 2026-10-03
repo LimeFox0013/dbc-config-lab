@@ -1,7 +1,6 @@
 import {
   ActivationType,
   assertConfigAllowsNewPool,
-  DammV2BaseFeeMode,
   getBaseFeeParams,
   validateConfigParameters,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
@@ -34,12 +33,6 @@ const validationError = (parameters: ConfigParameters): string | null => {
   }
 }
 
-/** Graduated-pool fee modes whose terms the config account stores in full. */
-const COPYABLE_MIGRATED_FEE_MODES: readonly DammV2BaseFeeMode[] = [
-  DammV2BaseFeeMode.FeeTimeSchedulerLinear,
-  DammV2BaseFeeMode.FeeTimeSchedulerExponential,
-]
-
 /** The SDK's refusal of terms no new config may use, which no adjustment here changes. */
 const retiredTermsError = (parameters: ConfigParameters): string | null => {
   try {
@@ -59,8 +52,6 @@ const retiredTermsError = (parameters: ConfigParameters): string | null => {
  * `clonedParameters` reports them until the clone is adjusted.
  */
 export const cloneRefusal = (parameters: ConfigParameters): string | null => {
-  if (!COPYABLE_MIGRATED_FEE_MODES.includes(parameters.migratedPoolBaseFeeMode))
-    return "The graduated pool's market-cap fee schedule is not stored in a form that can be copied"
   return retiredTermsError(parameters) ?? migratedUnsupportedReason(parameters)
 }
 

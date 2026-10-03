@@ -2,19 +2,15 @@ import BN from 'bn.js'
 import { describe, expect, it } from 'vitest'
 import {
   BaseFeeMode,
+  MigrationOption,
   swapQuotePartialFill,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { compileLaunchConfig, DEFAULT_LAUNCH_CONFIG } from '../launch-config'
 import type { LaunchConfig } from '../launch-config'
 import { FeeToken, simulateLaunch, TradeSide, TradeStatus, Venue } from '.'
 import type { Trade } from '.'
-import {
-  deltaBinId,
-  feeTotal,
-  feeValueInQuote,
-  toInitialPool,
-  toPoolConfig,
-} from './utils'
+import { deltaBinId } from '../volatility-tracker'
+import { feeTotal, feeValueInQuote, toInitialPool, toPoolConfig } from './utils'
 
 const SOL = new BN(1_000_000_000)
 
@@ -119,16 +115,9 @@ describe('simulateLaunch', () => {
 
   it('refuses post-graduation trades on a migrated pool it cannot reproduce, with a reason', () => {
     const parameters = compile(DEFAULT_LAUNCH_CONFIG)
-    // The DAMM v2 dynamic fee on the migrated pool is not replayed.
-    const dynamicFee = {
-      ...parameters,
-      migratedPoolFee: { ...parameters.migratedPoolFee, dynamicFee: 1 },
-    }
-    const result = simulateLaunch(dynamicFee, [
-      buy(0, 50),
-      buy(1, 50),
-      buy(2, 1),
-    ])
+    // Only a DAMM v2 graduation pool is replayed.
+    const dammV1 = { ...parameters, migrationOption: MigrationOption.MET_DAMM }
+    const result = simulateLaunch(dammV1, [buy(0, 50), buy(1, 50), buy(2, 1)])
     expect(result.outcomes[2].status).toBe(TradeStatus.Rejected)
     expect(result.outcomes[2].reason).toContain('Migrated pool not simulated')
   })

@@ -1,3 +1,4 @@
+import BN from 'bn.js'
 import { PublicKey } from '@solana/web3.js'
 import type { Connection, GetProgramAccountsFilter } from '@solana/web3.js'
 import {
@@ -13,13 +14,16 @@ import { errorMessage } from '../../core/shared'
 import type { SolanaNetwork } from '../../core/shared'
 import { DbcAccount } from '../onchain-config'
 import { EarningsRejection, MAX_EARNINGS_ROWS } from './constants'
-import type { EarningsResult, PoolFees } from './types'
-import { byValue, earningsRows } from './utils'
+import type { EarningsResult, EarningsRow, PoolFees } from './types'
+import { byValue, earningsRows, vaultShareRow } from './utils'
 import {
   POOL_CONFIG_LAYOUT,
   VIRTUAL_POOL_LAYOUT,
 } from '../../core/onchain-config'
 
+import { DynamicFeeSharingClient } from '@meteora-ag/dynamic-fee-sharing-sdk'
+import { COMMITMENT } from '../../core/config-deploy'
+import { royaltyVaultsOf } from '../../core/preset-royalty'
 const poolFees = (pool: string, account: VirtualPool): PoolFees => {
   const state = account.poolState
   return {
@@ -31,6 +35,53 @@ const poolFees = (pool: string, account: VirtualPool): PoolFees => {
     creatorQuoteFee: state.creatorQuoteFee,
     creatorBaseFee: state.creatorBaseFee,
   }
+}
+
+/**
+ * What `owner` can collect or claim as a recipient of royalty vaults: each vault's
+ * launchpad fees still in its config's pools, and the owner's unclaimed share in the vault.
+ * Only vaults that are their config's fee claimer — the ones this tool deploys — are read.
+ */
+const royaltyEarnings = async (
+  connection: Connection,
+  network: SolanaNetwork,
+  owner: PublicKey,
+  poolsOf: (config: PublicKey) => Promise<PoolFees[]>,
+  decodeConfig: (data: Buffer) => PoolConfig,
+): Promise<EarningsRow[]> => {
+  const client = new DynamicFeeSharingClient(connection, COMMITMENT)
+  const vaults = await royaltyVaultsOf(connection, owner, COMMITMENT)
+  const rows = await Promise.all(
+    vaults.map(async (vault) => {
+      const [state, breakdown] = await Promise.all([
+        client.getFeeVault(vault),
+        client.getFeeBreakdown(vault),
+      ])
+      const tokenMint = state.tokenMint.toBase58()
+      const share = vaultShareRow(
+        vault.toBase58(),
+        tokenMint,
+        breakdown.userFees.find((u) => u.address.equals(owner))?.feeUnclaimed ??
+          new BN(0),
+        network,
+      )
+      const configInfo = await connection.getAccountInfo(state.base)
+      const collects =
+        configInfo &&
+        configInfo.owner.equals(DYNAMIC_BONDING_CURVE_PROGRAM_ID) &&
+        decodeConfig(configInfo.data).feeClaimer.equals(vault)
+          ? earningsRows(
+              await poolsOf(state.base),
+              FeeRole.VaultCollect,
+              () => tokenMint,
+              network,
+              () => vault.toBase58(),
+            )
+          : []
+      return [...collects, ...share]
+    }),
+  )
+  return rows.flat()
 }
 
 /**
@@ -114,7 +165,21 @@ export const findEarnings = async (
         quoteMints.set(address, decodeConfig(info.data).quoteMint.toBase58())
     })
 
+    const royalty = await royaltyEarnings(
+      connection,
+      network,
+      owner,
+      (config) =>
+        accounts([
+          discriminator(DbcAccount.VirtualPool),
+          field(VIRTUAL_POOL_LAYOUT.config, config),
+        ]).then((pools) =>
+          pools.flatMap((p) => decodePool(p.pubkey, p.account.data)),
+        ),
+      decodeConfig,
+    )
     const rows = [
+      ...royalty,
       ...earningsRows(
         partnerPools.flatMap((p) => decodePool(p.pubkey, p.account.data)),
         FeeRole.Partner,
