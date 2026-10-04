@@ -119,7 +119,7 @@ test.describe('recommender', () => {
     await page
       .getByRole('checkbox', { name: /Also try other curve shapes/ })
       .check()
-    await expect(page.getByText(/opening at 75–95% of it/)).toBeVisible()
+    await expect(page.getByText(/opening at 80–95% of it/)).toBeVisible()
     await page.getByRole('button', { name: 'Find best configs' }).click()
     const best = page.locator('.recommender-panel__proposal').first()
     await expect(best).toContainText('market-cap curve 285 → 294 SOL', {

@@ -1,5 +1,5 @@
 import { Criterion } from '../../core/config-search'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import {
   compileLaunchConfig,
   CurveShape,
@@ -178,21 +178,25 @@ describe('curve search', () => {
 
 describe('price-anchored search (tokenized stock listing)', () => {
   const stock = SCENARIO_PRESETS[ScenarioPresetId.StockListing]
-  const started = performance.now()
-  const result = recommend(
-    DEFAULT_LAUNCH_CONFIG,
-    GOAL_OBJECTIVES[LaunchGoal.FairPrice],
-    stock,
-    { includeCurves: true },
-  )
-  const ms = performance.now() - started
+  let result: ReturnType<typeof recommend> = null
+  let ms = 0
+  beforeAll(() => {
+    const started = performance.now()
+    result = recommend(
+      DEFAULT_LAUNCH_CONFIG,
+      GOAL_OBJECTIVES[LaunchGoal.FairPrice],
+      stock,
+      { includeCurves: true },
+    )
+    ms = performance.now() - started
+  })
 
   it('proposes a curve opening near the outside price that leaves arbitrage less than the stock preset', () => {
     const best = result?.proposals[0]?.candidate
     expect(best?.curve?.curveShape).toBe(CurveShape.MarketCap)
     if (best?.curve?.curveShape !== CurveShape.MarketCap) return
     expect(best.curve.initialMarketCap).toBeGreaterThanOrEqual(
-      stock.arbitrageurs.fairMarketCapSol * 0.75,
+      stock.arbitrageurs.fairMarketCapSol * 0.8,
     )
     expect(best.metrics.graduationRate).toBe(1)
     const preset = LAUNCH_PRESETS.find(

@@ -10,6 +10,9 @@ import { LaunchGoal } from '../features/recommendation'
 import { ConfigSource, DEFAULT_LAB_URL } from './constants'
 import { createLabServer, ToolName } from '.'
 
+/** A full curve search runs inside this test; slow CI runners need more than the default. */
+const SEARCH_TIMEOUT_MS = 30_000
+
 const client = new Client({ name: 'mcp-test', version: '0.0.0' })
 
 beforeAll(async () => {
@@ -153,35 +156,41 @@ describe('lab MCP server', () => {
     expect(both.isError).toBe(true)
   })
 
-  it('anchors curves to an outside price the agent states', async () => {
-    const outside = 600
-    const recommendation = await callFor(
-      z.object({
-        outsideMarketCapSol: z.number(),
-        proposals: z.array(
-          z.object({
-            curve: z
-              .object({
-                initialMarketCap: z.number(),
-                migrationMarketCap: z.number(),
-              })
-              .nullable(),
-          }),
-        ),
-      }),
-      ToolName.RecommendConfig,
-      {
-        goal: LaunchGoal.FairPrice,
-        situation: ScenarioPresetId.StockListing,
-        outsideMarketCapSol: outside,
-        includeCurves: true,
-      },
-    )
-    expect(recommendation.outsideMarketCapSol).toBe(outside)
-    const [best] = recommendation.proposals
-    expect(best?.curve?.initialMarketCap).toBeGreaterThan(outside / 2)
-    expect(best?.curve?.migrationMarketCap).toBeLessThanOrEqual(outside * 1.05)
-  })
+  it(
+    'anchors curves to an outside price the agent states',
+    async () => {
+      const outside = 600
+      const recommendation = await callFor(
+        z.object({
+          outsideMarketCapSol: z.number(),
+          proposals: z.array(
+            z.object({
+              curve: z
+                .object({
+                  initialMarketCap: z.number(),
+                  migrationMarketCap: z.number(),
+                })
+                .nullable(),
+            }),
+          ),
+        }),
+        ToolName.RecommendConfig,
+        {
+          goal: LaunchGoal.FairPrice,
+          situation: ScenarioPresetId.StockListing,
+          outsideMarketCapSol: outside,
+          includeCurves: true,
+        },
+      )
+      expect(recommendation.outsideMarketCapSol).toBe(outside)
+      const [best] = recommendation.proposals
+      expect(best?.curve?.initialMarketCap).toBeGreaterThan(outside / 2)
+      expect(best?.curve?.migrationMarketCap).toBeLessThanOrEqual(
+        outside * 1.05,
+      )
+    },
+    SEARCH_TIMEOUT_MS,
+  )
 
   it('refuses an outside price for a situation without arbitrage traders', async () => {
     const { isError } = await call(ToolName.CompareConfigs, {
