@@ -38,3 +38,7 @@ export interface RealLaunches {
 export type RealLaunchesResult =
   | { ok: true; launches: RealLaunches }
   | { ok: false; rejection: RealLaunchesRejection; detail?: string }
+
+/** The real launches on a config: being read, or what the read gave. */
+export type RealLaunchesState =
+  { loading: true } | { loading: false; result: RealLaunchesResult }

@@ -3,6 +3,7 @@ export type { DecodeResult, SharedConfig } from './types'
 export {
   decodeSharedConfig,
   encodeSharedConfig,
+  readSharedConfig,
   shareLink,
   sharedFromHash,
   toTypeScript,

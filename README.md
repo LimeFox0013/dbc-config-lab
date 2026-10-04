@@ -13,7 +13,7 @@ A DBC config sets the rules of a token launch: curve shape, fee schedule, gradua
 | **Price discovery for tokenized names** | A launch with an outside price — a newly tokenized stock, say — adds arbitrage traders who know it and trade the launch toward it, decided against the live price at each moment on the curve or the migrated pool. The comparison shows how far each config ends from that price and what the arbitrage traders made. |
 | **Priced in SOL or USDC** | Any config can be priced in USDC: amounts re-price at a stated rate (1 SOL = 150 USDC), deploys use the network's USDC mint, and on-chain configs are simulated in the token their quote mint says. Every config is checked against Meteora's migration-keeper minimums (10 SOL, 750 USDC): below them, pools would not graduate on their own. |
 | **Compare** | Built-in, recommended, edited, shared and on-chain configs side by side: sniper and patient-bot profit, human profit, fees paid, partner + creator fees (with the post-graduation share), and when the launch graduated — plus a chart of each config's price over the launch, graduation marked. Configs whose graduation-pool liquidity is not fully locked say how much can be pulled. |
-| **Recommend for a goal** | Seven goals — fair launch, punish bots, fee income, graduate fast, raise the most, stable price, keep early supply out of bots' hands — or your own weights. Each measure is scaled across the candidates before weighting, so no unit dominates; when a measure cannot tell candidates apart in the current situation, the tool says so. Optionally also searches curve shapes and graduation thresholds. Runs in a Web Worker; every figure is simulated. |
+| **Recommend for a goal** | Eight goals — fair launch, punish bots, fee income, graduate fast, raise the most, stable price, keep early supply out of bots' hands, price close to an outside price — or your own weights. Each measure is scaled across the candidates before weighting, so no unit dominates; when a measure cannot tell candidates apart in the current situation, the tool says so. Optionally also searches curve shapes and graduation thresholds — in a situation with arbitrage traders, curves placed relative to their outside price (opening at 75–95% of it, graduating at 95–102%). Runs in a Web Worker; every figure is simulated. |
 | **Edit any config** | Token, curve (standard, market cap, two segments, liquidity weights), quote token (SOL or USDC), fee schedule, volatility fee, fees taken in the quote token or in the launched token, graduation pool fee — with its volatility fee and a fee that falls linearly or exponentially as the price rises — migration fee, LP split, tokens locked for the creator and their unlock schedule — each change validated by the DBC program's own rules as you type. |
 | **Share and reuse** | A share link reopens the config (it travels in the URL fragment, never sent to a server). "Show code" gives ready-to-run TypeScript that calls the right SDK builder and `createConfig`. |
 | **Inspect a live config** | Paste a DBC config address — or the address of a token's bonding-curve pool — to load that launchpad's rules from chain and test them against the same traders, read-only. The lab also reads the pools already launched on it (up to 500, sampled evenly beyond that) and shows how they really went: share that completed the curve, reached 10% of it or never traded, median raised, curve fees per launch, time to complete — next to what the simulation predicts. |
@@ -27,6 +27,8 @@ A DBC config sets the rules of a token launch: curve shape, fee schedule, gradua
 | **Preset royalties** | Publish a preset with your wallet and a share (1–50%), by share link or in the community registry. Every launchpad deployed from it makes a Meteora Dynamic Fee Sharing vault its fee claimer, created in the same transaction, which splits each fee claim between the launchpad and you. Each side claims its own share from the earnings panel; nothing is held by this tool. Verified on devnet to the lamport. |
 | **Your launchpad, live** | Paste a fee wallet to watch every config it collects fees for — launches, graduations, its lifetime curve fees and what is still unclaimed, read from all of the config's pools — and what its graduated-pool positions have earned (claimed plus pending; up to 1,000 positions read, an even sample scaled up beyond that). Refreshes every minute while open; read-only. |
 | **Income forecast** | For any config in the comparison and a number of launches: the range real launchpads with the same terms earned, with how many launchpads and launches it rests on and when they were read, plus a separate range for fees after graduation where comparables could be measured. When fewer than three launchpads share every term, it sets aside the creator's share, then the fee shape, then the graduation threshold — never the quote token — and says which. What comparable launchpads earned — not a promise. |
+| **Config report** | `/config/<config or pool>?network=…` — a read-only page for anyone deciding whether to buy or launch on a config, no wallet: the risks its terms leave open (graduation liquidity that can be withdrawn and by whom, mint or metadata authority kept, no automatic graduation, terms Meteora's SDK no longer accepts for new configs), its terms, how the real launches on it went, and a simulated typical launch — each figure labelled read or simulated. Downloads as JSON; the agent tools return the same report. Over the 200 most-graduated mainnet launchpads it finds withdrawable liquidity on 199. |
+| **For AI agents (MCP)** | The lab as a Model Context Protocol server: an agent lists the presets, situations and goals, compares any configs (built-in, shared, edited or on chain), asks for a recommendation by goal or by its own criterion weights, reads an on-chain config with its real launches, searches the launchpad economics snapshot, and exports a config as a share link and SDK code. Same simulator, same validation as the UI; read-only — it never signs or sends a transaction, so deploying stays in your own wallet. |
 
 ## What the simulations show
 
@@ -50,7 +52,7 @@ Averages over 20 seeded scenarios. Profit counts tokens still held at what each 
 
 **Vesting is the other lever.** In a hype launch, a flat-fee config that vests 100M tokens to the creator (10M at a one-month cliff, the rest over a year) leaves buyers about where they are without vesting while the tokens stay locked (human profit −47.77 vs −47.60 SOL). If the creator sells them once unlocked, it falls to −229.82 SOL and the creator receives 183.91 SOL (20 seeds) — so vesting delays a dump; it does not prevent one.
 
-**Open a tokenized name near its outside price.** In the stock-listing situation (outside price 300 SOL market cap, 10 seeds), the four meme-style presets open near 20 SOL market cap and hand arbitrage traders 131–145 SOL — about twice what the curve raises — and never graduate. A market-cap curve from 250 to 300 SOL (the built-in "Stock listing (USDC)": 37,500 → 45,000 USDC) leaves them 11.8 SOL and graduates every time; one graduating well above the outside price never graduates, because arbitrage sales cap the price.
+**Open a tokenized name near its outside price.** In the stock-listing situation (outside price 300 SOL market cap, 10 seeds), the four meme-style presets open near 20 SOL market cap and hand arbitrage traders 131–145 SOL — about twice what the curve raises — and never graduate. A market-cap curve from 250 to 300 SOL (the built-in "Stock listing (USDC)": 37,500 → 45,000 USDC) leaves them 11.8 SOL and graduates every time; one graduating well above the outside price never graduates, because arbitrage sales cap the price. Opening closer does better still: 95% → 98% of the outside market cap (285 → 294 SOL) leaves them 3.9 SOL under a flat fee and graduates every time. Asked for "price close to an outside price" with curves on, the recommender lands there and adds a 50% → 1% fee over 30 s, which leaves arbitrage traders about break-even (−0.4 SOL) and still graduates every launch in about two minutes.
 
 **Compounding trades fee payouts for depth.** With the graduated pool compounding all its LP fees, a hype launch moves 2.36 SOL from partner + creator payouts into the pool's liquidity, and human buyers come out about 1.7 SOL better because they sell into a deeper pool (5 seeds).
 
@@ -96,6 +98,16 @@ npm run e2e          # browser tests (Playwright)
 npm run typecheck
 npm run build
 ```
+
+### Use it from an AI agent
+
+The MCP server runs locally over stdio. For Claude Code:
+
+```bash
+claude mcp add dbc-config-lab -- npx tsx apps/web/src/mcp/server.ts
+```
+
+Any other MCP client takes the same command (`npx tsx apps/web/src/mcp/server.ts`, run from the repo root). Set `DBC_LAB_URL` to the lab's site so share links open there (default `http://localhost:5180/`). Tools: `list_options`, `compare_configs`, `recommend_config`, `load_onchain_config`, `export_config`, `find_launchpads`.
 
 ### Replay a real pool
 
@@ -151,9 +163,11 @@ apps/web/
   src/core/config-clone       a real config's parameters, adjusted and checked, for a new owner
   src/core/partner-branding   a launchpad's on-chain name, website and logo
   src/core/preset-royalty     an author's share of a launchpad's fees, through a Meteora fee-sharing vault
+  src/features/config-report  a config's open risks, terms, real and simulated launches, as one report
   src/features/…              comparison, editor, recommendation (Web Worker), sharing, wallet, on-chain lookup,
                               launchpad economics and income forecast, launch page
   src/views, src/components   the single-page UI
+  src/mcp                     the lab's tools for AI agents, as an MCP server over stdio
   scripts/mainnet-replay-verify.ts  replays a real pool's swap history and compares it swap by swap
   scripts/devnet-verify.ts    live check against devnet
   scripts/devnet-clone-verify.ts        clones mainnet configs on devnet and compares them byte for byte

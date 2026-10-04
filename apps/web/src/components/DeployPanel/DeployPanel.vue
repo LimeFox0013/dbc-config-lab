@@ -277,19 +277,7 @@ watch(step, (current) => {
 }
 
 .deploy-panel__summary {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-1) var(--space-4);
-  margin: 0;
-  font-size: var(--font-size-2);
-
-  dt {
-    color: var(--color-muted-foreground);
-  }
-
-  dd {
-    margin: 0;
-  }
+  @include mixins.term-list;
 }
 
 .deploy-panel__value {

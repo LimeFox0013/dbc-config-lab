@@ -1,7 +1,7 @@
 import { compileLaunchConfig } from '../../core/launch-config'
 import type { LaunchConfig } from '../../core/launch-config'
 import { QUOTE_TOKENS } from '../../core/quote-token'
-import { SolanaNetwork } from '../../core/shared'
+import { isRecord, SolanaNetwork } from '../../core/shared'
 import {
   ADDRESS_MAX_LENGTH,
   BUILDER_BY_SHAPE,
@@ -70,11 +70,22 @@ export const decodeSharedConfig = (encoded: string): DecodeResult => {
     return { ok: false, rejection: ShareRejection.NotJson }
   }
 
+  if (isRecord(parsed) && parsed['v'] !== SHARE_VERSION)
+    return { ok: false, rejection: ShareRejection.WrongVersion }
+  return readSharedConfig(parsed, 'link')
+}
+
+/**
+ * Rebuilds an untrusted, already-parsed shared config field by field (unknown fields
+ * dropped), then applies the DBC program's own validation. `path` prefixes field paths.
+ */
+export const readSharedConfig = (
+  value: unknown,
+  path: string,
+): DecodeResult => {
   let shared: SharedConfig
   try {
-    const fields = record(parsed, 'link')
-    if (fields['v'] !== SHARE_VERSION)
-      return { ok: false, rejection: ShareRejection.WrongVersion }
+    const fields = record(value, path)
     const config = readLaunchConfig(fields['config'], 'config')
     const name =
       fields['name'] === undefined

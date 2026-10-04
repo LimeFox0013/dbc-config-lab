@@ -7,6 +7,7 @@
     "@meteora-ag/cp-amm-sdk": "^1.5.1",
     "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.13",
     "@meteora-ag/dynamic-fee-sharing-sdk": "^1.1.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@solana/wallet-standard-features": "^1.5.0",
     "@solana/web3.js": "^1.98.4",
     "@wallet-standard/app": "^1.1.1",
@@ -17,7 +18,8 @@
     "buffer": "^6.0.3",
     "vue": "^3.5.41",
     "vue-i18n": "^11.4.8",
-    "vue-router": "^5.2.0"
+    "vue-router": "^5.2.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@coral-xyz/anchor": "^0.31.1",

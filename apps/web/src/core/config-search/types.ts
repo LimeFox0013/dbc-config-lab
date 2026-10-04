@@ -32,6 +32,8 @@ export interface MeanMetrics {
   maxDrawdownPercent: number
   /** Mean over seeds with early buys; null when no seed had any. */
   botShareOfEarlyBuys: number | null
+  /** What traders who know an outside price made; 0 in a situation without them. */
+  arbitrageProfit: number
 }
 
 export interface CriterionDefinition {

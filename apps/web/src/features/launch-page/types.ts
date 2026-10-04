@@ -4,8 +4,8 @@ import type { LoadRejection } from '../onchain-config'
 import type { LaunchPageStatus } from './constants'
 
 import type { RoyaltySplit } from '../../core/preset-royalty'
-export type LaunchPageState =
-  | { status: LaunchPageStatus.Loading }
+/** A finished read of a launch page's config: refused, or ready to show. */
+export type LaunchPageRead =
   | {
       status: LaunchPageStatus.Refused
       rejection: LoadRejection
@@ -19,3 +19,6 @@ export type LaunchPageState =
       /** When a royalty vault claims the fees: who it pays, and how much. */
       royalty: RoyaltySplit | null
     }
+
+export type LaunchPageState =
+  { status: LaunchPageStatus.Loading } | LaunchPageRead

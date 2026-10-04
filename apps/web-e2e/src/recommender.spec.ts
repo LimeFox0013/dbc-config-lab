@@ -104,4 +104,27 @@ test.describe('recommender', () => {
     await expect(first).toContainText(/curve/, { timeout: 15_000 })
     await expect(first).toContainText(/graduates in \d+% of launches/)
   })
+
+  test('anchors curves to the outside price in a tokenized stock listing', async ({
+    page,
+  }) => {
+    await page
+      .getByRole('combobox', { name: 'Launch situation' })
+      .selectOption('stock-listing')
+    await page
+      .getByRole('button', {
+        name: 'Price close to an outside price (tokenized names)',
+      })
+      .click()
+    await page
+      .getByRole('checkbox', { name: /Also try other curve shapes/ })
+      .check()
+    await expect(page.getByText(/opening at 75–95% of it/)).toBeVisible()
+    await page.getByRole('button', { name: 'Find best configs' }).click()
+    const best = page.locator('.recommender-panel__proposal').first()
+    await expect(best).toContainText('market-cap curve 285 → 294 SOL', {
+      timeout: 15_000,
+    })
+    await expect(best).toContainText('arbitrage traders made')
+  })
 })

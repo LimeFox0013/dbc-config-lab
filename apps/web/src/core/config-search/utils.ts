@@ -1,7 +1,12 @@
-import { FLAT_FEE_BPS, FLAT_SCHEDULE } from '../launch-config'
-import type { ScenarioMetrics } from '../sniper-scenario'
+import { CurveShape, FLAT_FEE_BPS, FLAT_SCHEDULE } from '../launch-config'
+import type { CurveSpec } from '../launch-config'
+import type { ScenarioMetrics, ScenarioSpec } from '../sniper-scenario'
 import {
+  ANCHOR_DECIMALS,
+  ANCHOR_GRADUATION_FRACTIONS,
+  ANCHOR_OPEN_FRACTIONS,
   Criterion,
+  DEFAULT_CURVE_VARIANTS,
   GRADUATION_SPEED_SCALE_SECONDS,
   RELATIVE_SPREAD_TOLERANCE,
 } from './constants'
@@ -50,6 +55,7 @@ export const meanMetrics = (runs: ScenarioMetrics[]): MeanMetrics => ({
   raised: mean(runs.map((r) => r.raised)),
   maxDrawdownPercent: mean(runs.map((r) => r.maxDrawdownPercent)),
   botShareOfEarlyBuys: meanOfPresent(runs.map((r) => r.botShareOfEarlyBuys)),
+  arbitrageProfit: mean(runs.map((r) => r.arbitrageProfit)),
 })
 
 /** Profit of every bot, fast or fee-waiting — deterring one kind while the other wins is no win. */
@@ -83,6 +89,12 @@ export const CRITERIA: Record<Criterion, CriterionDefinition> = {
     value: (m) => m.botShareOfEarlyBuys,
     higherIsBetter: false,
   },
+  // What arbitrage takes from the launch; beyond zero the goal is met, and taxing the
+  // traders who keep the price honest is not a better launch.
+  [Criterion.FairPrice]: {
+    value: (m) => Math.max(0, m.arbitrageProfit),
+    higherIsBetter: false,
+  },
 }
 
 const CRITERION_KEYS = Object.values(Criterion)
@@ -96,6 +108,7 @@ export const objectiveOf = (weights: Partial<Objective>): Objective => ({
   [Criterion.Raise]: weights[Criterion.Raise] ?? 0,
   [Criterion.PriceStability]: weights[Criterion.PriceStability] ?? 0,
   [Criterion.EarlyFairness]: weights[Criterion.EarlyFairness] ?? 0,
+  [Criterion.FairPrice]: weights[Criterion.FairPrice] ?? 0,
 })
 
 /** Weights are clamped to [0, 1]; a non-number becomes 0. */
@@ -109,6 +122,7 @@ export const sanitizeObjective = (objective: Objective): Objective => {
     [Criterion.Raise]: weight(Criterion.Raise),
     [Criterion.PriceStability]: weight(Criterion.PriceStability),
     [Criterion.EarlyFairness]: weight(Criterion.EarlyFairness),
+    [Criterion.FairPrice]: weight(Criterion.FairPrice),
   }
 }
 
@@ -162,3 +176,29 @@ export const scoreCandidates = (
     indistinguishable: undecided.length === scaled.length,
   }
 }
+
+const anchorScale = 10 ** ANCHOR_DECIMALS
+const anchored = (fairMarketCapSol: number, fraction: number): number =>
+  Math.round(fairMarketCapSol * fraction * anchorScale) / anchorScale
+
+/** Market-cap curves opening below an outside market cap and graduating near it, in SOL. */
+export const anchoredCurves = (fairMarketCapSol: number): CurveSpec[] =>
+  ANCHOR_OPEN_FRACTIONS.flatMap((open) =>
+    ANCHOR_GRADUATION_FRACTIONS.filter((graduate) => graduate > open).map(
+      (graduate) => ({
+        curveShape: CurveShape.MarketCap,
+        initialMarketCap: anchored(fairMarketCapSol, open),
+        migrationMarketCap: anchored(fairMarketCapSol, graduate),
+      }),
+    ),
+  )
+
+/**
+ * The curves a widened search tries in a launch situation, in SOL. With traders who know
+ * an outside price, curves placed relative to that price replace the general variants,
+ * which all open far below it.
+ */
+export const curveVariantsFor = (scenario: ScenarioSpec): CurveSpec[] =>
+  scenario.arbitrageurs.count > 0
+    ? anchoredCurves(scenario.arbitrageurs.fairMarketCapSol)
+    : DEFAULT_CURVE_VARIANTS

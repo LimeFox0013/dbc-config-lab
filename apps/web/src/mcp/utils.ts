@@ -1,0 +1,190 @@
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import { connectionFor } from '../core/config-deploy'
+import {
+  compileLaunchConfig,
+  LAUNCH_PRESETS,
+  UserPresetId,
+} from '../core/launch-config'
+import { pullableLiquidityPercent } from '../core/migrated-pool'
+import type { ComparisonEntry, ComparisonRow } from '../features/comparison'
+import { EntryIdPrefix, parametersEntry } from '../features/comparison'
+import {
+  decodeSharedConfig,
+  readSharedConfig,
+  sharedFromHash,
+} from '../features/config-sharing'
+import type { DecodeResult, SharedConfig } from '../features/config-sharing'
+import { graduationRate } from '../features/launchpad-economics'
+import type { LaunchpadRecord } from '../features/launchpad-economics'
+import { loadOnChainConfig } from '../features/onchain-config'
+import type { OnChainConfig } from '../features/onchain-config'
+import en from '../locales/en.json'
+import { ConfigSource, DECIMALS_KEPT, MCP_TEXT } from './constants'
+import type { AnyConfigRef, DesignConfigRef } from './schemas'
+
+type Refused = { ok: false; reason: string }
+
+export type ResolvedDesign =
+  | {
+      ok: true
+      label: Pick<ComparisonEntry, 'id' | 'name' | 'intent'>
+      shared: SharedConfig
+    }
+  | Refused
+
+export type ResolvedEntry = { ok: true; entry: ComparisonEntry } | Refused
+
+const reasonOf = (refusal: { rejection: string; detail?: string }): string =>
+  refusal.detail ? `${refusal.rejection}: ${refusal.detail}` : refusal.rejection
+
+/** The encoded config in a share link, or the input itself when it is not a link. */
+const encodedFromLink = (link: string): string => {
+  try {
+    return sharedFromHash(new URL(link).hash) ?? link
+  } catch {
+    return link
+  }
+}
+
+const fromDecoded = (
+  result: DecodeResult,
+  label: Pick<ComparisonEntry, 'id' | 'intent'>,
+): ResolvedDesign =>
+  result.ok
+    ? {
+        ok: true,
+        label: { ...label, name: result.shared.name ?? MCP_TEXT.unnamedConfig },
+        shared: result.shared,
+      }
+    : { ok: false, reason: reasonOf(result) }
+
+/** A config the lab can design with, validated the way a shared link is. */
+export const resolveDesign = (ref: DesignConfigRef): ResolvedDesign => {
+  switch (ref.source) {
+    case ConfigSource.Preset: {
+      const preset = LAUNCH_PRESETS.find((candidate) => candidate.id === ref.id)
+      return preset
+        ? {
+            ok: true,
+            label: { id: preset.id, name: preset.name, intent: preset.intent },
+            shared: {
+              config: preset.config,
+              name: preset.name,
+              ...(preset.royalty ? { royalty: preset.royalty } : {}),
+            },
+          }
+        : { ok: false, reason: MCP_TEXT.unknownPreset }
+    }
+    case ConfigSource.Shared:
+      return fromDecoded(decodeSharedConfig(encodedFromLink(ref.link)), {
+        id: UserPresetId.Shared,
+        intent: en.views.compare.sharedIntent,
+      })
+    case ConfigSource.Config:
+      return fromDecoded(
+        readSharedConfig({ config: ref.config, name: ref.name }, 'input'),
+        { id: UserPresetId.Custom, intent: MCP_TEXT.customIntent },
+      )
+  }
+}
+
+const onChainEntry = (loaded: OnChainConfig): ComparisonEntry =>
+  parametersEntry(
+    {
+      id: `${EntryIdPrefix.OnChain}:${loaded.network}:${loaded.configAddress}`,
+      name: loaded.configAddress,
+      intent: en.views.compare.onChainIntent,
+    },
+    loaded.parameters,
+    loaded.quoteToken,
+  )
+
+/** Any config a tool can simulate, including one read from chain. */
+export const resolveEntry = async (
+  ref: AnyConfigRef,
+): Promise<ResolvedEntry> => {
+  if (ref.source !== ConfigSource.OnChain) {
+    const design = resolveDesign(ref)
+    return design.ok
+      ? {
+          ok: true,
+          entry: {
+            ...design.label,
+            compiled: compileLaunchConfig(design.shared.config),
+          },
+        }
+      : design
+  }
+  const result = await loadOnChainConfig(
+    connectionFor(ref.network),
+    ref.network,
+    ref.address,
+  )
+  return result.ok
+    ? { ok: true, entry: onChainEntry(result.loaded) }
+    : { ok: false, reason: reasonOf(result) }
+}
+
+/** One comparison row as an agent reads it: metrics, price summary and pullable liquidity. */
+export const rowSummary = (row: ComparisonRow) => {
+  const { id, name, intent, compiled } = row.entry
+  if (!row.ok) return { id, name, intent, ok: false, reason: row.reason }
+  const multiples = row.path.map((point) => point.multiple)
+  return {
+    id,
+    name,
+    intent,
+    ok: true,
+    metrics: row.metrics,
+    price: {
+      peakMultiple: Math.max(...multiples),
+      finalMultiple: multiples.at(-1) ?? null,
+    },
+    pullableLiquidityPercent: compiled.ok
+      ? pullableLiquidityPercent(compiled.parameters)
+      : null,
+  }
+}
+
+export const launchpadSummary = (record: LaunchpadRecord) => ({
+  configAddress: record.config.configAddress,
+  feeClaimer: record.config.feeClaimer,
+  archetype: record.archetype,
+  launches: record.launches,
+  graduated: record.graduated,
+  graduationRate: graduationRate(record),
+  sampledPools: record.sampledPools,
+  neverTradedShare: record.neverTradedShare,
+  medianSecondsToComplete: record.medianSecondsToComplete,
+  partnerIncomePerLaunch: {
+    median: record.partnerIncomeMedian,
+    p75: record.partnerIncomeP75,
+  },
+  afterGraduation: record.afterGraduation,
+  pullableLiquidityPercent: pullableLiquidityPercent(record.config.parameters),
+  takenAt: record.takenAt,
+})
+
+const scale = 10 ** DECIMALS_KEPT
+
+/** Tool output as JSON text, numbers cut to the precision the simulation supports. */
+export const toolResult = (value: unknown): CallToolResult => ({
+  content: [
+    {
+      type: 'text',
+      text: JSON.stringify(
+        value,
+        (_key, field: unknown) =>
+          typeof field === 'number' && !Number.isInteger(field)
+            ? Math.round(field * scale) / scale
+            : field,
+        2,
+      ),
+    },
+  ],
+})
+
+export const toolRefusal = (reason: string): CallToolResult => ({
+  isError: true,
+  content: [{ type: 'text', text: reason }],
+})

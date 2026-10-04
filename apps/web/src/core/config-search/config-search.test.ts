@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { BaseFeeMode } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import {
   compileLaunchConfig,
+  CurveShape,
   DEFAULT_LAUNCH_CONFIG,
   FLAT_SCHEDULE,
+  withCurve,
   withQuoteToken,
 } from '../launch-config'
 import {
@@ -14,7 +16,9 @@ import {
 import type { ScenarioSpec } from '../sniper-scenario'
 import { QuoteToken } from '../quote-token'
 import {
+  anchoredCurves,
   Criterion,
+  curveVariantsFor,
   DEFAULT_CURVE_VARIANTS,
   objectiveOf,
   sanitizeObjective,
@@ -57,6 +61,7 @@ const metrics = (overrides: Partial<MeanMetrics>): MeanMetrics => ({
   raised: 0,
   maxDrawdownPercent: 0,
   botShareOfEarlyBuys: null,
+  arbitrageProfit: 0,
   ...overrides,
 })
 
@@ -197,5 +202,52 @@ describe('curve search on a config priced in USDC', () => {
     result.candidates.forEach((c) =>
       expect(c.config.quoteToken).toBe(QuoteToken.Usdc),
     )
+  })
+})
+
+describe('price-anchored curves', () => {
+  it('open below the outside market cap and graduate above where they open', () => {
+    const curves = anchoredCurves(300)
+    expect(curves.length).toBeGreaterThan(0)
+    curves.forEach((curve) => {
+      expect(curve.curveShape).toBe(CurveShape.MarketCap)
+      if (curve.curveShape !== CurveShape.MarketCap) return
+      expect(curve.initialMarketCap).toBeLessThan(300)
+      expect(curve.migrationMarketCap).toBeGreaterThan(curve.initialMarketCap)
+    })
+  })
+
+  it('replace the general variants only when traders know an outside price', () => {
+    const stock = SCENARIO_PRESETS[ScenarioPresetId.StockListing]
+    expect(curveVariantsFor(stock)).toEqual(
+      anchoredCurves(stock.arbitrageurs.fairMarketCapSol),
+    )
+    expect(curveVariantsFor(DEFAULT_SCENARIO)).toBe(DEFAULT_CURVE_VARIANTS)
+  })
+
+  it('every one compiles', () => {
+    anchoredCurves(300).forEach((curve) =>
+      expect(
+        compileLaunchConfig(withCurve(DEFAULT_LAUNCH_CONFIG, curve)).ok,
+      ).toBe(true),
+    )
+  })
+})
+
+describe('fair-price criterion', () => {
+  it('ranks the candidate arbitrage traders take least from first', () => {
+    const { scores } = scoreCandidates(
+      [metrics({ arbitrageProfit: 12 }), metrics({ arbitrageProfit: 4 })],
+      objectiveOf({ [Criterion.FairPrice]: 1 }),
+    )
+    expect(scores[1]).toBeGreaterThan(scores[0] ?? 0)
+  })
+
+  it('cannot rank in a situation without arbitrage traders', () => {
+    const { undecided } = scoreCandidates(
+      [metrics({}), metrics({ humanProfit: 1 })],
+      objectiveOf({ [Criterion.FairPrice]: 1 }),
+    )
+    expect(undecided).toEqual([Criterion.FairPrice])
   })
 })

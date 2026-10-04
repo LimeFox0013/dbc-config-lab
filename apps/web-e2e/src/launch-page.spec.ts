@@ -49,14 +49,14 @@ test.describe('launch page', () => {
     )
     // A self-published name: marked unverified, its link shown as the host it opens,
     // and the fee wallet and config in full.
-    await expect(page.locator('.launch-view__header')).toContainText(
+    await expect(page.locator('.launchpad-identity')).toContainText(
       'not verified by this site',
     )
     await expect(
       page.getByRole('link', { name: 'fair.example', exact: true }),
     ).toHaveAttribute('href', 'https://fair.example')
-    await expect(page.locator('.launch-view__header')).toContainText(FEE_WALLET)
-    await expect(page.locator('.launch-view__header')).toContainText(
+    await expect(page.locator('.launchpad-identity')).toContainText(FEE_WALLET)
+    await expect(page.locator('.launchpad-identity')).toContainText(
       CONFIG_ADDRESS,
     )
     await expect(page.locator('.launch-view__section').first()).toContainText(

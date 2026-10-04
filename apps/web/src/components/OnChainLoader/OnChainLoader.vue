@@ -50,72 +50,37 @@
       role="status"
     >
       {{ status }}
+      <RouterLink
+        v-if="loadedConfig"
+        :to="reportPagePath(loadedConfig.configAddress, loadedConfig.network)"
+        class="on-chain-loader__report-link"
+      >
+        {{ t('components.onChainLoader.reportLink') }}
+      </RouterLink>
     </p>
-    <div
+    <RealLaunchesSummary
       v-if="real"
-      class="on-chain-loader__real"
-      aria-live="polite"
+      :state="real"
     >
-      <h3 class="on-chain-loader__real-title">
-        {{ t('components.onChainLoader.real.title') }}
-      </h3>
-      <p
-        v-if="real.loading"
-        class="on-chain-loader__hint"
-      >
-        {{ t('components.onChainLoader.real.loading') }}
+      <p class="on-chain-loader__hint">
+        {{ t('components.onChainLoader.realCompare') }}
       </p>
-      <p
-        v-else-if="!real.result.ok"
-        class="on-chain-loader__hint"
-      >
-        {{ t(`components.onChainLoader.real.rejections.${real.result.rejection}`, { detail: real.result.detail ?? '' }) }}
-      </p>
-      <template v-else>
-        <p class="on-chain-loader__hint">
-          {{
-            real.result.launches.sampledPools < real.result.launches.totalPools ?
-              t('components.onChainLoader.real.sampled', { sampled: real.result.launches.sampledPools, total: real.result.launches.totalPools }) :
-              t('components.onChainLoader.real.all', { total: real.result.launches.totalPools })
-          }}
-        </p>
-        <dl class="on-chain-loader__figures">
-          <dt>{{ t('components.onChainLoader.real.completed') }}</dt>
-          <dd>{{ formatShare(real.result.launches.completedShare) }}</dd>
-          <dt>{{ t('components.onChainLoader.real.traction') }}</dt>
-          <dd>{{ formatShare(real.result.launches.tractionShare) }}</dd>
-          <dt>{{ t('components.onChainLoader.real.neverTraded') }}</dt>
-          <dd>{{ formatShare(real.result.launches.neverTradedShare) }}</dd>
-          <dt>{{ t('components.onChainLoader.real.raised') }}</dt>
-          <dd>{{ t('components.onChainLoader.real.solValue', { sol: formatSol(real.result.launches.medianRaised) }) }}</dd>
-          <dt>{{ t('components.onChainLoader.real.fees') }}</dt>
-          <dd>{{ t('components.onChainLoader.real.solValue', { sol: formatSol(real.result.launches.meanCurveFees) }) }}</dd>
-          <dt>{{ t('components.onChainLoader.real.time') }}</dt>
-          <dd>
-            {{
-              real.result.launches.medianSecondsToComplete === null ?
-                t('components.onChainLoader.real.timeUnknown') :
-                t('components.onChainLoader.real.seconds', { seconds: Math.round(real.result.launches.medianSecondsToComplete) })
-            }}
-          </dd>
-        </dl>
-        <p class="on-chain-loader__hint">
-          {{ t('components.onChainLoader.real.compare') }}
-        </p>
-      </template>
-    </div>
+    </RealLaunchesSummary>
   </section>
 </template>
 
 <script setup lang="ts">
-import type { RealLaunchesState } from './types'
-import { formatShare, formatSol, SolanaNetwork } from '../../core/shared'
+import { SolanaNetwork } from '../../core/shared'
 import { ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { connectionFor } from '../../core/config-deploy'
+import { reportPagePath } from '../../features/launch-page'
 import { loadOnChainConfig, MAX_ADDRESS_LENGTH } from '../../features/onchain-config'
 import type { OnChainConfig } from '../../features/onchain-config'
 import { fetchRealLaunches } from '../../features/real-launches'
+import type { RealLaunchesState } from '../../features/real-launches'
+import { RealLaunchesSummary } from '../RealLaunchesSummary'
 
 const emit = defineEmits<{ load: [loaded: OnChainConfig] }>()
 const { t } = useI18n()
@@ -127,6 +92,8 @@ const status = ref<string | null>(null)
 const failed = ref(false)
 /** How the real launches on the last loaded config went; read after the config loads. */
 const real = ref<RealLaunchesState | null>(null)
+/** The last config loaded, for its report link. */
+const loadedConfig = ref<OnChainConfig | null>(null)
 /** Bumped on every load, so a slower read for an earlier config never shows. */
 let lookup = 0
 
@@ -135,6 +102,7 @@ const load = async (): Promise<void> => {
   loading.value = true
   status.value = null
   real.value = null
+  loadedConfig.value = null
   const result = await loadOnChainConfig(connectionFor(network.value), network.value, address.value)
   loading.value = false
   failed.value = !result.ok
@@ -144,6 +112,7 @@ const load = async (): Promise<void> => {
   }
   status.value = t('components.onChainLoader.loaded')
   emit('load', result.loaded)
+  loadedConfig.value = result.loaded
   real.value = { loading: true }
   const { configAddress, parameters, quoteToken } = result.loaded
   const launches = await fetchRealLaunches(connectionFor(result.loaded.network), configAddress, parameters, quoteToken)
@@ -153,34 +122,6 @@ const load = async (): Promise<void> => {
 
 <style lang="scss">
 @use '../../styles/mixins';
-
-.on-chain-loader__real {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.on-chain-loader__real-title {
-  margin: 0;
-  font-size: var(--font-size-2);
-}
-
-.on-chain-loader__figures {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-1) var(--space-4);
-  margin: 0;
-  font-size: var(--font-size-2);
-
-  dt {
-    color: var(--color-muted-foreground);
-  }
-
-  dd {
-    margin: 0;
-    font-family: var(--font-family-mono);
-  }
-}
 
 .on-chain-loader {
   display: flex;
@@ -200,6 +141,11 @@ const load = async (): Promise<void> => {
   margin: 0;
   font-size: var(--font-size-2);
   color: var(--color-muted-foreground);
+}
+
+.on-chain-loader__report-link {
+  margin-left: var(--space-2);
+  color: var(--color-gain);
 }
 
 .on-chain-loader__status--problem {

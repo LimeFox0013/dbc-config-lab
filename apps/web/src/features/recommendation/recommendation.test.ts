@@ -2,9 +2,12 @@ import { Criterion } from '../../core/config-search'
 import { describe, expect, it } from 'vitest'
 import {
   compileLaunchConfig,
+  CurveShape,
   DEFAULT_LAUNCH_CONFIG,
   LAUNCH_PRESETS,
+  LaunchPresetId,
 } from '../../core/launch-config'
+import { DEFAULT_SEARCH_SEEDS, searchConfigs } from '../../core/config-search'
 import {
   DEFAULT_SCENARIO,
   SCENARIO_PRESETS,
@@ -169,6 +172,48 @@ describe('curve search', () => {
     )
     const ms = performance.now() - started
     console.log(`CURVE_SEARCH_MS ${Math.round(ms)}`)
+    expect(ms).toBeLessThan(5000)
+  })
+})
+
+describe('price-anchored search (tokenized stock listing)', () => {
+  const stock = SCENARIO_PRESETS[ScenarioPresetId.StockListing]
+  const started = performance.now()
+  const result = recommend(
+    DEFAULT_LAUNCH_CONFIG,
+    GOAL_OBJECTIVES[LaunchGoal.FairPrice],
+    stock,
+    { includeCurves: true },
+  )
+  const ms = performance.now() - started
+
+  it('proposes a curve opening near the outside price that leaves arbitrage less than the stock preset', () => {
+    const best = result?.proposals[0]?.candidate
+    expect(best?.curve?.curveShape).toBe(CurveShape.MarketCap)
+    if (best?.curve?.curveShape !== CurveShape.MarketCap) return
+    expect(best.curve.initialMarketCap).toBeGreaterThanOrEqual(
+      stock.arbitrageurs.fairMarketCapSol * 0.75,
+    )
+    expect(best.metrics.graduationRate).toBe(1)
+    const preset = LAUNCH_PRESETS.find(
+      (p) => p.id === LaunchPresetId.StockListing,
+    )
+    if (!preset) throw new Error('No stock-listing preset')
+    const presetRun = searchConfigs({
+      base: preset.config,
+      objective: GOAL_OBJECTIVES[LaunchGoal.FairPrice],
+      scenario: stock,
+      seeds: DEFAULT_SEARCH_SEEDS,
+      space: { modes: [], startingFeeBps: [], windowSeconds: [] },
+      curves: [],
+    }).candidates[0]
+    expect(best.metrics.arbitrageProfit).toBeLessThan(
+      presetRun?.metrics.arbitrageProfit ?? 0,
+    )
+  })
+
+  it('stays fast enough for the browser', () => {
+    console.log(`ANCHORED_SEARCH_MS ${Math.round(ms)}`)
     expect(ms).toBeLessThan(5000)
   })
 })

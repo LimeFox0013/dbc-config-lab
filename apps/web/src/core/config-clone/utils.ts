@@ -55,6 +55,11 @@ export const cloneRefusal = (parameters: ConfigParameters): string | null => {
   return retiredTermsError(parameters) ?? migratedUnsupportedReason(parameters)
 }
 
+/** Why the program would refuse these exact terms in a new config today, or null when it would accept them. */
+export const currentRulesRefusal = (
+  parameters: ConfigParameters,
+): string | null => retiredTermsError(parameters) ?? validationError(parameters)
+
 /** One fee period per slot or per second, so the window is exact in the config's own units. */
 const windowPoints = (parameters: ConfigParameters, seconds: number): number =>
   parameters.activationType === ActivationType.Slot

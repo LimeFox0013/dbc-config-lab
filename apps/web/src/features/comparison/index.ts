@@ -7,6 +7,7 @@ export type {
 } from './types'
 export {
   compareConfigs,
+  compareRow,
   parametersEntry,
   presetEntry,
   pricePath,

@@ -59,7 +59,17 @@ export enum Criterion {
   Raise = 'raise',
   PriceStability = 'price-stability',
   EarlyFairness = 'early-fairness',
+  FairPrice = 'fair-price',
 }
+
+/**
+ * Where price-anchored curves open and graduate, as fractions of the outside market cap.
+ * Graduating much above it never happens: arbitrage traders sell the price back down.
+ */
+export const ANCHOR_OPEN_FRACTIONS = [0.75, 0.85, 0.9, 0.95]
+export const ANCHOR_GRADUATION_FRACTIONS = [0.95, 0.98, 1, 1.02]
+/** Anchored market caps are rounded to this many decimals, so proposals read cleanly. */
+export const ANCHOR_DECIMALS = 2
 
 /** Graduation scores rate × 1 / (1 + seconds / this), so faster graduation scores higher. */
 export const GRADUATION_SPEED_SCALE_SECONDS = 600

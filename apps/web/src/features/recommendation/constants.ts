@@ -9,6 +9,7 @@ export enum LaunchGoal {
   MaxRaise = 'max-raise',
   StablePrice = 'stable-price',
   EarlyFairness = 'early-fairness',
+  FairPrice = 'fair-price',
 }
 
 /** Each goal weighs the criteria it is about; every goal keeps some weight on human buyers. */
@@ -39,6 +40,11 @@ export const GOAL_OBJECTIVES: Record<LaunchGoal, Objective> = {
   [LaunchGoal.StablePrice]: objectiveOf({
     [Criterion.PriceStability]: 1,
     [Criterion.HumanOutcome]: 0.3,
+  }),
+  [LaunchGoal.FairPrice]: objectiveOf({
+    [Criterion.FairPrice]: 1,
+    [Criterion.Graduation]: 0.5,
+    [Criterion.HumanOutcome]: 0.2,
   }),
   [LaunchGoal.EarlyFairness]: objectiveOf({
     [Criterion.EarlyFairness]: 1,

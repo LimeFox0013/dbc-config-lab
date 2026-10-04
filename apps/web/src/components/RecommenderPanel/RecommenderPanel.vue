@@ -53,6 +53,20 @@
       />
       {{ t('components.recommenderPanel.includeCurves') }}
     </label>
+    <p
+      v-if="includeCurves && scenario.arbitrageurs.count > 0"
+      class="recommender-panel__hint"
+    >
+      {{
+        t('components.recommenderPanel.anchoredCurves', {
+          marketCap: formatAmount(scenario.arbitrageurs.fairMarketCapSol),
+          openFrom: percentOf(ANCHOR_OPEN_FRACTIONS[0]),
+          openTo: percentOf(ANCHOR_OPEN_FRACTIONS.at(-1)),
+          graduateFrom: percentOf(ANCHOR_GRADUATION_FRACTIONS[0]),
+          graduateTo: percentOf(ANCHOR_GRADUATION_FRACTIONS.at(-1)),
+        })
+      }}
+    </p>
 
     <button
       type="button"
@@ -147,10 +161,10 @@
 
 <script setup lang="ts">
 import { useFeeScheduleText } from '../../features/fee-text'
-import { errorMessage, formatShare, formatSol, formatSolChange } from '../../core/shared'
+import { errorMessage, formatAmount, formatShare, formatSol, formatSolChange, PERCENT } from '../../core/shared'
 import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { botProfit, Criterion, DEFAULT_SEARCH_SEEDS } from '../../core/config-search'
+import { ANCHOR_GRADUATION_FRACTIONS, ANCHOR_OPEN_FRACTIONS, botProfit, Criterion, DEFAULT_SEARCH_SEEDS } from '../../core/config-search'
 import type { MeanMetrics, Objective } from '../../core/config-search'
 import type { CurveSpec, FeeSchedule } from '../../core/launch-config'
 import { CurveShape, DEFAULT_LAUNCH_CONFIG, LAUNCH_PRESETS, UserPresetId, weightGrowthOf } from '../../core/launch-config'
@@ -244,7 +258,13 @@ const measuresLabel = (metrics: MeanMetrics): string =>
     metrics.botShareOfEarlyBuys === null ?
         t('components.recommenderPanel.measures.noEarlyBuys') :
         t('components.recommenderPanel.measures.botShare', { share: formatShare(metrics.botShareOfEarlyBuys) }),
+    ...(props.scenario.arbitrageurs.count > 0 ?
+        [t('components.recommenderPanel.measures.arbitrage', { sol: formatSolChange(metrics.arbitrageProfit) })] :
+        []),
   ].join(' · ')
+
+/** A fraction as a whole percent; absent reads as nothing. */
+const percentOf = (fraction: number | undefined): string => (fraction === undefined ? '' : String(Math.round(fraction * PERCENT)))
 
 /** The curve in plain words. */
 const curveLabel = (curve: CurveSpec, quote: QuoteToken): string => {

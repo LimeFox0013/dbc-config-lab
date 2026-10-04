@@ -137,20 +137,40 @@
     "launch": {
       "loading": "Reading this launchpad from chain…",
       "refusedTitle": "This launchpad cannot be shown",
-      "unbranded": "Launchpad {address}",
-      "noBranding": "Its operator has not published a name for it.",
       "termsTitle": "What launching here means",
       "fee": "Trading fee",
       "typicalTitle": "How a typical launch plays out",
       "typicalIntro": "A simulated launch on this config: early bots and later human buyers, as in the lab's default launch situation. It is an illustration, not a forecast.",
       "typicalName": "A typical launch",
       "launchTitle": "Launch your token here",
-      "unverified": "This name, website and logo were published by the fee wallet below and are not verified by this site — check the addresses before you launch.",
-      "feeWallet": "Fee wallet",
-      "config": "Config",
-      "network": "Network",
-      "royalty": "Fee split",
-      "royaltyValue": "The fee wallet is a Meteora fee-sharing vault: {operator}% to the operator ({operatorAddress}), {author}% to the preset's author ({authorAddress})"
+      "reportLink": "Read the full report on this config"
+    },
+    "report": {
+      "eyebrow": "Config report",
+      "intro": "A read-only check of this config's terms and track record, for anyone deciding whether to buy or launch on it. Figures read from chain and simulated figures are labelled as such.",
+      "loading": "Reading this config from chain…",
+      "refusedTitle": "This config cannot be reported on",
+      "risksTitle": "Risks the terms leave open",
+      "risksNone": "None of the risks this report checks for: graduation liquidity is fully locked, nobody can mint more or change the token, pools graduate on their own, and the terms are still accepted for new configs.",
+      "risks": {
+        "liquidity-pullable": "{total}% of the liquidity the pool graduates with is not locked: the launchpad can withdraw {partner}% and the token's creator {creator}% right after graduation.",
+        "mint-authority-kept": "The {holder} keeps the authority to mint more of the token and to change its name, symbol and image.",
+        "metadata-mutable": "The {holder} can change the token's name, symbol and image after launch.",
+        "no-auto-graduation": "Pools on this config will not graduate on their own: the threshold is below Meteora's migration keepers' minimum, so someone must run the migration by hand.",
+        "refused-today": "Meteora's SDK would refuse these exact terms for a new config today: {reason}"
+      },
+      "holders": {
+        "partner": "launchpad",
+        "creator": "token's creator"
+      },
+      "termsTitle": "Terms",
+      "fee": "Trading fee",
+      "realLabel": "Read from chain",
+      "simulatedTitle": "Simulated: a typical launch",
+      "simulatedIntro": "The lab's default launch situation run against this config — early bots and later human buyers. An illustration from the simulator, not a record or a forecast.",
+      "simulatedName": "A typical launch",
+      "download": "Download as JSON",
+      "launchLink": "Open the launch page"
     }
   },
   "components": {
@@ -362,7 +382,8 @@
         "graduate-fast": "Graduate fast",
         "max-raise": "Raise the most",
         "stable-price": "Keep the price stable",
-        "early-fairness": "Keep early supply out of bots’ hands"
+        "early-fairness": "Keep early supply out of bots’ hands",
+        "fair-price": "Price close to an outside price (tokenized names)"
       },
       "weights": {
         "human-outcome": "Human buyers’ outcome",
@@ -371,7 +392,8 @@
         "graduation": "Graduating, and fast",
         "raise": "SOL raised",
         "price-stability": "Price stability",
-        "early-fairness": "Early supply in humans’ hands"
+        "early-fairness": "Early supply in humans’ hands",
+        "fair-price": "Arbitrage take"
       },
       "run": "Find best configs",
       "searching": "Simulating every candidate…",
@@ -390,7 +412,8 @@
         "raised": "raised {sol} SOL",
         "drawdown": "worst price drop {percent}%",
         "botShare": "bots took {share} of first-minute buys",
-        "noEarlyBuys": "no first-minute buys"
+        "noEarlyBuys": "no first-minute buys",
+        "arbitrage": "arbitrage traders made {sol} SOL"
       },
       "undecided": "In this launch situation every fee schedule scores the same on: {criteria}. The ranking comes from your other weights.",
       "includeCurves": "Also try other curve shapes and graduation thresholds (slower)",
@@ -400,7 +423,8 @@
         "market-cap": "market-cap curve {from} → {to} {symbol}",
         "two-segments": "two-segment curve {from} → {to} {symbol}",
         "liquidity-weights": "weighted curve {from} → {to} {symbol}, growth {growth}"
-      }
+      },
+      "anchoredCurves": "This launch situation has traders who know an outside price ({marketCap} SOL market cap), so the curve search tries curves opening at {openFrom}–{openTo}% of it and graduating at {graduateFrom}–{graduateTo}%."
     },
     "configEditor": {
       "title": "Edit a config",
@@ -499,26 +523,8 @@
       "load": "Load",
       "loading": "Reading from chain…",
       "loaded": "Loaded. It is now in the comparison below.",
-      "real": {
-        "title": "How real launches on this config went",
-        "loading": "Reading the pools launched with this config…",
-        "all": "All {total} pools launched with this config:",
-        "sampled": "{sampled} of the {total} pools launched with this config, spread evenly:",
-        "completed": "Completed the curve",
-        "traction": "Reached 10% of the threshold",
-        "neverTraded": "Never traded",
-        "raised": "Median raised",
-        "fees": "Partner + creator fees per launch (bonding curve; fees taken in the launched token valued at the curve's average price)",
-        "time": "Median time to complete the curve",
-        "seconds": "{seconds}s",
-        "timeUnknown": "Not available (pools on this config count time in slots)",
-        "solValue": "{sol} SOL",
-        "compare": "The comparison below simulates the same config under the launch situation you picked — set the two side by side to see whether the situation is realistic for this launchpad.",
-        "rejections": {
-          "network-error": "Could not read the pools ({detail}).",
-          "no-pools": "No pools have been launched with this config yet."
-        }
-      }
+      "realCompare": "The comparison below simulates the same config under the launch situation you picked — set the two side by side to see whether the situation is realistic for this launchpad.",
+      "reportLink": "Open its report"
     },
     "presetCatalog": {
       "title": "Preset catalogue — built-in configs and the most-graduated real launchpads",
@@ -726,6 +732,35 @@
         "no-configs": "This wallet is not the fee claimer of any DBC config on this network.",
         "network-error": "Could not read the wallet: {detail}. The figures above are from the last successful read."
       }
+    },
+    "realLaunchesSummary": {
+      "title": "How real launches on this config went",
+      "loading": "Reading the pools launched with this config…",
+      "all": "All {total} pools launched with this config:",
+      "sampled": "{sampled} of the {total} pools launched with this config, spread evenly:",
+      "completed": "Completed the curve",
+      "traction": "Reached 10% of the threshold",
+      "neverTraded": "Never traded",
+      "raised": "Median raised",
+      "fees": "Partner + creator fees per launch (bonding curve; fees taken in the launched token valued at the curve's average price)",
+      "time": "Median time to complete the curve",
+      "seconds": "{seconds}s",
+      "timeUnknown": "Not available (pools on this config count time in slots)",
+      "solValue": "{sol} SOL",
+      "rejections": {
+        "network-error": "Could not read the pools ({detail}).",
+        "no-pools": "No pools have been launched with this config yet."
+      }
+    },
+    "launchpadIdentity": {
+      "unbranded": "Launchpad {address}",
+      "noBranding": "Its operator has not published a name for it.",
+      "unverified": "This name, website and logo were published by the fee wallet below and are not verified by this site — check the addresses before you launch.",
+      "feeWallet": "Fee wallet",
+      "config": "Config",
+      "network": "Network",
+      "royalty": "Fee split",
+      "royaltyValue": "The fee wallet is a Meteora fee-sharing vault: {operator}% to the operator ({operatorAddress}), {author}% to the preset's author ({authorAddress})"
     }
   }
 }

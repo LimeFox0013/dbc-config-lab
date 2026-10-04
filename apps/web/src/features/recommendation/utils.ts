@@ -1,6 +1,6 @@
 import {
   CURVE_SEARCH_FEE_SPACE,
-  DEFAULT_CURVE_VARIANTS,
+  curveVariantsFor,
   DEFAULT_SEARCH_SEEDS,
   DEFAULT_SEARCH_SPACE,
   searchConfigs,
@@ -47,7 +47,7 @@ export const recommend = (
     space: options.includeCurves
       ? CURVE_SEARCH_FEE_SPACE
       : DEFAULT_SEARCH_SPACE,
-    curves: options.includeCurves ? DEFAULT_CURVE_VARIANTS : [],
+    curves: options.includeCurves ? curveVariantsFor(scenario) : [],
   })
   const flat = ranked.find(
     (candidate) =>
