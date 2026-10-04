@@ -28,6 +28,7 @@ A DBC config sets the rules of a token launch: curve shape, fee schedule, gradua
 | **Your launchpad, live** | Paste a fee wallet to watch every config it collects fees for — launches, graduations, its lifetime curve fees and what is still unclaimed, read from all of the config's pools — and what its graduated-pool positions have earned (claimed plus pending; up to 1,000 positions read, an even sample scaled up beyond that). Refreshes every minute while open; read-only. |
 | **Income forecast** | For any config in the comparison and a number of launches: the range real launchpads with the same terms earned, with how many launchpads and launches it rests on and when they were read, plus a separate range for fees after graduation where comparables could be measured. When fewer than three launchpads share every term, it sets aside the creator's share, then the fee shape, then the graduation threshold — never the quote token — and says which. What comparable launchpads earned — not a promise. |
 | **Config report** | `/config/<config or pool>?network=…` — a read-only page for anyone deciding whether to buy or launch on a config, no wallet: the risks its terms leave open (graduation liquidity that can be withdrawn and by whom, mint or metadata authority kept, no automatic graduation, terms Meteora's SDK no longer accepts for new configs), its terms, how the real launches on it went, and a simulated typical launch — each figure labelled read or simulated. Downloads as JSON; the agent tools return the same report. Over the 200 most-graduated mainnet launchpads it finds withdrawable liquidity on 199. |
+| **Report feed** | The report for every one of the 200 launchpads in the snapshot, published with the site as JSON any terminal or script can fetch, no key: `/data/launchpads/index.json` lists each with the risks its terms leave open, its launches, graduation rate and partner income, and links its full entry (`/data/launchpads/<config>.json` — terms, risks, a simulated typical launch, the snapshot record). Each entry says what it does not carry (branding, royalty split, the page's live read of every pool). Regenerated from the snapshot on every build. |
 | **For AI agents (MCP)** | The lab as a Model Context Protocol server: an agent lists the presets, situations and goals, compares any configs (built-in, shared, edited or on chain), asks for a recommendation by goal or by its own criterion weights, reads an on-chain config with its real launches, searches the launchpad economics snapshot, and exports a config as a share link and SDK code. Same simulator, same validation as the UI; read-only — it never signs or sends a transaction, so deploying stays in your own wallet. |
 
 ## What the simulations show
@@ -99,6 +100,15 @@ npm run typecheck
 npm run build
 ```
 
+### Fetch the report feed
+
+`npm run build` writes the feed into `apps/web/dist/data/launchpads/`; the site serves it from any origin:
+
+```bash
+curl https://<site>/data/launchpads/index.json            # every launchpad, its risks and record
+curl https://<site>/data/launchpads/<config address>.json # one launchpad's full entry
+```
+
 ### Use it from an AI agent
 
 The MCP server runs locally over stdio. For Claude Code:
@@ -164,6 +174,7 @@ apps/web/
   src/core/partner-branding   a launchpad's on-chain name, website and logo
   src/core/preset-royalty     an author's share of a launchpad's fees, through a Meteora fee-sharing vault
   src/features/config-report  a config's open risks, terms, real and simulated launches, as one report
+  src/features/report-feed    the report for every snapshot launchpad, as static JSON files
   src/features/…              comparison, editor, recommendation (Web Worker), sharing, wallet, on-chain lookup,
                               launchpad economics and income forecast, launch page
   src/views, src/components   the single-page UI

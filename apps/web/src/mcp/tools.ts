@@ -15,7 +15,11 @@ import {
   shareLink,
   toTypeScript,
 } from '../features/config-sharing'
-import { loadLaunchpads, rankLaunchpads } from '../features/launchpad-economics'
+import {
+  launchpadSummary,
+  loadLaunchpads,
+  rankLaunchpads,
+} from '../features/launchpad-economics'
 import {
   configReport,
   simulationOf,
@@ -50,7 +54,6 @@ import {
   recommendInput,
 } from './schemas'
 import {
-  launchpadSummary,
   resolveDesign,
   resolveEntry,
   rowSummary,

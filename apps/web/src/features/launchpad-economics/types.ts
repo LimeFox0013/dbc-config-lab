@@ -97,3 +97,21 @@ export type IncomeForecast =
       relaxed: RelaxableTerm[]
     }
   | { ok: false; comparables: number; minimum: number }
+
+/** One launchpad's record as data for agents and feeds: no decoded parameters, figures in SOL. */
+export interface LaunchpadSummary {
+  configAddress: string
+  feeClaimer: string
+  archetype: Archetype
+  launches: number
+  graduated: number
+  /** Share 0–1 of launches that graduated. */
+  graduationRate: number
+  sampledPools: number
+  neverTradedShare: number
+  medianSecondsToComplete: number | null
+  partnerIncomePerLaunch: { median: number; p75: number }
+  afterGraduation: AfterGraduation | null
+  pullableLiquidityPercent: number
+  takenAt: string
+}

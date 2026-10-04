@@ -14,8 +14,6 @@ import {
   sharedFromHash,
 } from '../features/config-sharing'
 import type { DecodeResult, SharedConfig } from '../features/config-sharing'
-import { graduationRate } from '../features/launchpad-economics'
-import type { LaunchpadRecord } from '../features/launchpad-economics'
 import { loadOnChainConfig } from '../features/onchain-config'
 import type { OnChainConfig } from '../features/onchain-config'
 import en from '../locales/en.json'
@@ -145,25 +143,6 @@ export const rowSummary = (row: ComparisonRow) => {
       : null,
   }
 }
-
-export const launchpadSummary = (record: LaunchpadRecord) => ({
-  configAddress: record.config.configAddress,
-  feeClaimer: record.config.feeClaimer,
-  archetype: record.archetype,
-  launches: record.launches,
-  graduated: record.graduated,
-  graduationRate: graduationRate(record),
-  sampledPools: record.sampledPools,
-  neverTradedShare: record.neverTradedShare,
-  medianSecondsToComplete: record.medianSecondsToComplete,
-  partnerIncomePerLaunch: {
-    median: record.partnerIncomeMedian,
-    p75: record.partnerIncomeP75,
-  },
-  afterGraduation: record.afterGraduation,
-  pullableLiquidityPercent: pullableLiquidityPercent(record.config.parameters),
-  takenAt: record.takenAt,
-})
 
 const scale = 10 ** DECIMALS_KEPT
 

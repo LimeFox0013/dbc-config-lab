@@ -33,7 +33,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && tsx scripts/build-report-feed.ts",
     "test": "vitest run",
     "typecheck": "vue-tsc --noEmit",
     "verify:devnet": "tsx scripts/devnet-verify.ts"
@@ -55,7 +55,7 @@
           "{workspaceRoot}/apps/web/dist"
         ],
         "options": {
-          "command": "vite build",
+          "command": "vite build && tsx scripts/build-report-feed.ts",
           "cwd": "apps/web"
         }
       },

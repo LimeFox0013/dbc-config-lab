@@ -75,6 +75,15 @@ jobs:
             -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' http://127.0.0.1:8080/rpc/mainnet)
           echo "proxy answered $code: $(head -c 200 rpc.txt)"
           case "$code" in 404|500|502|503|504) exit 1 ;; esac
+      - name: Publishes the launchpad report feed, fetchable from any origin
+        run: |
+          curl -sf -o feed.json -D feed-headers.txt -H 'Origin: https://terminal.example' \
+            http://127.0.0.1:8080/data/launchpads/index.json
+          grep -qi '^access-control-allow-origin: \*' feed-headers.txt
+          entry=$(node -e "const f=require('./feed.json'); if (!f.launchpads.length) process.exit(1); console.log(f.launchpads[0].entry)")
+          curl -sf -o /dev/null "http://127.0.0.1:8080$entry"
+          # A missing feed file is a 404, never the SPA's index.html.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/data/launchpads/missing.json)" = 404
       - if: failure()
         run: docker logs web
 

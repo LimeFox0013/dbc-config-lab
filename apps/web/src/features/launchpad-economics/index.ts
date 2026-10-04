@@ -14,6 +14,7 @@ export type {
   LaunchpadQuery,
   LaunchpadRecord,
   LaunchpadSnapshot,
+  LaunchpadSummary,
 } from './types'
 export {
   afterGraduationPerLaunch,
@@ -21,6 +22,7 @@ export {
   graduationRate,
   incomeForecast,
   launchpadRecords,
+  launchpadSummary,
   rankLaunchpads,
   readAfterGraduation,
 } from './utils'

@@ -7,6 +7,7 @@ import type {
   PoolConfig,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { connectionFor } from '../../core/config-deploy'
+import { pullableLiquidityPercent } from '../../core/migrated-pool'
 import { fromPoolConfig } from '../../core/onchain-config'
 import {
   QUOTE_TOKENS,
@@ -38,6 +39,7 @@ import type {
   LaunchpadQuery,
   LaunchpadRecord,
   LaunchpadSnapshot,
+  LaunchpadSummary,
   RelaxableTerm,
 } from './types'
 
@@ -267,3 +269,24 @@ export const afterGraduationPerLaunch = (
       return null
   }
 }
+
+export const launchpadSummary = (
+  record: LaunchpadRecord,
+): LaunchpadSummary => ({
+  configAddress: record.config.configAddress,
+  feeClaimer: record.config.feeClaimer,
+  archetype: record.archetype,
+  launches: record.launches,
+  graduated: record.graduated,
+  graduationRate: graduationRate(record),
+  sampledPools: record.sampledPools,
+  neverTradedShare: record.neverTradedShare,
+  medianSecondsToComplete: record.medianSecondsToComplete,
+  partnerIncomePerLaunch: {
+    median: record.partnerIncomeMedian,
+    p75: record.partnerIncomeP75,
+  },
+  afterGraduation: record.afterGraduation,
+  pullableLiquidityPercent: pullableLiquidityPercent(record.config.parameters),
+  takenAt: record.takenAt,
+})
