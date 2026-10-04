@@ -26,6 +26,7 @@ import {
   readLaunchPage,
   reportPagePath,
 } from '../features/launch-page'
+import type { OnChainConfig } from '../features/onchain-config'
 import { fetchRealLaunches } from '../features/real-launches'
 import {
   GOAL_OBJECTIVES,
@@ -60,6 +61,15 @@ import {
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false } as const
 
 const labUrl = (): string => process.env[LAB_URL_ENV] ?? DEFAULT_LAB_URL
+
+/** The lab's report page for a config, on the configured site. */
+const reportUrl = (
+  config: Pick<OnChainConfig, 'configAddress' | 'network'>,
+): string =>
+  new URL(
+    reportPagePath(config.configAddress, config.network),
+    labUrl(),
+  ).toString()
 
 type Situation =
   { ok: true; scenario: ScenarioSpec } | { ok: false; reason: string }
@@ -249,10 +259,7 @@ export const registerTools = (server: McpServer): void => {
             typicalLaunchRow(config, MCP_TEXT.typicalLaunchName),
           ),
         }),
-        reportPage: new URL(
-          reportPagePath(config.configAddress, config.network),
-          labUrl(),
-        ).toString(),
+        reportPage: reportUrl(config),
         compareAs: {
           source: ConfigSource.OnChain,
           address: config.configAddress,
@@ -299,7 +306,10 @@ export const registerTools = (server: McpServer): void => {
       return toolResult({
         matched: records.length,
         takenAt: records[0]?.takenAt ?? null,
-        launchpads: records.slice(0, limit).map(launchpadSummary),
+        launchpads: records.slice(0, limit).map((record) => ({
+          ...launchpadSummary(record),
+          reportPage: reportUrl(record.config),
+        })),
       })
     },
   )

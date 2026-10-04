@@ -239,6 +239,7 @@ describe('lab MCP server', () => {
         launchpads: z.array(
           z.object({
             partnerIncomePerLaunch: z.object({ median: z.number() }),
+            reportPage: z.string(),
           }),
         ),
       }),
@@ -246,6 +247,11 @@ describe('lab MCP server', () => {
       { limit: 3 },
     )
     expect(found.matched).toBeGreaterThan(3)
+    found.launchpads.forEach((launchpad) =>
+      expect(launchpad.reportPage).toMatch(
+        /^http:\/\/localhost:5180\/config\/\w+\?network=mainnet-beta$/,
+      ),
+    )
     const incomes = found.launchpads.map((l) => l.partnerIncomePerLaunch.median)
     expect(incomes).toEqual([...incomes].sort((a, b) => b - a))
   })

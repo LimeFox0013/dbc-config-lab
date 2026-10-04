@@ -197,7 +197,9 @@ export const fitsOneTransaction = (
  */
 export const rpcEndpointFor = (
   network: SolanaNetwork,
-  origin: string | null = typeof location === 'undefined' ? null : location.origin,
+  origin: string | null = typeof location === 'undefined'
+    ? null
+    : location.origin,
 ): string =>
   network === SolanaNetwork.Mainnet && origin !== null
     ? `${origin}${MAINNET_RPC_PROXY_PATH}`

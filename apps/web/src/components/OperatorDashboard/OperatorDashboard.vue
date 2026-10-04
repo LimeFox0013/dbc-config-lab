@@ -88,9 +88,9 @@
         {{
           positions.held === 0 ?
             t('components.operatorDashboard.positionsNone', { symbol: QUOTE_TOKENS[positions.quoteToken].symbol }) :
-          positions.read < positions.held ?
-            t('components.operatorDashboard.positionsSampled', { read: formatCount(positions.read), held: formatCount(positions.held), symbol: QUOTE_TOKENS[positions.quoteToken].symbol }) :
-            t('components.operatorDashboard.positionsAll', { held: formatCount(positions.held), symbol: QUOTE_TOKENS[positions.quoteToken].symbol })
+            positions.read < positions.held ?
+              t('components.operatorDashboard.positionsSampled', { read: formatCount(positions.read), held: formatCount(positions.held), symbol: QUOTE_TOKENS[positions.quoteToken].symbol }) :
+              t('components.operatorDashboard.positionsAll', { held: formatCount(positions.held), symbol: QUOTE_TOKENS[positions.quoteToken].symbol })
         }}
       </p>
       <div class="operator-dashboard__scroll">

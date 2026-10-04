@@ -98,6 +98,12 @@
         >
           {{ t('components.presetCatalog.compare') }}
         </button>
+        <RouterLink
+          :to="reportPagePath(launchpad.config.configAddress, launchpad.config.network)"
+          class="preset-catalog__report"
+        >
+          {{ t('components.presetCatalog.report') }}
+        </RouterLink>
       </li>
     </ul>
   </details>
@@ -107,7 +113,9 @@
 import { communityPresets } from '../../features/community-presets'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { explorerAddressUrl } from '../../core/config-deploy'
+import { reportPagePath } from '../../features/launch-page'
 import { LAUNCH_PRESETS } from '../../core/launch-config'
 import type { LaunchPreset } from '../../core/launch-config'
 import { migratedUnsupportedReason, pullableLiquidityPercent } from '../../core/migrated-pool'
@@ -250,5 +258,10 @@ const termsText = (launchpad: LaunchpadRecord): string => {
   font-family: var(--font-family);
   font-size: var(--font-size-2);
   cursor: pointer;
+}
+.preset-catalog__report {
+  align-self: flex-start;
+  color: var(--color-gain);
+  font-size: var(--font-size-2);
 }
 </style>

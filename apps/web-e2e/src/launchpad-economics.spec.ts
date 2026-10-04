@@ -30,6 +30,14 @@ test.describe('launchpad economics', () => {
     )
   })
 
+  test('links every launchpad to its report', async ({ page }) => {
+    const report = rows(page).first().getByRole('link', { name: 'Report' })
+    await expect(report).toHaveAttribute(
+      'href',
+      /^\/config\/\w+\?network=mainnet-beta$/,
+    )
+  })
+
   test('narrows the list by the terms a builder picks', async ({ page }) => {
     await expect(rows(page).first()).toBeVisible()
     await panel(page)

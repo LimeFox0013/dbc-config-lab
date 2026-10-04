@@ -139,6 +139,12 @@
                 >
                   {{ t('components.launchpadEconomics.compare') }}
                 </button>
+                <RouterLink
+                  :to="reportPagePath(record.config.configAddress, record.config.network)"
+                  class="launchpad-economics__report"
+                >
+                  {{ t('components.launchpadEconomics.report') }}
+                </RouterLink>
               </td>
             </tr>
           </tbody>
@@ -154,7 +160,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { explorerAddressUrl } from '../../core/config-deploy'
+import { reportPagePath } from '../../features/launch-page'
 import { migratedUnsupportedReason, pullableLiquidityPercent } from '../../core/migrated-pool'
 import { QUOTE_TOKENS, wholeQuoteTokens } from '../../core/quote-token'
 import { formatAmount, formatCount, formatShare, formatSol, shortAddress } from '../../core/shared'
@@ -303,5 +311,11 @@ const termsText = (record: LaunchpadRecord): string => {
 
 .launchpad-economics__hidden {
   @include mixins.visually-hidden;
+}
+.launchpad-economics__report {
+  margin-left: var(--space-2);
+  color: var(--color-gain);
+  font-size: var(--font-size-2);
+  white-space: nowrap;
 }
 </style>

@@ -542,7 +542,8 @@
       "use": "Use this preset",
       "communityTitle": "Community presets",
       "communityEmpty": "None yet. Build a preset in the editor, set your royalty, copy its link and add it to the registry by pull request — every launchpad deployed from it then pays you your share.",
-      "communityHow": "How to add one"
+      "communityHow": "How to add one",
+      "report": "Read its report"
     },
     "launchpadEconomics": {
       "title": "Launchpad economics — what real launchpads earn",
@@ -580,7 +581,8 @@
         "notHeld": "not measurable — positions moved",
         "unknown": "not read",
         "positions": "{median} SOL median · {p75} SOL top quarter per graduated launch ({positions} positions)"
-      }
+      },
+      "report": "Report"
     },
     "clonePanel": {
       "title": "Clone a launchpad config",
