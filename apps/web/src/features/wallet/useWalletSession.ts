@@ -1,7 +1,7 @@
 import { onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { errorMessage, SolanaNetwork } from '../../core/shared'
-import { connectWallet, listDeployWallets, onWalletsChanged } from '.'
-import type { ConnectedWallet, DeployWallet } from '.'
+import type { ConnectedWallet, DeployWallet } from './types'
+import { connectWallet, listDeployWallets, onWalletsChanged } from './wallet'
 
 /**
  * The wallet a screen signs with and the network it signs on. Switching network drops the
