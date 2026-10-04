@@ -1,3 +1,5 @@
+import { SolanaNetwork } from '../core/shared'
+
 export const SERVER_INFO = { name: 'dbc-config-lab', version: '0.2.0' } as const
 
 export enum ToolName {
@@ -27,6 +29,12 @@ export enum ConfigSource {
 /** The lab page share links open; set it to the live site's URL. */
 export const LAB_URL_ENV = 'DBC_LAB_URL'
 export const DEFAULT_LAB_URL = 'http://localhost:5180/'
+
+/** Optional RPC endpoints per network (a provider URL, key included); the public ones otherwise. */
+export const RPC_URL_ENV: Record<SolanaNetwork, string> = {
+  [SolanaNetwork.Devnet]: 'DBC_LAB_RPC_DEVNET',
+  [SolanaNetwork.Mainnet]: 'DBC_LAB_RPC_MAINNET',
+}
 
 export const MAX_COMPARED_CONFIGS = 8
 export const DEFAULT_LAUNCHPADS_RETURNED = 10
@@ -58,6 +66,7 @@ export const MCP_TEXT = {
   mainnetNotAcknowledged:
     'This is a mainnet action that spends real funds. Ask the owner first, then call again with acknowledgeMainnet: true.',
   invalidOwner: 'owner is not a Solana address.',
+  invalidRpcUrl: 'is not an http(s) URL; unset it to use the public endpoint.',
   invalidPool: 'pool is not a Solana address.',
   nothingToClaim:
     'The owner has no unclaimed fees on that pool in that role; call find_earnings for what it can claim.',

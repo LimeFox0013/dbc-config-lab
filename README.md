@@ -234,7 +234,7 @@ or from a clone of this repo:
 claude mcp add dbc-config-lab -- npx tsx apps/web/src/mcp/server.ts
 ```
 
-Any other MCP client takes the same command. Set `DBC_LAB_URL` to the lab's site so share and hand-off links open there (default `http://localhost:5180/`). The tools are listed under [Agent tools](#agent-tools-mcp).
+Any other MCP client takes the same command. Set `DBC_LAB_URL` to the lab's site so share and hand-off links open there (default `http://localhost:5180/`). Chain reads use Solana's public endpoints, which rate-limit heavy reads (earnings, dashboards, real launches); set `DBC_LAB_RPC_MAINNET` and/or `DBC_LAB_RPC_DEVNET` to a provider's http(s) URL to use it instead — the URL is never echoed back to the agent. The tools are listed under [Agent tools](#agent-tools-mcp).
 
 `npm run build:mcp -w apps/web` bundles the server, its dependencies and the launchpad snapshot into `apps/web/mcp-package/server.mjs`, the file the npm package publishes.
 

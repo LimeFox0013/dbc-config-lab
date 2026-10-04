@@ -1,5 +1,4 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { connectionFor } from '../core/config-deploy'
 import {
   Criterion,
   DEFAULT_SEARCH_SEEDS,
@@ -52,6 +51,7 @@ import {
   READ_ONLY,
   readableTerms,
   resolveDesign,
+  rpcConnection,
   resolveEntry,
   rowSummary,
   toolRefusal,
@@ -231,7 +231,7 @@ export const registerTools = (server: McpServer): void => {
       annotations: { ...READ_ONLY, openWorldHint: true },
     },
     async ({ address, network, includeRealLaunches }) => {
-      const connection = connectionFor(network)
+      const connection = rpcConnection(network)
       const read = await readLaunchPage(connection, network, address)
       if (read.status !== LaunchPageStatus.Ready)
         return toolRefusal(

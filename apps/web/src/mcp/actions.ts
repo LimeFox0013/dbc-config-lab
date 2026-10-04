@@ -4,7 +4,6 @@ import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js'
 import type { Connection } from '@solana/web3.js'
 import { clonedParameters } from '../core/config-clone'
 import {
-  connectionFor,
   prepareDeployment,
   prepareParametersDeployment,
 } from '../core/config-deploy'
@@ -36,6 +35,7 @@ import {
   READ_ONLY,
   readableTerms,
   reasonOf,
+  rpcConnection,
   resolveDesign,
   toolRefusal,
   toolResult,
@@ -117,7 +117,7 @@ export const registerActionTools = (server: McpServer): void => {
       if (!owner.ok) return owner.result
       const design = resolveDesign(config)
       if (!design.ok) return toolRefusal(design.reason)
-      const connection = connectionFor(target.network)
+      const connection = rpcConnection(target.network)
       const result = await prepareDeployment(connection, {
         config: design.shared.config,
         network: target.network,
@@ -148,14 +148,14 @@ export const registerActionTools = (server: McpServer): void => {
       const owner = ownerOf(target)
       if (!owner.ok) return owner.result
       const loaded = await loadOnChainConfig(
-        connectionFor(sourceNetwork),
+        rpcConnection(sourceNetwork),
         sourceNetwork,
         sourceAddress,
       )
       if (!loaded.ok) return toolRefusal(reasonOf(loaded))
       const clone = clonedParameters(loaded.loaded.parameters, adjustments)
       if (!clone.ok) return toolRefusal(clone.reason)
-      const connection = connectionFor(target.network)
+      const connection = rpcConnection(target.network)
       const result = await prepareParametersDeployment(connection, {
         parameters: clone.parameters,
         quoteToken: loaded.loaded.quoteToken,
@@ -193,7 +193,7 @@ export const registerActionTools = (server: McpServer): void => {
       const owner = ownerOf(target)
       if (!owner.ok) return owner.result
       const branding = { name, website, logo }
-      const connection = connectionFor(target.network)
+      const connection = rpcConnection(target.network)
       const result = await preparePartnerBranding(connection, {
         branding,
         owner: owner.owner,
@@ -228,7 +228,7 @@ export const registerActionTools = (server: McpServer): void => {
     async ({ configAddress, name, symbol, uri, firstBuy, ...target }) => {
       const owner = ownerOf(target)
       if (!owner.ok) return owner.result
-      const connection = connectionFor(target.network)
+      const connection = rpcConnection(target.network)
       const loaded = await loadOnChainConfig(
         connection,
         target.network,
@@ -278,7 +278,7 @@ export const registerActionTools = (server: McpServer): void => {
     async ({ owner, network }) => {
       const key = parseAddress(owner)
       if (!key) return toolRefusal(MCP_TEXT.invalidOwner)
-      const found = await findEarnings(connectionFor(network), network, key)
+      const found = await findEarnings(rpcConnection(network), network, key)
       if (!found.ok) return toolRefusal(reasonOf(found))
       return toolResult({
         network,
@@ -308,7 +308,7 @@ export const registerActionTools = (server: McpServer): void => {
       if (!owner.ok) return owner.result
       const poolKey = parseAddress(pool)
       if (!poolKey) return toolRefusal(MCP_TEXT.invalidPool)
-      const connection = connectionFor(target.network)
+      const connection = rpcConnection(target.network)
       const found = await findEarnings(connection, target.network, owner.owner)
       if (!found.ok) return toolRefusal(reasonOf(found))
       const row = found.earnings.rows.find(
@@ -346,7 +346,7 @@ export const registerActionTools = (server: McpServer): void => {
     },
     async ({ feeWallet, network }) => {
       const found = await fetchOperatorReport(
-        connectionFor(network),
+        rpcConnection(network),
         network,
         feeWallet,
       )

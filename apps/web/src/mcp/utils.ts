@@ -7,7 +7,9 @@ import {
   TokenType,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { ConfigTerms } from '../core/config-deploy'
-import { connectionFor } from '../core/config-deploy'
+import { Connection } from '@solana/web3.js'
+import { COMMITMENT, connectionFor } from '../core/config-deploy'
+import type { SolanaNetwork } from '../core/shared'
 import {
   compileLaunchConfig,
   LAUNCH_PRESETS,
@@ -31,6 +33,7 @@ import {
   DEFAULT_LAB_URL,
   LAB_URL_ENV,
   MCP_TEXT,
+  RPC_URL_ENV,
 } from './constants'
 import type { AnyConfigRef, DesignConfigRef } from './schemas'
 
@@ -38,6 +41,26 @@ type Refused = { ok: false; reason: string }
 
 /** Every tool is read-only: nothing is signed, sent or stored. */
 export const READ_ONLY = { readOnlyHint: true, destructiveHint: false } as const
+
+const isHttpUrl = (value: string): boolean => {
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The network's connection: the endpoint its environment variable names, or the public
+ * one. A provider URL usually carries its key, so it is never echoed back to the agent.
+ */
+export const rpcConnection = (network: SolanaNetwork): Connection => {
+  const name = RPC_URL_ENV[network]
+  const custom = process.env[name]
+  if (!custom) return connectionFor(network)
+  if (!isHttpUrl(custom)) throw new Error(`${name} ${MCP_TEXT.invalidRpcUrl}`)
+  return new Connection(custom, { commitment: COMMITMENT })
+}
 
 /** The lab site links point at; set it to the live site's URL. */
 export const labUrl = (): string => process.env[LAB_URL_ENV] ?? DEFAULT_LAB_URL
@@ -137,7 +160,7 @@ export const resolveEntry = async (
       : design
   }
   const result = await loadOnChainConfig(
-    connectionFor(ref.network),
+    rpcConnection(ref.network),
     ref.network,
     ref.address,
   )
