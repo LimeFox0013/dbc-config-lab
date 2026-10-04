@@ -15,20 +15,12 @@ import {
   VIRTUAL_POOL_LAYOUT,
 } from '../../core/onchain-config'
 import { quoteTokenOfMint, solFromQuoteUnits } from '../../core/quote-token'
-import { errorMessage } from '../../core/shared'
+import { errorMessage, parseAddress } from '../../core/shared'
 import type { SolanaNetwork } from '../../core/shared'
 import { DbcAccount } from '../onchain-config'
 import { OperatorRejection, POSITION_READ_LIMIT } from './constants'
 import type { OperatorPositions, OperatorResult } from './types'
 import { operatorConfig, scaledPositionFees } from './utils'
-
-const parseAddress = (address: string): PublicKey | null => {
-  try {
-    return new PublicKey(address)
-  } catch {
-    return null
-  }
-}
 
 /**
  * Everything `address` earns as a launchpad fee wallet: each config it is fee claimer of,

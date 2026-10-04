@@ -52,7 +52,7 @@ test.describe('preset royalty', () => {
       .click()
     await page.getByRole('combobox', { name: 'Config' }).selectOption('custom')
     await page.getByRole('button', { name: 'Prepare transaction' }).click()
-    const summary = page.locator('.deploy-panel__summary')
+    const summary = page.locator('.config-deploy__summary')
     await expect(summary).toContainText(
       `You 90% · preset author 10% (${AUTHOR})`,
     )

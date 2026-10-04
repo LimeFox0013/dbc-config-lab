@@ -244,7 +244,10 @@ const {
   prepareAllowed,
   prepare,
   signAndSend,
-} = usePoolLaunch({ network, connected, mainnetAcknowledged }, initialConfigAddress)
+} = usePoolLaunch({ network, connected, mainnetAcknowledged }, initialConfigAddress, {
+  metadata: props.initialMetadata,
+  firstBuy: props.initialFirstBuy,
+})
 
 watch(busy, (value) => emit('busy', value))
 

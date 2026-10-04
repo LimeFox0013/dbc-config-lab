@@ -1,4 +1,5 @@
-import { ADDRESS_EDGE } from './constants'
+import { PublicKey } from '@solana/web3.js'
+import { ADDRESS_EDGE, MAX_ADDRESS_LENGTH } from './constants'
 /** A thrown value as readable text. */
 export const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
@@ -46,3 +47,14 @@ export const chunks = <T>(items: readonly T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
     items.slice(i * size, (i + 1) * size),
   )
+
+/** A Solana address typed by someone, or null when it is not one. */
+export const parseAddress = (raw: string): PublicKey | null => {
+  const trimmed = raw.trim()
+  if (trimmed.length === 0 || trimmed.length > MAX_ADDRESS_LENGTH) return null
+  try {
+    return new PublicKey(trimmed)
+  } catch {
+    return null
+  }
+}

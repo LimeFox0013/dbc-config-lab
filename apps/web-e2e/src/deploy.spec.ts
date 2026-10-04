@@ -53,7 +53,7 @@ test.describe('deploy with a wallet', () => {
     await expect(page.getByText(`Connected: ${FAKE_WALLET_NAME}`)).toBeVisible()
     await page.getByRole('button', { name: 'Prepare transaction' }).click()
 
-    const summary = page.locator('.deploy-panel__summary')
+    const summary = page.locator('.config-deploy__summary')
     await expect(summary).toContainText('devnet')
     await expect(summary).toContainText(FAKE_WALLET_ADDRESS)
     await expect(
@@ -92,12 +92,12 @@ test.describe('deploy with a wallet', () => {
       .getByRole('button', { name: `Connect ${FAKE_WALLET_NAME}` })
       .click()
     await page.getByRole('button', { name: 'Prepare transaction' }).click()
-    await expect(page.locator('.deploy-panel__summary')).toBeVisible()
+    await expect(page.locator('.config-deploy__summary')).toBeVisible()
 
     await page
       .getByRole('combobox', { name: 'Config' })
       .selectOption('sniper-shield')
-    await expect(page.locator('.deploy-panel__summary')).toHaveCount(0)
+    await expect(page.locator('.config-deploy__summary')).toHaveCount(0)
     await expect(
       page.getByRole('button', { name: 'Sign and send in wallet' }),
     ).toHaveCount(0)
@@ -156,7 +156,7 @@ test.describe('deploy with a wallet', () => {
       .click()
     await page.getByRole('button', { name: 'Prepare transaction' }).click()
 
-    const summary = page.locator('.deploy-panel__summary')
+    const summary = page.locator('.config-deploy__summary')
     await expect(summary).toContainText('Creator can update metadata')
     await expect(summary).toContainText('Creator’s share of trading fees100%')
     await expect(summary).toContainText('Launchpad 0% + 50% locked')

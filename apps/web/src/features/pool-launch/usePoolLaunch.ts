@@ -16,11 +16,14 @@ import type { WalletSessionRefs } from '../wallet'
 export const usePoolLaunch = (
   session: WalletSessionRefs,
   initialConfigAddress: Readonly<Ref<string>>,
+  initial: { metadata?: TokenMetadata; firstBuy?: number } = {},
 ) => {
   const { network, connected } = session
   const configAddress = ref(initialConfigAddress.value)
-  const metadata = ref<TokenMetadata>({ name: '', symbol: '', uri: '' })
-  const firstBuy = ref(0)
+  const metadata = ref<TokenMetadata>({
+    ...(initial.metadata ?? { name: '', symbol: '', uri: '' }),
+  })
+  const firstBuy = ref(initial.firstBuy ?? 0)
   const transaction = useSignedTransaction<PreparedLaunch>(session)
   /** Why the config could not be read, as a code the screen words; null otherwise. */
   const loadRejection = ref<LoadRefusal | null>(null)

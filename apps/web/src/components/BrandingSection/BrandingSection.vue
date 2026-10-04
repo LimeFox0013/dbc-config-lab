@@ -138,7 +138,7 @@ const { t } = useI18n()
 const { network, connected, mainnetAcknowledged } = toRefs(props)
 
 const { published, branding, rejection, step, busy, error, signature, prepareAllowed, prepare, signAndSend } =
-  usePartnerBranding({ network, connected, mainnetAcknowledged })
+  usePartnerBranding({ network, connected, mainnetAcknowledged }, props.initialBranding)
 
 watch(busy, (value) => emit('busy', value))
 </script>

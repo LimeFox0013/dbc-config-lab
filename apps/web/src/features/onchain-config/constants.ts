@@ -13,5 +13,4 @@ export enum LoadRejection {
   NetworkError = 'network-error',
 }
 
-/** Longest input treated as a possible address; base58 public keys are 32–44 characters. */
-export const MAX_ADDRESS_LENGTH = 64
+export { MAX_ADDRESS_LENGTH } from '../../core/shared'

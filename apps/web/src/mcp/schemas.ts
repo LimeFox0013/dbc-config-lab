@@ -4,6 +4,12 @@ import { QuoteToken } from '../core/quote-token'
 import { SolanaNetwork } from '../core/shared'
 import { ScenarioPresetId } from '../core/sniper-scenario'
 import { Criterion } from '../core/config-search'
+import {
+  BRANDING_NAME_LIMIT,
+  BRANDING_URL_LIMIT,
+} from '../core/partner-branding'
+import { FeeRole } from '../core/fee-claim'
+import { METADATA_LIMITS } from '../core/pool-launch'
 import { MAX_SHARE_LENGTH } from '../features/config-sharing'
 import { MAX_ADDRESS_LENGTH } from '../features/onchain-config'
 import { SCENARIO_LIMITS } from '../features/comparison'
@@ -154,6 +160,131 @@ export const findLaunchpadsInput = {
     .min(1)
     .max(MAX_LAUNCHPADS_RETURNED)
     .default(DEFAULT_LAUNCHPADS_RETURNED),
+}
+
+const owner = z
+  .string()
+  .max(MAX_ADDRESS_LENGTH)
+  .describe(
+    'The wallet that will pay, sign and own the result — fee claimer, leftover receiver or pool creator. Only this wallet can sign the hand-off.',
+  )
+
+const actionNetwork = z
+  .nativeEnum(SolanaNetwork)
+  .default(SolanaNetwork.Devnet)
+  .describe('Where the action runs. Defaults to devnet.')
+
+const acknowledgeMainnet = z
+  .boolean()
+  .default(false)
+  .describe(
+    'Required true for a mainnet action, which spends real funds; set it only after the owner agreed.',
+  )
+
+const actionBase = { owner, network: actionNetwork, acknowledgeMainnet }
+
+export const previewDeployInput = {
+  ...actionBase,
+  config: designConfigSchema,
+}
+
+const percent = z.number().int().min(0).max(100)
+
+export const previewCloneInput = {
+  ...actionBase,
+  sourceAddress: onChainRef.shape.address.describe(
+    'The real config to copy, or a pool launched on it.',
+  ),
+  sourceNetwork: onChainRef.shape.network.describe(
+    'Where the original is; defaults to mainnet. The copy is deployed on network.',
+  ),
+  adjustments: z
+    .object({
+      feeSchedule: z
+        .object({
+          startingFeeBps: z.number().int().min(0),
+          endingFeeBps: z.number().int().min(0),
+          windowSeconds: z.number().int().min(0),
+        })
+        .optional()
+        .describe('Only for an original with a fee schedule; keeps its mode.'),
+      creatorTradingFeePercentage: percent.optional(),
+      liquidity: z
+        .object({
+          partnerPercentage: percent,
+          partnerLockedPercentage: percent,
+          creatorPercentage: percent,
+          creatorLockedPercentage: percent,
+        })
+        .optional()
+        .describe(
+          'Graduation liquidity shares; with any vesting shares they must total 100, and the program requires at least 10 locked.',
+        ),
+      firstBuyAtMinimumFee: z.boolean().optional(),
+    })
+    .default({})
+    .describe(
+      'Terms to change; none reshapes the bonding curve. Empty copies the original exactly.',
+    ),
+}
+
+export const previewBrandingInput = {
+  ...actionBase,
+  name: z.string().max(BRANDING_NAME_LIMIT),
+  website: z
+    .string()
+    .max(BRANDING_URL_LIMIT)
+    .default('')
+    .describe('An https URL, or empty.'),
+  logo: z
+    .string()
+    .max(BRANDING_URL_LIMIT)
+    .default('')
+    .describe('An https image URL, or empty.'),
+}
+
+export const previewLaunchInput = {
+  ...actionBase,
+  configAddress: onChainRef.shape.address.describe(
+    'The DBC config to launch on, or a pool launched on it.',
+  ),
+  name: z.string().max(METADATA_LIMITS.name),
+  symbol: z.string().max(METADATA_LIMITS.symbol),
+  uri: z
+    .string()
+    .max(METADATA_LIMITS.uri)
+    .default('')
+    .describe('Link to the token metadata JSON (https, ipfs or ar), or empty.'),
+  firstBuy: z
+    .number()
+    .min(0)
+    .default(0)
+    .describe(
+      'Whole quote tokens the creator buys in the launch transaction, so nobody buys first; 0 for none.',
+    ),
+}
+
+export const findEarningsInput = {
+  owner,
+  network: actionNetwork,
+}
+
+export const previewClaimInput = {
+  ...actionBase,
+  pool: z.string().max(MAX_ADDRESS_LENGTH),
+  role: z
+    .nativeEnum(FeeRole)
+    .describe('The role find_earnings listed the pool under.'),
+}
+
+export const operatorDashboardInput = {
+  feeWallet: z
+    .string()
+    .max(MAX_ADDRESS_LENGTH)
+    .describe(
+      'A launchpad fee wallet; it does not have to be connected or owned.',
+    ),
+  network: onChainRef.shape.network,
 }
 
 export type DesignConfigRef = z.infer<typeof designConfigSchema>

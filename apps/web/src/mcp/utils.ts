@@ -1,4 +1,12 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import {
+  CollectFeeMode,
+  MigratedCollectFeeMode,
+  MigrationFeeOption,
+  TokenAuthorityOption,
+  TokenType,
+} from '@meteora-ag/dynamic-bonding-curve-sdk'
+import type { ConfigTerms } from '../core/config-deploy'
 import { connectionFor } from '../core/config-deploy'
 import {
   compileLaunchConfig,
@@ -17,10 +25,22 @@ import type { DecodeResult, SharedConfig } from '../features/config-sharing'
 import { loadOnChainConfig } from '../features/onchain-config'
 import type { OnChainConfig } from '../features/onchain-config'
 import en from '../locales/en.json'
-import { ConfigSource, DECIMALS_KEPT, MCP_TEXT } from './constants'
+import {
+  ConfigSource,
+  DECIMALS_KEPT,
+  DEFAULT_LAB_URL,
+  LAB_URL_ENV,
+  MCP_TEXT,
+} from './constants'
 import type { AnyConfigRef, DesignConfigRef } from './schemas'
 
 type Refused = { ok: false; reason: string }
+
+/** Every tool is read-only: nothing is signed, sent or stored. */
+export const READ_ONLY = { readOnlyHint: true, destructiveHint: false } as const
+
+/** The lab site links point at; set it to the live site's URL. */
+export const labUrl = (): string => process.env[LAB_URL_ENV] ?? DEFAULT_LAB_URL
 
 export type ResolvedDesign =
   | {
@@ -32,7 +52,10 @@ export type ResolvedDesign =
 
 export type ResolvedEntry = { ok: true; entry: ComparisonEntry } | Refused
 
-const reasonOf = (refusal: { rejection: string; detail?: string }): string =>
+export const reasonOf = (refusal: {
+  rejection: string
+  detail?: string
+}): string =>
   refusal.detail ? `${refusal.rejection}: ${refusal.detail}` : refusal.rejection
 
 /** The encoded config in a share link, or the input itself when it is not a link. */
@@ -166,4 +189,28 @@ export const toolResult = (value: unknown): CallToolResult => ({
 export const toolRefusal = (reason: string): CallToolResult => ({
   isError: true,
   content: [{ type: 'text', text: reason }],
+})
+
+/** The config-terms fields that hold an SDK option number. */
+type OptionField =
+  | 'tokenAuthority'
+  | 'feesCollectedIn'
+  | 'migrationFeeOption'
+  | 'graduatedFeesCollectedIn'
+  | 'tokenType'
+
+export type ReadableTerms<T extends ConfigTerms> = Omit<T, OptionField> &
+  Record<OptionField, string | undefined>
+
+/** Config terms as an agent reads them: each SDK option number replaced by the SDK's name for it. */
+export const readableTerms = <T extends ConfigTerms>(
+  terms: T,
+): ReadableTerms<T> => ({
+  ...terms,
+  tokenAuthority: TokenAuthorityOption[terms.tokenAuthority],
+  feesCollectedIn: CollectFeeMode[terms.feesCollectedIn],
+  migrationFeeOption: MigrationFeeOption[terms.migrationFeeOption],
+  graduatedFeesCollectedIn:
+    MigratedCollectFeeMode[terms.graduatedFeesCollectedIn],
+  tokenType: TokenType[terms.tokenType],
 })

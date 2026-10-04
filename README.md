@@ -29,7 +29,117 @@ A DBC config sets the rules of a token launch: curve shape, fee schedule, gradua
 | **Income forecast** | For any config in the comparison and a number of launches: the range real launchpads with the same terms earned, with how many launchpads and launches it rests on and when they were read, plus a separate range for fees after graduation where comparables could be measured. When fewer than three launchpads share every term, it sets aside the creator's share, then the fee shape, then the graduation threshold — never the quote token — and says which. What comparable launchpads earned — not a promise. |
 | **Config report** | `/config/<config or pool>?network=…` — a read-only page for anyone deciding whether to buy or launch on a config, no wallet: the risks its terms leave open (graduation liquidity that can be withdrawn and by whom, mint or metadata authority kept, no automatic graduation, terms Meteora's SDK no longer accepts for new configs), its terms, how the real launches on it went, and a simulated typical launch — each figure labelled read or simulated. Downloads as JSON; the agent tools return the same report. Over the 200 most-graduated mainnet launchpads it finds withdrawable liquidity on 199. |
 | **Report feed** | The report for every one of the 200 launchpads in the snapshot, published with the site as JSON any terminal or script can fetch, no key: `/data/launchpads/index.json` lists each with the risks its terms leave open, its launches, graduation rate and partner income, and links its full entry (`/data/launchpads/<config>.json` — terms, risks, a simulated typical launch, the snapshot record). Each entry says what it does not carry (branding, royalty split, the page's live read of every pool). Regenerated from the snapshot on every build. |
-| **For AI agents (MCP)** | The lab as a Model Context Protocol server: an agent lists the presets, situations and goals, compares any configs (built-in, shared, edited or on chain), asks for a recommendation by goal or by its own criterion weights, reads an on-chain config with its real launches, searches the launchpad economics snapshot, and exports a config as a share link and SDK code. Same simulator, same validation as the UI; read-only — it never signs or sends a transaction, so deploying stays in your own wallet. |
+| **For AI agents (MCP)** | The lab as a Model Context Protocol server: an agent lists the presets, situations and goals, compares any configs (built-in, shared, edited or on chain), asks for a recommendation by goal or by its own criterion weights, reads an on-chain config with its real launches, searches the launchpad economics snapshot, and exports a config as a share link and SDK code. In agent mode it also proposes deploying a config or an adjusted copy of a real one, publishing launchpad branding, launching a token and claiming fees: it dry-runs each for the owner's address and returns a hand-off link where the owner checks the same summary and signs in their own wallet. Same simulator, same validation as the UI; it never signs or sends a transaction. `npx dbc-config-lab-mcp`. |
+
+## Reference
+
+### Pages
+
+| Path                                 | For                                                                                                                                                                                                                                                | Wallet                                            |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `/`                                  | The lab: launch situation, comparison and price chart, recommender, editor, preset catalogue, on-chain lookup and real launches, launchpad economics and income forecast, clone, deploy and branding, token launch, fee claims, operator dashboard | Only to deploy, launch, publish branding or claim |
+| `/launch/<config>?network=…`         | Creators launching on one launchpad: its name and logo (marked unverified), terms, a simulated typical launch, the launch form                                                                                                                     | To launch                                         |
+| `/config/<config or pool>?network=…` | Anyone deciding whether to trade or launch on a config: its risks, terms, real launches and a simulated typical launch; downloads as JSON                                                                                                          | None                                              |
+| `/act#action=…`                      | The owner of an action an agent proposed: the action rebuilt in the browser, dry-run, with the same summary as the lab's own screens; only the wallet the agent named can sign | To sign the proposed action |
+| `#config=…` on any page              | A shared config, decoded in the browser and never sent to a server                                                                                                                                                                                 | —                                                 |
+
+`network` is `devnet` or `mainnet-beta` (default).
+
+### Launch situations
+
+| Id              | Name                    | Who trades                                                                                      |
+| --------------- | ----------------------- | ----------------------------------------------------------------------------------------------- |
+| `typical`       | Typical meme launch     | A handful of first-second snipers and a steady trickle of human buyers over ten minutes         |
+| `hype`          | Hype launch             | Many snipers, patient bots and two hundred buyers in the first three minutes; usually graduates |
+| `slow-burn`     | Slow burn               | Little bot interest; buyers spread over an hour                                                 |
+| `patient-bots`  | Patient bots            | No first-second snipers; bots wait for the fee to drop before buying                            |
+| `stock-listing` | Tokenized stock listing | Thin human demand over half an hour, and arbitrage traders who know an outside price            |
+
+Every situation takes a seed, the counts and sizes of each trader group, an optional pull of unlocked liquidity right after graduation, an optional creator vesting sale, and (for `stock-listing`) the outside market cap.
+
+### Built-in presets
+
+| Id              | Name                 | Intent                                                                               |
+| --------------- | -------------------- | ------------------------------------------------------------------------------------ |
+| `flat`          | Flat 1%              | The same fee for everyone, as on most meme launchpads                                |
+| `sniper-shield` | Sniper shield        | Fee falls 90% → 1% over the first 10 seconds                                         |
+| `soft-open`     | Soft open            | Fee falls 50% → 1% over 5 seconds, exponentially: a milder deterrent                 |
+| `long-tax`      | Long tax             | Fee falls 50% → 1% over a minute; a warning: early humans pay too                    |
+| `stock-listing` | Stock listing (USDC) | Opens at a 37,500 USDC market cap, just under a ~45,000 USDC (300 SOL) outside price |
+
+Community presets live in `apps/web/src/features/community-presets/presets.json` (a share link's encoded config, a name, an intent and an optional royalty); add one by pull request.
+
+### Recommender goals and criteria
+
+| Goal                                                    | Weighs mostly                     |
+| ------------------------------------------------------- | --------------------------------- |
+| `fair-launch` — Fair launch for early buyers            | human outcome                     |
+| `sniper-deterrent` — Punish bots hardest                | bot deterrence                    |
+| `fee-income` — Maximise fee income                      | partner + creator fees            |
+| `graduate-fast` — Graduate fast                         | graduation, and how soon          |
+| `max-raise` — Raise the most                            | quote raised                      |
+| `stable-price` — Keep the price stable                  | price stability                   |
+| `early-fairness` — Keep early supply out of bots' hands | share of early supply humans hold |
+| `fair-price` — Price close to an outside price          | distance from the outside price   |
+
+Every goal keeps some weight on human buyers. Custom weights (0–1) go on the criteria `human-outcome`, `bot-deterrence`, `fee-income`, `graduation`, `raise`, `price-stability`, `early-fairness`, `fair-price`. Candidates are ranked over several seeds, and each proposal is set against a flat 1% fee.
+
+### Config report risks
+
+| Risk                  | Raised when                                                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `liquidity-pullable`  | Part of the liquidity the pool graduates with is not locked; the report says how much the launchpad and the creator can each withdraw right after graduation |
+| `mint-authority-kept` | The launchpad or the creator keeps the authority to mint more of the token and change its metadata                                                           |
+| `metadata-mutable`    | The launchpad or the creator can change the token's name, symbol and image after launch                                                                      |
+| `no-auto-graduation`  | The threshold is below Meteora's migration keepers' minimum (10 SOL, 750 USDC), so pools will not graduate on their own                                      |
+| `refused-today`       | Meteora's SDK would refuse these exact terms for a new config, with its reason                                                                               |
+
+### Agent tools (MCP)
+
+Nothing is signed, sent or stored, and no tool asks for a key. A config can be given as `{ source: "preset", id }`, `{ source: "shared", link }` (a share link or its encoded part), `{ source: "config", config }` (a full config object, validated by the program's rules) or, where noted, `{ source: "on-chain", address, network }`.
+
+| Tool                  | Input                                                                                              | Returns                                                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `list_options`        | —                                                                                                  | Presets, situations (with their full trader spec), goals with their weights, criteria                                        |
+| `compare_configs`     | `configs` (any source, on-chain included), `situation`, `seed?`, `outsideMarketCapSol?`            | One row per config: sniper, patient-bot, human and arbitrage profit, fees, graduation, raise, price path, pullable liquidity |
+| `recommend_config`    | `goal` or `weights`, `base?` (not on-chain), `situation`, `outsideMarketCapSol?`, `includeCurves?` | Ranked proposals with figures, how each compares with a flat fee, and a `shared` string to pass back in                      |
+| `load_onchain_config` | `address` (config or pool), `network`, `includeRealLaunches?`                                      | The config report (as on `/config`), its page URL, and a ref to compare it                                                   |
+| `export_config`       | a config (not on-chain)                                                                            | The config object, a share link and TypeScript that creates it with the DBC SDK                                              |
+| `find_launchpads`     | `sort`, `limit`, and filters on quote token, threshold, fee shape, creator share                   | The snapshot's matching launchpads with their record and report URL                                                          |
+| `preview_deploy_config` | `owner`, `config` (not on-chain), `network?`, `acknowledgeMainnet?` | Dry run, the deploy summary (who earns which fees, who can withdraw the graduated liquidity, who controls the token), hand-off link |
+| `preview_clone_config` | `owner`, `sourceAddress` (config or pool), `sourceNetwork?` (default mainnet), `adjustments?` (fee schedule, creator share, liquidity split and locks, first buy at the minimum fee), `network?`, `acknowledgeMainnet?` | Dry run of deploying a copy of a real config with the owner as fee claimer — exact unless adjusted, never a different curve — summary, hand-off link |
+| `preview_partner_branding` | `owner`, `name`, `website?`, `logo?`, `network?`, `acknowledgeMainnet?` | Dry run of writing the launchpad's name against the owner's fee wallet, hand-off link |
+| `preview_token_launch` | `owner`, `configAddress` (config or pool), `name`, `symbol`, `uri?`, `firstBuy?`, `network?`, `acknowledgeMainnet?` | Dry run, the config's terms for creators, the simulated first buy and its fee, hand-off link |
+| `find_earnings` | `owner`, `network?` | Every pool owing the wallet trading fees, by role, and a link to the claim page |
+| `preview_fee_claim` | `owner`, `pool`, `role`, `network?`, `acknowledgeMainnet?` | Dry run of claiming what one pool owes in one role, hand-off link |
+| `read_operator_dashboard` | `feeWallet`, `network` | The live dashboard for any launchpad fee wallet: each config's launches, graduations, lifetime and unclaimed curve fees, graduated-pool earnings, totals |
+
+**Agent mode.** The `preview_*` tools take only the owner's address. Each dry-runs the action on the target network (devnet by default) and returns what the owner will sign plus a `handoffLink` to `/act`. The link carries the proposed action, never a transaction — a prepared transaction expires within about a minute and is partly signed by a one-off key that must stay in the owner's browser — so the page builds it again, dry-runs it, shows the same summary as the lab's own screens, and lets only the wallet the agent named sign. The fee claimer, leftover receiver and pool creator are always the owner. Mainnet actions are refused unless the agent passes `acknowledgeMainnet: true`, and the owner still ticks the page's own mainnet acknowledgement. Addresses of one-off accounts (a new config, a new mint and its pool) are assigned when the owner signs. Each preview also reports `ownerBalanceSol`, and a dry run that fails because the owner holds no SOL says so. Config terms come back with the SDK's option names (`tokenAuthority: "Immutable"`) rather than numbers. A proposed clone's link carries only the original's address and the adjustments: the page reads the original from chain and rebuilds the copy itself.
+
+### Report feed format
+
+`/data/launchpads/index.json` (`version` 1; values below are illustrative):
+
+```jsonc
+{
+  "version": 1,
+  "takenAt": "2026-10-03", // when the snapshot read the chain
+  "launchpads": [
+    {
+      "configAddress": "…",
+      "risks": ["liquidity-pullable"],
+      "pullableLiquidityPercent": 89,
+      "launches": 127,
+      "graduationRate": 1, // 0–1
+      "partnerIncomeMedian": 0.004, // SOL per launch, curve fees
+      "entry": "/data/launchpads/<config>.json",
+      "reportPage": "/config/<config>?network=mainnet",
+    },
+  ],
+}
+```
+
+Each `<config>.json` entry carries the report's `terms`, `risks` and `simulated` typical launch, the fee claimer, the snapshot `record` (launches, graduations, share never traded, median time to complete, partner income median and top quarter, income after graduation, pullable liquidity) and `notCarried` — what the live page has but the feed does not: `branding`, `royalty-split`, `live-real-launches`. `version` changes when the shape does.
 
 ## What the simulations show
 
@@ -77,6 +187,7 @@ Averages over 20 seeded scenarios. Profit counts tokens still held at what each 
 ## Security
 
 - **No keys handled.** Your wallet signs; the config account's one-off keypair is generated in the browser, signs once and is discarded. The fee claimer and leftover receiver are always the connected wallet.
+- **Agents propose, owners sign.** The agent tools never hold a key or send a transaction. A hand-off link is untrusted input, decoded and checked like a share link; the page rebuilds the action itself and refuses any wallet but the one the agent named.
 - **Dry run before signing.** Every deployment is simulated on the target network first; a failing transaction is reported instead of being offered for signature. Before signing you see every setting that decides who earns fees, who can withdraw the graduated liquidity and who controls the token, read from the exact parameters in the transaction. Changing the config, network or wallet discards a prepared transaction — including one still being prepared; mainnet requires an explicit acknowledgement, and unticking it withdraws the transaction. A config opened from someone else's link is never the preselected one.
 - **Royalties hold no funds.** A royalty is split by Meteora's fee-sharing program; this tool only builds the transactions. A royalty config's vault also receives the launchpad's position in the graduated pool (the program gives it to the fee claimer), so that liquidity cannot be withdrawn — said before signing.
 - **Branding from chain is untrusted.** Anyone's wallet can publish any name, so a launch page marks it as unverified and shows the full fee wallet and config it belongs to. Names are shown as plain text with hidden characters removed; websites and logos only when they are plain https URLs, links by the host they open. Logos load from their own host (any https image is allowed by the page's policy, with no referrer sent), so that host sees the viewer's IP address.
@@ -111,13 +222,21 @@ curl https://<site>/data/launchpads/<config address>.json # one launchpad's full
 
 ### Use it from an AI agent
 
-The MCP server runs locally over stdio. For Claude Code:
+The MCP server runs locally over stdio. For Claude Code, from npm:
+
+```bash
+claude mcp add dbc-config-lab -- npx -y dbc-config-lab-mcp
+```
+
+or from a clone of this repo:
 
 ```bash
 claude mcp add dbc-config-lab -- npx tsx apps/web/src/mcp/server.ts
 ```
 
-Any other MCP client takes the same command (`npx tsx apps/web/src/mcp/server.ts`, run from the repo root). Set `DBC_LAB_URL` to the lab's site so share links open there (default `http://localhost:5180/`). Tools: `list_options`, `compare_configs`, `recommend_config`, `load_onchain_config`, `export_config`, `find_launchpads`.
+Any other MCP client takes the same command. Set `DBC_LAB_URL` to the lab's site so share and hand-off links open there (default `http://localhost:5180/`). The tools are listed under [Agent tools](#agent-tools-mcp).
+
+`npm run build:mcp -w apps/web` bundles the server, its dependencies and the launchpad snapshot into `apps/web/mcp-package/server.mjs`, the file the npm package publishes.
 
 ### Replay a real pool
 
@@ -178,7 +297,10 @@ apps/web/
   src/features/…              comparison, editor, recommendation (Web Worker), sharing, wallet, on-chain lookup,
                               launchpad economics and income forecast, launch page
   src/views, src/components   the single-page UI
+  src/features/agent-handoff  the link an agent hands an owner, and its untrusted-input decoder
   src/mcp                     the lab's tools for AI agents, as an MCP server over stdio
+  mcp-package/                the npm package that runs the bundled MCP server with npx
+  scripts/build-mcp.ts        bundles the MCP server into mcp-package/server.mjs
   scripts/mainnet-replay-verify.ts  replays a real pool's swap history and compares it swap by swap
   scripts/devnet-verify.ts    live check against devnet
   scripts/devnet-clone-verify.ts        clones mainnet configs on devnet and compares them byte for byte

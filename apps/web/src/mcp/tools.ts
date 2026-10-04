@@ -39,13 +39,7 @@ import {
   recommend,
 } from '../features/recommendation'
 import en from '../locales/en.json'
-import {
-  ConfigSource,
-  DEFAULT_LAB_URL,
-  LAB_URL_ENV,
-  MCP_TEXT,
-  ToolName,
-} from './constants'
+import { ConfigSource, MCP_TEXT, ToolName } from './constants'
 import {
   compareInput,
   exportInput,
@@ -54,16 +48,15 @@ import {
   recommendInput,
 } from './schemas'
 import {
+  labUrl,
+  READ_ONLY,
+  readableTerms,
   resolveDesign,
   resolveEntry,
   rowSummary,
   toolRefusal,
   toolResult,
 } from './utils'
-
-const READ_ONLY = { readOnlyHint: true, destructiveHint: false } as const
-
-const labUrl = (): string => process.env[LAB_URL_ENV] ?? DEFAULT_LAB_URL
 
 /** The lab's report page for a config, on the configured site. */
 const reportUrl = (
@@ -253,15 +246,17 @@ export const registerTools = (server: McpServer): void => {
             config.quoteToken,
           )
         : null
+      const report = configReport(config, {
+        branding,
+        royalty,
+        real,
+        simulated: simulationOf(
+          typicalLaunchRow(config, MCP_TEXT.typicalLaunchName),
+        ),
+      })
       return toolResult({
-        report: configReport(config, {
-          branding,
-          royalty,
-          real,
-          simulated: simulationOf(
-            typicalLaunchRow(config, MCP_TEXT.typicalLaunchName),
-          ),
-        }),
+        report: { ...report, terms: readableTerms(report.terms) },
+        ...(report.branding ? { brandingNote: MCP_TEXT.unverifiedNote } : {}),
         reportPage: reportUrl(config),
         compareAs: {
           source: ConfigSource.OnChain,

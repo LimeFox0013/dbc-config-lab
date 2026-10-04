@@ -16,11 +16,16 @@ import type { WalletSessionRefs } from '../wallet'
  * account per fee-claiming wallet and creates it once, so what is already on chain is
  * read first and shown instead of the form.
  */
-export const usePartnerBranding = (session: WalletSessionRefs) => {
+export const usePartnerBranding = (
+  session: WalletSessionRefs,
+  initial?: PartnerBranding,
+) => {
   const { network, connected } = session
   /** Undefined while being read; null when the wallet has published none. */
   const published = shallowRef<PartnerBranding | null | undefined>(undefined)
-  const branding = ref<PartnerBranding>({ name: '', website: '', logo: '' })
+  const branding = ref<PartnerBranding>({
+    ...(initial ?? { name: '', website: '', logo: '' }),
+  })
   const transaction = useSignedTransaction<PreparedTransaction>(session)
   const readError = ref<string | null>(null)
   watch(branding, transaction.discard, { deep: true })

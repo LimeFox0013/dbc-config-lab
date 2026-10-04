@@ -5,6 +5,7 @@ export {
   evenSample,
   isRecord,
   isEnumValue,
+  parseAddress,
   plainCopy,
   shortAddress,
 } from './utils'
@@ -12,6 +13,7 @@ export {
   ACCOUNTS_PER_READ,
   BPS_PER_PERCENT,
   BPS_SCALE,
+  MAX_ADDRESS_LENGTH,
   PERCENT,
   PRICE_X128_SHIFT,
   SolanaNetwork,

@@ -1,8 +1,13 @@
 import type { App } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
-import { LAUNCH_PAGE_PATH, REPORT_PAGE_PATH } from './constants'
+import {
+  HANDOFF_PAGE_PATH,
+  LAUNCH_PAGE_PATH,
+  REPORT_PAGE_PATH,
+} from './constants'
 
 export {
+  HANDOFF_PAGE_PATH,
   LAUNCH_PAGE_PATH,
   NETWORK_QUERY_KEY,
   REPORT_PAGE_PATH,
@@ -25,6 +30,11 @@ const router = createRouter({
       path: `${REPORT_PAGE_PATH}/:config`,
       name: 'report',
       component: () => import('../views/ReportView.vue'),
+    },
+    {
+      path: HANDOFF_PAGE_PATH,
+      name: 'act',
+      component: () => import('../views/ActView.vue'),
     },
   ],
 })

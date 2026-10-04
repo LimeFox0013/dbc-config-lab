@@ -12,7 +12,7 @@ import { LAUNCH_PRESETS } from '../../core/launch-config'
 import { presetEntry } from '../comparison'
 import type * as ConfigDeploy from '../../core/config-deploy'
 import type * as Wallet from '../wallet'
-import { signAndSendPrepared } from '../wallet'
+import { signAndSendPrepared, useWalletSession } from '../wallet'
 import type { DeployWallet } from '../wallet'
 import { DeployStep } from './constants'
 import type { DeployTarget } from './types'
@@ -101,12 +101,14 @@ if (!first || !second) throw new Error('needs two built-in presets')
 const setUp = async (network: SolanaNetwork) => {
   const scope = effectScope()
   const preset = ref<DeployTarget>(first)
-  const deployment = scope.run(() => useDeployment(preset))
+  const session = scope.run(() => useWalletSession())
+  if (!session) throw new Error('scope did not run')
+  const deployment = scope.run(() => useDeployment(preset, session))
   if (!deployment) throw new Error('scope did not run')
-  deployment.network.value = network
+  session.network.value = network
   await nextTick()
-  await deployment.connect(wallet)
-  return { scope, preset, deployment }
+  await session.connect(wallet)
+  return { scope, preset, deployment, session }
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -149,8 +151,8 @@ describe('useDeployment', () => {
 
   it('withdraws a mainnet transaction when the acknowledgement is taken back', async () => {
     const release = await heldPreparation()
-    const { scope, deployment } = await setUp(SolanaNetwork.Mainnet)
-    deployment.mainnetAcknowledged.value = true
+    const { scope, deployment, session } = await setUp(SolanaNetwork.Mainnet)
+    session.mainnetAcknowledged.value = true
     await nextTick()
 
     const preparing = deployment.prepare()
@@ -158,7 +160,7 @@ describe('useDeployment', () => {
     await preparing
     expect(deployment.step.value).toBe(DeployStep.Ready)
 
-    deployment.mainnetAcknowledged.value = false
+    session.mainnetAcknowledged.value = false
     await nextTick()
     await deployment.signAndSend()
 

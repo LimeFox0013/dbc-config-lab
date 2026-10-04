@@ -171,6 +171,40 @@
       "simulatedName": "A typical launch",
       "download": "Download as JSON",
       "launchLink": "Open the launch page"
+    },
+    "act": {
+      "titles": {
+        "deploy": "Deploy a launch config",
+        "clone": "Deploy a copy of a launchpad config",
+        "branding": "Publish your launchpad's name",
+        "launch": "Launch a token",
+        "claim": "Claim your trading fees"
+      },
+      "intro": "An AI agent proposed this action. Nothing happens until you sign it in your own wallet: the lab prepares it again here, dry-runs it on the network, and shows exactly what you would sign. Check every line.",
+      "network": "Network",
+      "owner": "Wallet that signs",
+      "connectOwner": "Connect the wallet the agent named: {owner}.",
+      "wrongWallet": "This wallet is not the one the agent named. Only {owner} can sign this action; connect it instead.",
+      "configName": "Config proposed by an agent",
+      "configIntent": "Opened from an agent's hand-off link.",
+      "refusedTitle": "This proposed action cannot be shown",
+      "rejections": {
+        "missing": "The link carries no proposed action.",
+        "too-long": "The link is too long to be a proposed action.",
+        "unknown-action": "The link names an action the lab does not offer.",
+        "unknown-network": "The link names an unknown network.",
+        "invalid-owner": "The link's signing wallet is not a Solana address.",
+        "invalid-config": "The proposed config is not valid: {detail}",
+        "invalid-launchpad": "The config to launch on is not a Solana address.",
+        "invalid-metadata": "The token's name, symbol or link is not valid: {detail}",
+        "invalid-first-buy": "The first buy must be zero or more.",
+        "invalid-branding": "The launchpad name, website or logo is not valid: {detail}",
+        "invalid-source": "The config to copy is not a Solana address on a known network.",
+        "invalid-adjustments": "The proposed changes to the copied config are not valid."
+      },
+      "cloneLoading": "Reading the original config from chain…",
+      "cloneRefused": "This config cannot be copied as proposed: {reason}",
+      "cloneName": "Copy of {address}"
     }
   },
   "components": {

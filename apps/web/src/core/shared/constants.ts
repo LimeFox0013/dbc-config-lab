@@ -23,3 +23,6 @@ export const ADDRESS_EDGE = 4
 
 /** Accounts per `getMultipleAccountsInfo` call — the RPC's own maximum. */
 export const ACCOUNTS_PER_READ = 100
+
+/** Longest input treated as a possible address; base58 public keys are 32–44 characters. */
+export const MAX_ADDRESS_LENGTH = 64

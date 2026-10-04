@@ -10,20 +10,10 @@ import type {
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { fromPoolConfig } from '../../core/onchain-config'
 import { quoteTokenOfMint } from '../../core/quote-token'
-import { errorMessage } from '../../core/shared'
-import { DbcAccount, LoadRejection, MAX_ADDRESS_LENGTH } from './constants'
+import { errorMessage, parseAddress } from '../../core/shared'
+import { DbcAccount, LoadRejection } from './constants'
 import type { LoadResult, ReadResult } from './types'
 import type { SolanaNetwork } from '../../core/shared'
-
-const parseAddress = (raw: string): PublicKey | null => {
-  const trimmed = raw.trim()
-  if (trimmed.length === 0 || trimmed.length > MAX_ADDRESS_LENGTH) return null
-  try {
-    return new PublicKey(trimmed)
-  } catch {
-    return null
-  }
-}
 
 type Account =
   | { kind: DbcAccount.PoolConfig; config: PoolConfig }

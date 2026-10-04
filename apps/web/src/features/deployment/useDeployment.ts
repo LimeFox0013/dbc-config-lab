@@ -5,25 +5,19 @@ import {
   prepareParametersDeployment,
 } from '../../core/config-deploy'
 import type { PreparedDeployment } from '../../core/config-deploy'
-import { useWalletSession } from '../wallet'
-import type { DeployWallet, WalletSession } from '../wallet'
+import type { WalletSessionRefs } from '../wallet'
 import type { DeployTarget } from './types'
 import { useSignedTransaction } from './useSignedTransaction'
 
 /** Deploys the chosen config — a preset, an edit or a clone — from the connected wallet. */
 export const useDeployment = (
-  target: Ref<DeployTarget>,
-  session: WalletSession = useWalletSession(),
+  target: Readonly<Ref<DeployTarget>>,
+  session: WalletSessionRefs,
 ) => {
-  const { network, mainnetAcknowledged, wallets, connected } = session
+  const { network, connected } = session
   const transaction = useSignedTransaction<PreparedDeployment>(session)
   // A replaced config (a re-added clone, an edit) drops what was prepared for the old one.
   watch(target, transaction.discard)
-
-  const connect = async (wallet: DeployWallet): Promise<void> => {
-    const reason = await session.connect(wallet)
-    if (reason) transaction.fail(reason)
-  }
 
   const prepare = (): Promise<boolean> =>
     transaction.runPreparation(async () => {
@@ -48,16 +42,11 @@ export const useDeployment = (
 
   return {
     busy: transaction.busy,
-    network,
-    mainnetAcknowledged,
-    wallets,
-    connected,
     prepared: transaction.prepared,
     step: transaction.step,
     error: transaction.error,
     signature: transaction.signature,
     prepareAllowed: transaction.canSign,
-    connect,
     prepare,
     signAndSend: transaction.signAndSend,
   }

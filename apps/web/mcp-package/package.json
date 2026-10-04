@@ -1,0 +1,28 @@
+{
+  "name": "dbc-config-lab-mcp",
+  "version": "0.2.0",
+  "description": "DBC Config Lab as an MCP server: AI agents simulate, compare and check Meteora Dynamic Bonding Curve launch configs, and propose deploys, launches and fee claims for the owner to sign.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "dbc-config-lab-mcp": "server.mjs"
+  },
+  "files": [
+    "server.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LimeFox0013/dbc-config-lab.git"
+  },
+  "keywords": [
+    "mcp",
+    "solana",
+    "meteora",
+    "dynamic-bonding-curve",
+    "launchpad"
+  ]
+}
