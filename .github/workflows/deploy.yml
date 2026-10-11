@@ -201,6 +201,19 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+      # Temporary: print which roles the deploy client's token carries (claims only, never the token).
+      - name: Diagnose deploy token roles
+        continue-on-error: true
+        run: |
+          node -e "
+          const body = new URLSearchParams({ grant_type: 'client_credentials', client_id: process.env.ID, client_secret: process.env.SECRET })
+          fetch('https://lime-fox.net/auth/realms/limefox/protocol/openid-connect/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
+            .then((r) => r.json())
+            .then((j) => { const c = JSON.parse(Buffer.from(j.access_token.split('.')[1], 'base64url').toString()); console.log(JSON.stringify({ azp: c.azp, iss: c.iss, roles: c.realm_access && c.realm_access.roles, aud: c.aud, scope: c.scope })) })
+          "
+        env:
+          ID: ${{ secrets.LFI_DEPLOY_CLIENT_ID }}
+          SECRET: ${{ secrets.LFI_DEPLOY_CLIENT_SECRET }}
       - run: npm run deploy
         env:
           REGISTRY_URL: ${{ vars.REGISTRY_URL }}
