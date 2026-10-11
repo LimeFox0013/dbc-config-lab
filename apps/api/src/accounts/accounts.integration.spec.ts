@@ -278,11 +278,12 @@ describe.skipIf(!url)('accounts against Postgres', () => {
     expect((await accounts.get(account.id))?.paidPlan).toBe(PlanId.Pro)
     expect(await payments.creditOpen()).toBe(0) // credited once, no longer open
 
-    // A request older than the window is no longer checked.
-    const later = new Date(Date.now() + OPEN_PAYMENT_WINDOW_MS + 1)
+    // A request older than the window is no longer checked. The cutoff is taken after
+    // the request exists, with a second's margin, so database latency cannot put it inside.
     const stale = await payments.request(account, PlanId.Pro)
     chain.signatures = [signatureInfo(`stale-sig-${stale.reference}`)]
     chain.transaction = transferTo(stale.reference, 49_000_000n)
+    const later = new Date(Date.now() + OPEN_PAYMENT_WINDOW_MS + 1_000)
     expect(await payments.creditOpen(later)).toBe(0)
   })
 })
