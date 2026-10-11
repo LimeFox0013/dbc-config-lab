@@ -1,0 +1,47 @@
+import { MigrationFeeOption } from '@meteora-ag/dynamic-bonding-curve-sdk'
+
+/** Trading fee of the DAMM v2 pool a fixed-fee migration option creates. */
+export const FIXED_MIGRATED_FEE_BPS: Partial<
+  Record<MigrationFeeOption, number>
+> = {
+  [MigrationFeeOption.FixedBps25]: 25,
+  [MigrationFeeOption.FixedBps30]: 30,
+  [MigrationFeeOption.FixedBps100]: 100,
+  [MigrationFeeOption.FixedBps200]: 200,
+  [MigrationFeeOption.FixedBps400]: 400,
+  [MigrationFeeOption.FixedBps600]: 600,
+}
+
+/**
+ * Share of the migrated quote the DBC program keeps as its protocol fee when it opens the
+ * DAMM v2 pool (program constant PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS; not exported by the SDK).
+ */
+export const PROTOCOL_LIQUIDITY_MIGRATION_FEE_BPS = 20
+
+/** DAMM v2 protocol and referral shares of a trading fee, in percent. */
+export const MIGRATED_PROTOCOL_FEE_PERCENT = 20
+export const MIGRATED_REFERRAL_FEE_PERCENT = 20
+
+/*
+ * The dynamic fee the DBC program gives a graduated pool when the config enables it
+ * (damm_v2_utils.rs, calculate_dynamic_fee_params; constants.rs, dynamic_fee): up to this
+ * share of the pool's lowest base fee, on the DAMM v2 SDK's default volatility settings.
+ */
+export const MIGRATED_MAX_DYNAMIC_FEE_PERCENT = 20
+export const MIGRATED_MAX_VOLATILITY_ACCUMULATOR = 14_460_000
+export const MIGRATED_SQUARE_VFA_BIN = '209091600000000'
+
+/** Why the post-graduation pool cannot be simulated exactly. */
+export const MIGRATED_UNSUPPORTED_REASONS = {
+  notDammV2: 'Only DAMM v2 migration is simulated',
+  unknownFeeSchedule: 'Unknown graduated pool fee schedule',
+  unknownFeeOption: 'Unknown migration fee option',
+  unsupportedFeeSettings: 'Unsupported migrated pool fee settings',
+} as const
+
+/** Why a swap on the migrated pool is refused, as the DAMM v2 program words it. */
+export const MIGRATED_SWAP_ERRORS = {
+  noAmount: 'Amount in must be greater than 0',
+  noLiquidity: 'The pool has no liquidity',
+  disabled: 'Swap is disabled',
+} as const

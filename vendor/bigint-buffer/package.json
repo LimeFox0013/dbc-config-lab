@@ -1,0 +1,23 @@
+{
+  "name": "@dbc-config-lab/bigint-buffer",
+  "version": "1.1.5-js.0",
+  "private": true,
+  "description": "Pure-JS stand-in for bigint-buffer: its four conversions without the native binding (CVE-2025-3194). Swapped in for bigint-buffer through npm overrides; ES module, loaded by CommonJS callers through Node's require(esm).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "devDependencies": {
+    "vitest": "^4.0.18"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
+}

@@ -1,0 +1,435 @@
+import BN from 'bn.js'
+import { describe, expect, it } from 'vitest'
+import {
+  ActivationType,
+  BaseFeeMode,
+  MigrationOption,
+  swapQuotePartialFill,
+} from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { compileLaunchConfig, DEFAULT_LAUNCH_CONFIG } from '../launch-config'
+import type { LaunchConfig } from '../launch-config'
+import {
+  exitValue,
+  feeScheduleOf,
+  FeeToken,
+  simulateLaunch,
+  TradeSide,
+  TradeStatus,
+  Venue,
+} from '.'
+import type { Trade } from '.'
+import { deltaBinId } from '../volatility-tracker'
+import {
+  addFeeShares,
+  emptyFeeShares,
+  feeTotal,
+  feeValueInQuote,
+  lockedVestingAmount,
+  nextQuoteReserve,
+  pointAt,
+  splitTradingFee,
+  timestampAt,
+  toInitialPool,
+  toPoolConfig,
+} from './utils'
+
+const SOL = new BN(1_000_000_000)
+
+/** A real SDK quote, so fixtures that override a few amounts keep the result's full shape. */
+const swapQuoteFixture = (() => {
+  const compiled = compileLaunchConfig(DEFAULT_LAUNCH_CONFIG)
+  if (!compiled.ok) throw new Error(compiled.reason)
+  return swapQuotePartialFill(
+    toInitialPool(compiled.parameters),
+    toPoolConfig(compiled.parameters),
+    false,
+    SOL,
+    0,
+    false,
+    new BN(0),
+    false,
+  )
+})()
+
+const compile = (config: LaunchConfig) => {
+  const compiled = compileLaunchConfig(config)
+  if (!compiled.ok) throw new Error(compiled.reason)
+  return compiled.parameters
+}
+
+const buy = (at: number, sol: number, trader = 'human'): Trade => ({
+  at,
+  side: TradeSide.Buy,
+  amountIn: SOL.muln(sol),
+  trader,
+})
+
+const ANTI_SNIPE: LaunchConfig = {
+  ...DEFAULT_LAUNCH_CONFIG,
+  fee: {
+    ...DEFAULT_LAUNCH_CONFIG.fee,
+    baseFeeParams: {
+      baseFeeMode: BaseFeeMode.FeeSchedulerExponential,
+      feeSchedulerParam: {
+        startingFeeBps: 5000,
+        endingFeeBps: 100,
+        numberOfPeriod: 60,
+        totalDuration: 60,
+      },
+    },
+  },
+}
+
+describe('simulateLaunch', () => {
+  it('matches the SDK quote for a single trade', () => {
+    const parameters = compile(DEFAULT_LAUNCH_CONFIG)
+    const expected = swapQuotePartialFill(
+      toInitialPool(parameters),
+      toPoolConfig(parameters),
+      false,
+      SOL,
+      0,
+      false,
+      new BN(0),
+      false,
+    )
+
+    const [outcome] = simulateLaunch(parameters, [buy(0, 1)]).outcomes
+
+    expect(outcome.amountOut.eq(expected.outputAmount)).toBe(true)
+    expect(outcome.fee.protocol.eq(expected.protocolFee)).toBe(true)
+  })
+
+  it('is deterministic', () => {
+    const parameters = compile(DEFAULT_LAUNCH_CONFIG)
+    const trades: Trade[] = [
+      buy(0, 2),
+      buy(3, 1),
+      { at: 10, side: TradeSide.SellAll, trader: 'human' },
+    ]
+    const out = (r: ReturnType<typeof simulateLaunch>) =>
+      r.outcomes.map((o) => o.amountOut.toString())
+
+    expect(out(simulateLaunch(parameters, trades))).toEqual(
+      out(simulateLaunch(parameters, trades)),
+    )
+  })
+
+  it('graduates at the threshold and keeps trading on the migrated pool', () => {
+    const result = simulateLaunch(compile(DEFAULT_LAUNCH_CONFIG), [
+      buy(0, 50),
+      buy(1, 50),
+      buy(2, 1),
+    ])
+
+    expect(result.graduatedAt).toBe(1)
+    expect(result.outcomes.map((o) => [o.status, o.venue])).toEqual([
+      [TradeStatus.Filled, Venue.Curve],
+      [TradeStatus.PartiallyFilled, Venue.Curve],
+      [TradeStatus.Filled, Venue.Migrated],
+    ])
+    expect(result.migratedPool).not.toBeNull()
+  })
+
+  it('carries the price across graduation without a jump', () => {
+    const parameters = compile(DEFAULT_LAUNCH_CONFIG)
+    const result = simulateLaunch(parameters, [buy(0, 50), buy(1, 50)])
+    const migrationSqrtPrice = toPoolConfig(parameters).migrationSqrtPrice
+    expect(result.outcomes[1].sqrtPriceAfter.eq(migrationSqrtPrice)).toBe(true)
+    expect(result.migratedPool?.sqrtPrice.eq(migrationSqrtPrice)).toBe(true)
+  })
+
+  it('collects post-graduation fees separately, split by LP share', () => {
+    const result = simulateLaunch(compile(DEFAULT_LAUNCH_CONFIG), [
+      buy(0, 50),
+      buy(1, 50),
+      buy(2, 5),
+    ])
+    const after = result.migratedFees[FeeToken.Quote]
+    expect(after.partner.add(after.creator).gtn(0)).toBe(true)
+    expect(after.partner.eq(after.creator)).toBe(true) // default config splits LP 50/50
+  })
+
+  it('refuses post-graduation trades on a migrated pool it cannot reproduce, with a reason', () => {
+    const parameters = compile(DEFAULT_LAUNCH_CONFIG)
+    // Only a DAMM v2 graduation pool is replayed.
+    const dammV1 = { ...parameters, migrationOption: MigrationOption.MET_DAMM }
+    const result = simulateLaunch(dammV1, [buy(0, 50), buy(1, 50), buy(2, 1)])
+    expect(result.outcomes[2].status).toBe(TradeStatus.Rejected)
+    expect(result.outcomes[2].reason).toContain('Migrated pool not simulated')
+  })
+
+  it('sells a whole holding on sell-all and rejects overselling', () => {
+    const result = simulateLaunch(compile(DEFAULT_LAUNCH_CONFIG), [
+      buy(0, 1, 'a'),
+      { at: 5, side: TradeSide.SellAll, trader: 'a' },
+      { at: 6, side: TradeSide.Sell, amountIn: new BN(1), trader: 'a' },
+    ])
+
+    expect(result.outcomes.map((o) => o.status)).toEqual([
+      TradeStatus.Filled,
+      TradeStatus.Filled,
+      TradeStatus.Rejected,
+    ])
+    expect(
+      result.outcomes[1].amountInUsed.eq(result.outcomes[0].amountOut),
+    ).toBe(true)
+    expect(result.holdings['a'].isZero()).toBe(true)
+  })
+
+  it('charges an early buyer more than a late one under a falling fee schedule', () => {
+    const parameters = compile(ANTI_SNIPE)
+    const [early] = simulateLaunch(parameters, [buy(0, 1)]).outcomes
+    const [late] = simulateLaunch(parameters, [buy(120, 1)]).outcomes
+
+    expect(early.fee.protocol.gt(late.fee.protocol.muln(10))).toBe(true)
+  })
+
+  describe('dynamic fee', () => {
+    const withDynamicFee = (dynamicFeeEnabled: boolean) =>
+      compile({
+        ...DEFAULT_LAUNCH_CONFIG,
+        fee: { ...DEFAULT_LAUNCH_CONFIG.fee, dynamicFeeEnabled },
+      })
+    const feesOf = (dynamicFeeEnabled: boolean, trades: Trade[]): BN[] =>
+      simulateLaunch(withDynamicFee(dynamicFeeEnabled), trades).outcomes.map(
+        (outcome) => feeTotal(outcome.fee),
+      )
+
+    it('adds a capped volatility fee after a large price move', () => {
+      const trades = [buy(0, 20), buy(1, 1)]
+      const [firstBase, secondBase] = feesOf(false, trades)
+      const [firstDynamic, secondDynamic] = feesOf(true, trades)
+
+      expect(firstDynamic?.eq(firstBase ?? new BN(0))).toBe(true)
+      expect(secondDynamic?.gt(secondBase ?? new BN(0))).toBe(true)
+      // The SDK's default dynamic-fee parameters cap the extra at 20% of the base fee.
+      expect(
+        secondDynamic?.lte((secondBase ?? new BN(0)).muln(12).divn(10)),
+      ).toBe(true)
+    })
+
+    it('partly decays the extra within the decay window', () => {
+      const [, raised, decayed] = feesOf(true, [
+        buy(0, 20),
+        buy(20, 1),
+        buy(21, 1),
+      ])
+      const [, base] = feesOf(false, [buy(0, 20), buy(20, 1)])
+
+      expect(decayed?.lt(raised ?? new BN(0))).toBe(true)
+      expect(decayed?.gt(base ?? new BN(0))).toBe(true)
+    })
+
+    it('drops the extra after a pause past the decay period, one trade later as on chain', () => {
+      const [, stillRaised, reset] = feesOf(true, [
+        buy(0, 20),
+        buy(1000, 1),
+        buy(1001, 1),
+      ])
+      const [, raised] = feesOf(true, [buy(0, 20), buy(1, 1)])
+      const [, base] = feesOf(false, [buy(0, 20), buy(1000, 1)])
+
+      expect(stillRaised?.eq(raised ?? new BN(0))).toBe(true)
+      expect(reset?.lt((base ?? new BN(0)).muln(102).divn(100))).toBe(true)
+    })
+
+    it('counts bins symmetrically and none for an unchanged price', () => {
+      const { dynamicFee } = withDynamicFee(true).poolFees
+      if (!dynamicFee) throw new Error('dynamic fee expected')
+      const low = new BN(2).pow(new BN(64))
+      const high = low.muln(101).divn(100)
+
+      expect(deltaBinId(dynamicFee.binStepU128, low, low).isZero()).toBe(true)
+      expect(
+        deltaBinId(dynamicFee.binStepU128, low, high).eq(
+          deltaBinId(dynamicFee.binStepU128, high, low),
+        ),
+      ).toBe(true)
+    })
+  })
+})
+
+describe('feeValueInQuote', () => {
+  const shares = (partner: number, protocol: number) => ({
+    partner: new BN(partner),
+    creator: new BN(0),
+    protocol: new BN(protocol),
+    referral: new BN(0),
+  })
+
+  it('passes a quote-token fee through unchanged', () => {
+    const fee = shares(80, 20)
+    expect(
+      feeValueInQuote(fee, FeeToken.Quote, true, new BN(10_000), new BN(5)),
+    ).toBe(fee)
+  })
+
+  it('values a base-token fee on a buy at the price the buyer paid', () => {
+    // 1,000 lamports bought 990 tokens plus a 10-token fee: 1 lamport per token.
+    const value = feeValueInQuote(
+      shares(8, 2),
+      FeeToken.Base,
+      true,
+      new BN(1_000),
+      new BN(990),
+    )
+    expect(value.partner.toNumber()).toBe(8)
+    expect(value.protocol.toNumber()).toBe(2)
+  })
+
+  it('values a base-token fee on a sell at the price the seller got', () => {
+    // 1,000 tokens in, 10 of them fee, 1,980 lamports out: 2 lamports per token.
+    const value = feeValueInQuote(
+      shares(10, 0),
+      FeeToken.Base,
+      false,
+      new BN(1_000),
+      new BN(1_980),
+    )
+    expect(value.partner.toNumber()).toBe(20)
+  })
+
+  it('values a fee as nothing when the trade moved nothing', () => {
+    const value = feeValueInQuote(
+      shares(10, 0),
+      FeeToken.Base,
+      true,
+      new BN(0),
+      new BN(0),
+    )
+    expect(value.partner.isZero()).toBe(true)
+  })
+})
+
+describe('fee shares', () => {
+  const fee = (partner: number, creator: number) => ({
+    partner: new BN(partner),
+    creator: new BN(creator),
+    protocol: new BN(3),
+    referral: new BN(1),
+  })
+
+  it('start empty, add share by share and total every share', () => {
+    expect(feeTotal(emptyFeeShares()).isZero()).toBe(true)
+    const sum = addFeeShares(fee(10, 20), fee(1, 2))
+    expect(sum.partner.toNumber()).toBe(11)
+    expect(sum.creator.toNumber()).toBe(22)
+    expect(sum.protocol.toNumber()).toBe(6)
+    expect(feeTotal(sum).toNumber()).toBe(11 + 22 + 6 + 2)
+  })
+
+  it('give the creator its percentage of the trading fee, rounded down, and the partner the rest', () => {
+    const split = splitTradingFee(new BN(99), new BN(5), new BN(2), 50)
+    expect(split.creator.toNumber()).toBe(49)
+    expect(split.partner.toNumber()).toBe(50)
+    expect(split.protocol.toNumber()).toBe(5)
+    expect(split.referral.toNumber()).toBe(2)
+  })
+})
+
+describe('program clock', () => {
+  it('counts seconds, or 400 ms slots for a slot-activated config', () => {
+    expect(pointAt(10, ActivationType.Timestamp).toNumber()).toBe(10)
+    expect(pointAt(10, ActivationType.Slot).toNumber()).toBe(25)
+    expect(pointAt(1.1, ActivationType.Slot).toNumber()).toBe(2)
+  })
+
+  it('places the simulated pool at an absolute unix time', () => {
+    expect(timestampAt(5).sub(timestampAt(0)).toNumber()).toBe(5)
+    expect(timestampAt(0).gtn(0)).toBe(true)
+  })
+})
+
+describe('lockedVestingAmount', () => {
+  it('is the cliff unlock plus every period’s release', () => {
+    const parameters = compile(DEFAULT_LAUNCH_CONFIG)
+    expect(lockedVestingAmount(parameters).isZero()).toBe(true)
+    const vesting = {
+      ...parameters,
+      lockedVesting: {
+        ...parameters.lockedVesting,
+        cliffUnlockAmount: new BN(100),
+        amountPerPeriod: new BN(7),
+        numberOfPeriod: new BN(3),
+      },
+    }
+    expect(lockedVestingAmount(vesting).toNumber()).toBe(121)
+  })
+})
+
+describe('nextQuoteReserve', () => {
+  const quote = {
+    excludedFeeInputAmount: new BN(990),
+    includedFeeInputAmount: new BN(1000),
+    outputAmount: new BN(500),
+    tradingFee: new BN(8),
+    protocolFee: new BN(2),
+    referralFee: new BN(0),
+  } as const
+  const pool = toInitialPool(compile(DEFAULT_LAUNCH_CONFIG))
+  const reserve = (isBuy: boolean, feesOnInput: boolean) =>
+    nextQuoteReserve(
+      {
+        poolState: { ...pool.poolState, quoteReserve: new BN(10_000) },
+      },
+      { ...swapQuoteFixture, ...quote },
+      isBuy,
+      feesOnInput,
+    ).toNumber()
+
+  it('adds a buy’s input without the fee when fees are taken from the input', () => {
+    expect(reserve(true, true)).toBe(10_990)
+    expect(reserve(true, false)).toBe(11_000)
+  })
+
+  it('pays a sale’s output, plus the fees when they are taken from it', () => {
+    expect(reserve(false, true)).toBe(9_500)
+    expect(reserve(false, false)).toBe(9_490)
+  })
+})
+
+describe('feeScheduleOf', () => {
+  it('reads the schedule back from compiled parameters', () => {
+    expect(feeScheduleOf(compile(ANTI_SNIPE))).toEqual({
+      mode: BaseFeeMode.FeeSchedulerExponential,
+      startingFeeBps: 5000,
+      endingFeeBps: 100,
+      windowSeconds: 60,
+    })
+  })
+
+  it('converts a slot-counted window back to seconds', () => {
+    const slots = compile({
+      ...ANTI_SNIPE,
+      activationType: ActivationType.Slot,
+      fee: {
+        ...ANTI_SNIPE.fee,
+        baseFeeParams: {
+          baseFeeMode: BaseFeeMode.FeeSchedulerLinear,
+          feeSchedulerParam: {
+            startingFeeBps: 5000,
+            endingFeeBps: 100,
+            numberOfPeriod: 25,
+            totalDuration: 25,
+          },
+        },
+      },
+    })
+    expect(feeScheduleOf(slots)?.windowSeconds).toBe(10)
+  })
+})
+
+describe('exitValue', () => {
+  it('is nothing for no tokens, and what a final sale on the curve fetches otherwise', () => {
+    const parameters = compile(DEFAULT_LAUNCH_CONFIG)
+    const simulation = simulateLaunch(parameters, [buy(0, 1)])
+    const [outcome] = simulation.outcomes
+    if (!outcome) throw new Error('no outcome')
+    expect(exitValue(parameters, simulation, new BN(0), 1).isZero()).toBe(true)
+    const value = exitValue(parameters, simulation, outcome.amountOut, 1)
+    // Selling back what was just bought returns less than was paid: two fees.
+    expect(value.gtn(0)).toBe(true)
+    expect(value.lt(outcome.amountInUsed)).toBe(true)
+  })
+})

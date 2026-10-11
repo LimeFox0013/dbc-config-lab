@@ -1,0 +1,16 @@
+{
+  "name": "@lf/safe-fetch",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Standalone SSRF guard: private-IP detection, protocol lockdown, and a safe fetch wrapper. Vendored source from the LimeFox platform; not edited in this repo.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0",
+    "undici": "^7.22.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@lf/agentic-account-drizzle",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Drizzle ORM implementation of @lf/agentic-account's IAgenticAccountRepository — generic over any project's own table definitions, no shared schema or DI coupling. Vendored source from the LimeFox platform; not edited in this repo.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lf/agentic-account": "*",
+    "drizzle-orm": "^0.45.2",
+    "tslib": "^2.3.0"
+  }
+}

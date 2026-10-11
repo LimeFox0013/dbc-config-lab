@@ -1,0 +1,34 @@
+import { BaseFeeMode } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import type { FeeSchedule, LaunchConfig } from './types'
+
+/** The config with only its fee schedule replaced; one fee period per second. */
+export const withSchedule = (
+  base: LaunchConfig,
+  schedule: FeeSchedule,
+): LaunchConfig => ({
+  ...base,
+  fee: {
+    ...base.fee,
+    baseFeeParams: {
+      baseFeeMode: schedule.mode,
+      feeSchedulerParam: {
+        startingFeeBps: schedule.startingFeeBps,
+        endingFeeBps: schedule.endingFeeBps,
+        numberOfPeriod: schedule.windowSeconds,
+        totalDuration: schedule.windowSeconds,
+      },
+    },
+  },
+})
+
+/** The config's fee schedule, or null for the deprecated rate-limiter mode, which is not editable. */
+export const scheduleOf = (config: LaunchConfig): FeeSchedule | null => {
+  const base = config.fee.baseFeeParams
+  if (base.baseFeeMode === BaseFeeMode.RateLimiter) return null
+  return {
+    mode: base.baseFeeMode,
+    startingFeeBps: base.feeSchedulerParam.startingFeeBps,
+    endingFeeBps: base.feeSchedulerParam.endingFeeBps,
+    windowSeconds: base.feeSchedulerParam.totalDuration,
+  }
+}

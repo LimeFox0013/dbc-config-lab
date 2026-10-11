@@ -1,4 +1,7 @@
-import type { ConnectedWallet, DeployWallet } from '../../features/wallet'
+import type {
+  ConnectedWallet,
+  DeployWallet,
+} from '@dbc-config-lab/core/features/wallet'
 import type { WalletAcknowledgement } from './constants'
 
 export interface WalletBarProps {

@@ -162,19 +162,19 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { explorerAddressUrl } from '../../core/config-deploy'
-import { QUOTE_TOKENS } from '../../core/quote-token'
+import { explorerAddressUrl } from '@dbc-config-lab/core/core/config-deploy'
+import { QUOTE_TOKENS } from '@dbc-config-lab/core/core/quote-token'
 import {
   formatCount,
   formatSol,
   shortAddress,
   SolanaNetwork,
-} from '../../core/shared'
-import { MAX_ADDRESS_LENGTH } from '../../features/onchain-config'
+} from '@dbc-config-lab/core/core/shared'
+import { MAX_ADDRESS_LENGTH } from '@dbc-config-lab/core/features/onchain-config'
 import {
   operatorTotals,
   useOperatorDashboard,
-} from '../../features/operator-dashboard'
+} from '@dbc-config-lab/core/features/operator-dashboard'
 
 const { t } = useI18n()
 const network = ref(SolanaNetwork.Mainnet)

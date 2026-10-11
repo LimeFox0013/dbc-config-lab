@@ -1,4 +1,7 @@
-import type { ComparisonRow, PricePoint } from '../../features/comparison'
+import type {
+  ComparisonRow,
+  PricePoint,
+} from '@dbc-config-lab/core/features/comparison'
 
 export interface PriceChartProps {
   rows: ComparisonRow[]

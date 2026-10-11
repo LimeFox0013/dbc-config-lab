@@ -21,7 +21,7 @@ test.describe('replay check', () => {
       'https://explorer.solana.com/address/8EeVgd9m2fvNRQ9DSqpKonfubzkkwFkPcAJQPWCvuR37',
     )
     await expect(check.locator('code').nth(1)).toHaveText(
-      'npx tsx apps/web/scripts/mainnet-replay-verify.ts Z4EsKJjpBuxKqbRNzxeWbj7PsaNcp2vjZpAHWu86Wkn Abi3ww223iVFgv7zfTBxPoAR1f7XxFWHLufQHNvGhUUC',
+      'npx tsx packages/core/scripts/mainnet-replay-verify.ts Z4EsKJjpBuxKqbRNzxeWbj7PsaNcp2vjZpAHWu86Wkn Abi3ww223iVFgv7zfTBxPoAR1f7XxFWHLufQHNvGhUUC',
     )
   })
 })

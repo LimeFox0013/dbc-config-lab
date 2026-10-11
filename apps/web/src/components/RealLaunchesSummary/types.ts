@@ -1,4 +1,4 @@
-import type { RealLaunchesState } from '../../features/real-launches'
+import type { RealLaunchesState } from '@dbc-config-lab/core/features/real-launches'
 
 export interface RealLaunchesSummaryProps {
   state: RealLaunchesState

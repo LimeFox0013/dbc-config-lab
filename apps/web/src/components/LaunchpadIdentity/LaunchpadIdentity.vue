@@ -75,9 +75,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { explorerAddressUrl } from '../../core/config-deploy'
-import { brandingHost, displayBrandingName, safeBrandingUrl } from '../../core/partner-branding'
-import { shortAddress } from '../../core/shared'
+import { explorerAddressUrl } from '@dbc-config-lab/core/core/config-deploy'
+import { brandingHost, displayBrandingName, safeBrandingUrl } from '@dbc-config-lab/core/core/partner-branding'
+import { shortAddress } from '@dbc-config-lab/core/core/shared'
 import type { LaunchpadIdentityProps } from './types'
 
 const props = defineProps<LaunchpadIdentityProps>()

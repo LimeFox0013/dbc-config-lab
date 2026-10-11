@@ -40,15 +40,15 @@
 </template>
 
 <script setup lang="ts">
-import { SolanaNetwork } from '../../core/shared'
+import { SolanaNetwork } from '@dbc-config-lab/core/core/shared'
 import { useI18n } from 'vue-i18n'
-import { explorerAddressUrl } from '../../core/config-deploy'
+import { explorerAddressUrl } from '@dbc-config-lab/core/core/config-deploy'
 import {
   REPLAY_COMMAND,
   REPLAYED_LAUNCHES,
   replayCommand,
   replayTotals,
-} from '../../features/replay-check'
+} from '@dbc-config-lab/core/features/replay-check'
 
 const { t } = useI18n()
 const totals = replayTotals(REPLAYED_LAUNCHES)

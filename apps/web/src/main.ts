@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import { setupBuffer } from './plugins/buffer'
+import { setupBuffer } from '@dbc-config-lab/core/plugins/buffer'
 import { setupVueI18n } from './plugins/vue-i18n'
 import { setupRouter } from './router'
 import './styles/main.scss'

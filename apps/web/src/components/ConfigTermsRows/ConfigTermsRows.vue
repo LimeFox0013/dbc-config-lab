@@ -166,8 +166,8 @@
 import { LiquidityHolder } from './constants'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { QUOTE_TOKENS } from '../../core/quote-token'
-import { formatAmount, formatMultiple, percentFromBps } from '../../core/shared'
+import { QUOTE_TOKENS } from '@dbc-config-lab/core/core/quote-token'
+import { formatAmount, formatMultiple, percentFromBps } from '@dbc-config-lab/core/core/shared'
 import type { ConfigTermsRowsProps } from './types'
 import { durationParts } from './utils'
 

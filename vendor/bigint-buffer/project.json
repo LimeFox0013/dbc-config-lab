@@ -1,0 +1,16 @@
+{
+  "name": "bigint-buffer",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "tags": [
+    "type:lib"
+  ],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run",
+        "cwd": "vendor/bigint-buffer"
+      }
+    }
+  }
+}

@@ -27,46 +27,21 @@
       {{ t(`components.walletBar.mainnetAcknowledge.${acknowledgement}`) }}
     </label>
 
-    <div class="wallet-bar__wallets">
-      <p
-        v-if="connected"
-        class="wallet-bar__hint"
-      >
-        {{ t('components.walletBar.connectedAs', { wallet: connected.wallet.name, address: connected.owner.toBase58() }) }}
-      </p>
-      <template v-else-if="wallets.length > 0">
-        <button
-          v-for="wallet in wallets"
-          :key="wallet.name"
-          type="button"
-          class="wallet-bar__control wallet-bar__button"
-          :disabled="disabled"
-          @click="emit('connect', wallet)"
-        >
-          <img
-            v-if="isSafeWalletIcon(wallet.icon)"
-            :src="wallet.icon"
-            alt=""
-            class="wallet-bar__icon"
-          />
-          {{ t('components.walletBar.connect', { wallet: wallet.name }) }}
-        </button>
-      </template>
-      <p
-        v-else
-        class="wallet-bar__hint"
-      >
-        {{ t('components.walletBar.noWallet') }}
-      </p>
-    </div>
+    <WalletPicker
+      :wallets="wallets"
+      :connected="connected"
+      :disabled="disabled"
+      :no-wallet-text="t('components.walletBar.noWallet')"
+      @connect="emit('connect', $event)"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { SolanaNetwork } from '../../core/shared'
+import { SolanaNetwork } from '@dbc-config-lab/core/core/shared'
 import { useI18n } from 'vue-i18n'
-import { isSafeWalletIcon } from '../../features/deployment'
-import type { DeployWallet } from '../../features/wallet'
+import type { DeployWallet } from '@dbc-config-lab/core/features/wallet'
+import { WalletPicker } from '../WalletPicker'
 import type { WalletBarProps } from './types'
 
 withDefaults(defineProps<WalletBarProps>(), { networkLocked: false })
@@ -92,8 +67,7 @@ const { t } = useI18n()
   align-self: flex-start;
 }
 
-.wallet-bar__label,
-.wallet-bar__hint {
+.wallet-bar__label {
   margin: 0;
   font-size: var(--font-size-2);
   color: var(--color-muted-foreground);
@@ -103,30 +77,11 @@ const { t } = useI18n()
   @include mixins.control;
 }
 
-.wallet-bar__button {
-  display: inline-flex;
-  gap: var(--space-2);
-  align-items: center;
-  @include mixins.clickable;
-}
-
-.wallet-bar__icon {
-  width: var(--space-4);
-  height: var(--space-4);
-}
-
 .wallet-bar__acknowledge {
   display: flex;
   gap: var(--space-2);
   align-items: center;
   color: var(--color-loss);
   font-size: var(--font-size-2);
-}
-
-.wallet-bar__wallets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  align-items: center;
 }
 </style>

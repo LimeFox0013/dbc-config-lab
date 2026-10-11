@@ -3,9 +3,10 @@ export interface ArbitraryPodSpec {
     image: string;
     ports: number[];
     env: Record<string, string>;
-    persistenceKind: 'DATABASE' | 'VOLUME';
+    persistenceKind: 'NONE' | 'DATABASE' | 'VOLUME';
     resourceTier?: string;
     assignSubdomain?: boolean;
+    subdomainLabel?: string;
 }
 export interface ArbitraryPodDeployConfig {
     apiUrl: string;

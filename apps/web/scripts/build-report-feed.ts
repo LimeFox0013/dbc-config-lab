@@ -8,8 +8,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadLaunchpads } from '../src/features/launchpad-economics'
-import { FEED_DIRECTORY, feedFiles } from '../src/features/report-feed'
+import { loadLaunchpads } from '@dbc-config-lab/core/features/launchpad-economics'
+import {
+  FEED_DIRECTORY,
+  feedFiles,
+} from '@dbc-config-lab/core/features/report-feed'
 
 const dist = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist')
 const files = feedFiles(await loadLaunchpads())

@@ -1,3 +1,7 @@
+// libs/deploy-templates/src/arbitrary-pod/constants.ts
+var ERROR_PREFIX = "[deploy-templates arbitrary-pod]";
+var ARBITRARY_PODS_PATH = "/arbitrary-pods";
+
 // libs/deploy-templates/src/arbitrary-pod/deploy.ts
 var deployArbitraryPod = async (cfg) => {
   const token = await getAccessToken(cfg);
@@ -19,12 +23,12 @@ var resolveExistingPodId = (pod, existingPods) => {
   ).id;
 };
 var listExistingPods = async (cfg, token) => {
-  const res = await fetch(`${cfg.apiUrl}/arbitrary-pods`, {
+  const res = await fetch(`${cfg.apiUrl}${ARBITRARY_PODS_PATH}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) {
     throw new Error(
-      `[deploy-templates arbitrary-pod] Listing existing pods failed: ${res.status} ${await res.text()}`
+      `${ERROR_PREFIX} Listing existing pods failed: ${res.status} ${await res.text()}`
     );
   }
   const body = await res.json();
@@ -43,20 +47,18 @@ var getAccessToken = async (cfg) => {
   });
   if (!res.ok) {
     throw new Error(
-      `[deploy-templates arbitrary-pod] Keycloak token request failed (${tokenUrl}): ${res.status} ${await res.text()}`
+      `${ERROR_PREFIX} Keycloak token request failed (${tokenUrl}): ${res.status} ${await res.text()}`
     );
   }
   const body = await res.json();
   if (!body.access_token) {
-    throw new Error(
-      "[deploy-templates arbitrary-pod] Token response missing access_token"
-    );
+    throw new Error(`${ERROR_PREFIX} Token response missing access_token`);
   }
   return body.access_token;
 };
 var declarePod = async (cfg, token, podId) => {
   const pod = cfg.pod;
-  const url = podId ? `${cfg.apiUrl}/arbitrary-pods/${podId}/redeploy` : `${cfg.apiUrl}/arbitrary-pods`;
+  const url = podId ? `${cfg.apiUrl}${ARBITRARY_PODS_PATH}/${podId}/redeploy` : `${cfg.apiUrl}${ARBITRARY_PODS_PATH}`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -69,22 +71,25 @@ var declarePod = async (cfg, token, podId) => {
       env: pod.env,
       persistenceKind: pod.persistenceKind,
       resourceTier: pod.resourceTier,
-      assignSubdomain: pod.assignSubdomain
+      assignSubdomain: pod.assignSubdomain,
+      subdomainLabel: pod.subdomainLabel
     })
   });
   if (!res.ok) {
     throw new Error(
-      `[deploy-templates arbitrary-pod] "${pod.name}" ${podId ? "redeploy" : "create"} failed (${url}): ${res.status} ${await res.text()}`
+      `${ERROR_PREFIX} "${pod.name}" ${podId ? "redeploy" : "create"} failed (${url}): ${res.status} ${await res.text()}`
     );
   }
   const body = await res.json();
   const resultId = podId ?? body.id ?? body.podId;
   if (!resultId) {
-    throw new Error(
-      `[deploy-templates arbitrary-pod] "${pod.name}" response missing pod id`
-    );
+    throw new Error(`${ERROR_PREFIX} "${pod.name}" response missing pod id`);
   }
-  return { name: pod.name, podId: resultId, action: podId ? "redeployed" : "created" };
+  return {
+    name: pod.name,
+    podId: resultId,
+    action: podId ? "redeployed" : "created"
+  };
 };
 
 // libs/deploy-templates/src/arbitrary-pod/config.ts
@@ -106,5 +111,6 @@ export {
   deployArbitraryPod,
   getAccessToken,
   loadArbitraryPodDeployConfig,
+  requireEnv,
   resolveExistingPodId
 };

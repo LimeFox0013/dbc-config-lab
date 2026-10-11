@@ -1,9 +1,12 @@
 import type { ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
-import { LIQUIDITY_SHARES } from '../../core/config-clone'
-import type { CloneAdjustments } from '../../core/config-clone'
-import type { LiquiditySplit } from '../../core/config-deploy'
-import { feeScheduleOf } from '../../core/launch-simulator'
-import { bpsFromPercent, percentFromBps } from '../../core/shared'
+import { LIQUIDITY_SHARES } from '@dbc-config-lab/core/core/config-clone'
+import type { CloneAdjustments } from '@dbc-config-lab/core/core/config-clone'
+import type { LiquiditySplit } from '@dbc-config-lab/core/core/config-deploy'
+import { feeScheduleOf } from '@dbc-config-lab/core/core/launch-simulator'
+import {
+  bpsFromPercent,
+  percentFromBps,
+} from '@dbc-config-lab/core/core/shared'
 import type { CloneForm } from './types'
 
 const liquidityOf = (parameters: ConfigParameters): LiquiditySplit => ({

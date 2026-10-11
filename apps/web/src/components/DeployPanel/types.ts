@@ -1,4 +1,4 @@
-import type { DeployTarget } from '../../features/deployment'
+import type { DeployTarget } from '@dbc-config-lab/core/features/deployment'
 
 export interface DeployPanelProps {
   targets: DeployTarget[]

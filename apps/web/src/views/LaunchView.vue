@@ -100,40 +100,30 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { ComparisonTable } from '../components/ComparisonTable'
 import { ConfigTermsRows } from '../components/ConfigTermsRows'
 import { LaunchpadIdentity } from '../components/LaunchpadIdentity'
 import { PoolLaunch } from '../components/PoolLaunch'
 import { WalletAcknowledgement, WalletBar } from '../components/WalletBar'
-import { configTerms } from '../core/config-deploy'
-import { feeScheduleOf } from '../core/launch-simulator'
-import { typicalLaunchRow } from '../features/config-report'
-import { useFeeScheduleText } from '../features/fee-text'
-import { LaunchPageStatus, networkFromQuery, reportPagePath, useLaunchPage } from '../features/launch-page'
-import { useWalletSession } from '../features/wallet'
-import type { DeployWallet } from '../features/wallet'
-import { NETWORK_QUERY_KEY } from '../router'
+import { useRoutedLaunchPage, useWalletConnect } from '../composables'
+import { configTerms } from '@dbc-config-lab/core/core/config-deploy'
+import { typicalLaunchRow } from '@dbc-config-lab/core/features/config-report'
+import { useFeeScheduleText } from '@dbc-config-lab/core/features/fee-text'
+import { LaunchPageStatus, reportPagePath } from '@dbc-config-lab/core/features/launch-page'
+import { useWalletSession } from '@dbc-config-lab/core/features/wallet'
 
 const { t } = useI18n()
 const feeScheduleText = useFeeScheduleText()
-const route = useRoute()
-const network = computed(() => networkFromQuery(route.query[NETWORK_QUERY_KEY]))
-const configAddress = computed(() => String(route.params.config ?? ''))
-const { state } = useLaunchPage(network, configAddress)
+const { network, state, ready, schedule } = useRoutedLaunchPage()
 
 const session = useWalletSession()
 watch(network, (current) => {
   session.network.value = current
 }, { immediate: true })
-const connectError = ref<string | null>(null)
-const connect = async (wallet: DeployWallet): Promise<void> => {
-  connectError.value = await session.connect(wallet)
-}
+const { connectError, connect } = useWalletConnect(session.connect)
 const launchBusy = ref(false)
 
-const ready = computed(() => (state.value.status === LaunchPageStatus.Ready ? state.value : null))
-const schedule = computed(() => (ready.value ? feeScheduleOf(ready.value.config.parameters) : null))
 const terms = computed(() =>
   ready.value ? configTerms(ready.value.config.parameters, ready.value.config.quoteToken) : null,
 )

@@ -160,19 +160,19 @@
 </template>
 
 <script setup lang="ts">
-import { useFeeScheduleText } from '../../features/fee-text'
-import { errorMessage, formatAmount, formatShare, formatSol, formatSolChange, PERCENT } from '../../core/shared'
+import { useFeeScheduleText } from '@dbc-config-lab/core/features/fee-text'
+import { errorMessage, formatAmount, formatShare, formatSol, formatSolChange, PERCENT } from '@dbc-config-lab/core/core/shared'
 import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ANCHOR_GRADUATION_FRACTIONS, ANCHOR_OPEN_FRACTIONS, botProfit, Criterion, DEFAULT_SEARCH_SEEDS } from '../../core/config-search'
-import type { MeanMetrics, Objective } from '../../core/config-search'
-import type { CurveSpec, FeeSchedule } from '../../core/launch-config'
-import { CurveShape, DEFAULT_LAUNCH_CONFIG, LAUNCH_PRESETS, UserPresetId, weightGrowthOf } from '../../core/launch-config'
-import type { LaunchPreset } from '../../core/launch-config'
-import { QUOTE_TOKENS } from '../../core/quote-token'
-import type { QuoteToken } from '../../core/quote-token'
-import { createRecommender, GOAL_OBJECTIVES, LaunchGoal, matchingPreset } from '../../features/recommendation'
-import type { Proposal, Recommendation } from '../../features/recommendation'
+import { ANCHOR_GRADUATION_FRACTIONS, ANCHOR_OPEN_FRACTIONS, botProfit, Criterion, DEFAULT_SEARCH_SEEDS } from '@dbc-config-lab/core/core/config-search'
+import type { MeanMetrics, Objective } from '@dbc-config-lab/core/core/config-search'
+import type { CurveSpec, FeeSchedule } from '@dbc-config-lab/core/core/launch-config'
+import { CurveShape, DEFAULT_LAUNCH_CONFIG, LAUNCH_PRESETS, UserPresetId, weightGrowthOf } from '@dbc-config-lab/core/core/launch-config'
+import type { LaunchPreset } from '@dbc-config-lab/core/core/launch-config'
+import { QUOTE_TOKENS } from '@dbc-config-lab/core/core/quote-token'
+import type { QuoteToken } from '@dbc-config-lab/core/core/quote-token'
+import { createRecommender, GOAL_OBJECTIVES, LaunchGoal, matchingPreset } from '@dbc-config-lab/core/features/recommendation'
+import type { Proposal, Recommendation } from '@dbc-config-lab/core/features/recommendation'
 import type { RecommenderPanelProps } from './types'
 
 const props = defineProps<RecommenderPanelProps>()

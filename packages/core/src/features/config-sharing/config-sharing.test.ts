@@ -1,0 +1,322 @@
+import { Keypair } from '@solana/web3.js'
+import { describe, expect, it } from 'vitest'
+import { RoyaltyRejection } from '../../core/preset-royalty'
+import {
+  compileLaunchConfig,
+  CurveShape,
+  DEFAULT_LAUNCH_CONFIG,
+  defaultCurve,
+  LAUNCH_PRESETS,
+  withCurve,
+  withQuoteToken,
+} from '../../core/launch-config'
+import type { LaunchConfig } from '../../core/launch-config'
+import { QUOTE_TOKENS, QuoteToken } from '../../core/quote-token'
+import { SolanaNetwork } from '../../core/shared'
+import {
+  decodeSharedConfig,
+  encodeSharedConfig,
+  MAX_SHARE_LENGTH,
+  shareLink,
+  sharedFromHash,
+  readSharedConfig,
+  ShareRejection,
+  toTypeScript,
+} from '.'
+import {
+  arrayOf,
+  boolean,
+  finiteNumber,
+  oneOf,
+  optional,
+  ReadError,
+  record,
+  text,
+} from './readers'
+import { BUILDER_BY_SHAPE } from './constants'
+import { readLaunchConfig } from './document'
+
+const encodeRaw = (value: unknown): string =>
+  btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(value))))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+const shapes = Object.values(CurveShape).map((shape) =>
+  withCurve(DEFAULT_LAUNCH_CONFIG, defaultCurve(shape)),
+)
+
+describe('round trip', () => {
+  it.each([
+    ...LAUNCH_PRESETS.map((p) => [p.id, p.config] as const),
+    ...shapes.map((c) => [c.curveShape, c] as const),
+  ])('%s reopens exactly', (_, config) => {
+    const result = decodeSharedConfig(
+      encodeSharedConfig({ config, name: 'Ünïcode — test' }),
+    )
+    expect(result).toEqual({
+      ok: true,
+      shared: { config, name: 'Ünïcode — test' },
+    })
+  })
+
+  it('reopens a link made before quote tokens existed as a SOL config', () => {
+    const { quoteToken, ...withoutQuote } = DEFAULT_LAUNCH_CONFIG
+    expect(quoteToken).toBe(QuoteToken.Sol)
+    const result = decodeSharedConfig(encodeRaw({ v: 1, config: withoutQuote }))
+    expect(result).toEqual({
+      ok: true,
+      shared: { config: DEFAULT_LAUNCH_CONFIG },
+    })
+  })
+
+  it('travels in the URL fragment of a full link', () => {
+    const link = shareLink(
+      { config: DEFAULT_LAUNCH_CONFIG },
+      'https://example.com/lab?x=1',
+    )
+    const url = new URL(link)
+    expect(url.search).toBe('?x=1')
+    const encoded = sharedFromHash(url.hash)
+    expect(encoded && decodeSharedConfig(encoded)).toMatchObject({ ok: true })
+  })
+})
+
+describe('untrusted input', () => {
+  const reject = (encoded: string) => decodeSharedConfig(encoded)
+
+  it('refuses an oversized link before decoding it', () => {
+    expect(reject('A'.repeat(MAX_SHARE_LENGTH + 1))).toEqual({
+      ok: false,
+      rejection: ShareRejection.TooLong,
+    })
+  })
+
+  it('refuses text that is not base64url, and bytes that are not UTF-8 JSON', () => {
+    expect(reject('***')).toMatchObject({
+      rejection: ShareRejection.NotDecodable,
+    })
+    expect(
+      reject(encodeRaw('just a string').slice(0, -2) + '!!'),
+    ).toMatchObject({ ok: false })
+    expect(reject(btoa('{not json'))).toMatchObject({
+      rejection: ShareRejection.NotJson,
+    })
+  })
+
+  it('refuses an unknown version', () => {
+    expect(
+      reject(encodeRaw({ v: 99, config: DEFAULT_LAUNCH_CONFIG })),
+    ).toMatchObject({ rejection: ShareRejection.WrongVersion })
+  })
+
+  it('names the field that is missing or of the wrong type', () => {
+    const missing = {
+      ...DEFAULT_LAUNCH_CONFIG,
+      token: { ...DEFAULT_LAUNCH_CONFIG.token, totalTokenSupply: undefined },
+    }
+    expect(reject(encodeRaw({ v: 1, config: missing }))).toEqual({
+      ok: false,
+      rejection: ShareRejection.InvalidField,
+      detail: 'config.token.totalTokenSupply',
+    })
+    const wrongType = {
+      ...DEFAULT_LAUNCH_CONFIG,
+      migrationQuoteThreshold: '85',
+    }
+    expect(reject(encodeRaw({ v: 1, config: wrongType }))).toMatchObject({
+      detail: 'config.migrationQuoteThreshold',
+    })
+  })
+
+  it('refuses values outside an enum', () => {
+    const badShape = { ...DEFAULT_LAUNCH_CONFIG, curveShape: 'spiral' }
+    expect(reject(encodeRaw({ v: 1, config: badShape }))).toMatchObject({
+      detail: 'config.curveShape',
+    })
+  })
+
+  it('refuses a config the DBC program would reject, with its reason', () => {
+    const lp = {
+      ...DEFAULT_LAUNCH_CONFIG.liquidityDistribution,
+      partnerLiquidityPercentage: 10,
+    }
+    const result = reject(
+      encodeRaw({
+        v: 1,
+        config: { ...DEFAULT_LAUNCH_CONFIG, liquidityDistribution: lp },
+      }),
+    )
+    expect(result).toMatchObject({
+      ok: false,
+      rejection: ShareRejection.RejectedByProgram,
+    })
+  })
+
+  it('drops unknown fields, including __proto__, without touching Object.prototype', () => {
+    const hostile = JSON.parse(
+      `{"v":1,"name":"x","extra":1,"__proto__":{"polluted":true},"config":${JSON.stringify(
+        {
+          ...DEFAULT_LAUNCH_CONFIG,
+          evil: '<script>',
+          token: {
+            ...DEFAULT_LAUNCH_CONFIG.token,
+            constructor: { prototype: { polluted: true } },
+          },
+        },
+      )}}`,
+    )
+    const result = decodeSharedConfig(encodeRaw(hostile))
+    expect(result).toEqual({
+      ok: true,
+      shared: { config: DEFAULT_LAUNCH_CONFIG, name: 'x' },
+    })
+    expect(Reflect.get({}, 'polluted')).toBeUndefined()
+  })
+
+  it('refuses an over-long name', () => {
+    expect(
+      reject(
+        encodeRaw({
+          v: 1,
+          name: 'x'.repeat(61),
+          config: DEFAULT_LAUNCH_CONFIG,
+        }),
+      ),
+    ).toMatchObject({ detail: 'name' })
+  })
+})
+
+describe('toTypeScript', () => {
+  it.each(shapes.map((c) => [c.curveShape, c] as const))(
+    'the %s snippet carries exactly the builder input the tool compiles',
+    (shape, config: LaunchConfig) => {
+      const code = toTypeScript(config)
+      expect(code).toContain(`const parameters = ${BUILDER_BY_SHAPE[shape]}(`)
+      const start = code.indexOf('(', code.indexOf('const parameters')) + 1
+      const json = code.slice(start, code.indexOf('})\n', start) + 1)
+      expect(json).not.toContain('curveShape')
+      // Read the snippet's input back through the typed reader, then compile it the way the tool does.
+      const fromSnippet = readLaunchConfig(
+        { ...JSON.parse(json), curveShape: shape },
+        'snippet',
+      )
+      expect(fromSnippet).toEqual(config)
+      const a = compileLaunchConfig(fromSnippet)
+      const b = compileLaunchConfig(config)
+      expect(
+        a.ok &&
+          b.ok &&
+          JSON.stringify(a.parameters) === JSON.stringify(b.parameters),
+      ).toBe(true)
+    },
+  )
+
+  it('creates a USDC config against devnet USDC, with USDC decimals', () => {
+    const code = toTypeScript(
+      withQuoteToken(DEFAULT_LAUNCH_CONFIG, QuoteToken.Usdc),
+    )
+    expect(code).toContain(
+      QUOTE_TOKENS[QuoteToken.Usdc].mints[SolanaNetwork.Devnet],
+    )
+    expect(code).toContain('"tokenQuoteDecimal": 6')
+    expect(code).toContain('"migrationQuoteThreshold": 12750')
+    expect(code).not.toContain('quoteToken')
+  })
+})
+
+describe('royalty in a share link', () => {
+  const author = Keypair.generate().publicKey.toBase58()
+  const config = DEFAULT_LAUNCH_CONFIG
+
+  it('travels with the preset', () => {
+    expect(
+      decodeSharedConfig(
+        encodeSharedConfig({ config, royalty: { author, sharePercent: 10 } }),
+      ),
+    ).toEqual({
+      ok: true,
+      shared: { config, royalty: { author, sharePercent: 10 } },
+    })
+  })
+
+  it('refuses a royalty that cannot be paid, naming why', () => {
+    expect(
+      decodeSharedConfig(
+        encodeSharedConfig({ config, royalty: { author, sharePercent: 90 } }),
+      ),
+    ).toEqual({
+      ok: false,
+      rejection: ShareRejection.RoyaltyRefused,
+      detail: RoyaltyRejection.ShareOutOfRange,
+    })
+  })
+})
+
+describe('readers', () => {
+  const failure = (read: () => unknown): string => {
+    try {
+      read()
+    } catch (error) {
+      if (error instanceof ReadError) return error.path
+      throw error
+    }
+    throw new Error('expected a ReadError')
+  }
+
+  it('read numbers, booleans and bounded text, naming the failing path', () => {
+    expect(finiteNumber(3, 'n')).toBe(3)
+    expect(failure(() => finiteNumber(Number.NaN, 'fee.bps'))).toBe('fee.bps')
+    expect(failure(() => finiteNumber('3', 'n'))).toBe('n')
+    expect(boolean(false, 'b')).toBe(false)
+    expect(failure(() => boolean(0, 'b'))).toBe('b')
+    expect(text(3)('abc', 't')).toBe('abc')
+    expect(failure(() => text(3)('abcd', 't'))).toBe('t')
+  })
+
+  it('read enum values, bounded lists and objects', () => {
+    expect(oneOf([1, 2])(2, 'e')).toBe(2)
+    expect(failure(() => oneOf([1, 2])(3, 'e'))).toBe('e')
+    expect(arrayOf(finiteNumber, 2)([1, 2], 'list')).toEqual([1, 2])
+    expect(failure(() => arrayOf(finiteNumber, 2)([1, 2, 3], 'list'))).toBe(
+      'list',
+    )
+    expect(failure(() => arrayOf(finiteNumber, 2)([1, 'x'], 'list'))).toBe(
+      'list[1]',
+    )
+    expect(record({ a: 1 }, 'r')).toEqual({ a: 1 })
+    expect(failure(() => record([], 'r'))).toBe('r')
+  })
+
+  it('let an optional field be absent but check it when present', () => {
+    expect(optional(finiteNumber)(undefined, 'o')).toBeUndefined()
+    expect(optional(finiteNumber)(4, 'o')).toBe(4)
+    expect(failure(() => optional(finiteNumber)(null, 'o'))).toBe('o')
+  })
+})
+
+describe('readSharedConfig', () => {
+  it('rebuilds an already-parsed config, dropping unknown fields', () => {
+    const result = readSharedConfig(
+      { config: DEFAULT_LAUNCH_CONFIG, name: 'Mine', extra: 'dropped' },
+      'input',
+    )
+    expect(result).toEqual({
+      ok: true,
+      shared: { config: DEFAULT_LAUNCH_CONFIG, name: 'Mine' },
+    })
+  })
+
+  it('names the first invalid field under the given path', () => {
+    expect(readSharedConfig({ config: 'nope' }, 'input')).toEqual({
+      ok: false,
+      rejection: ShareRejection.InvalidField,
+      detail: 'config',
+    })
+    expect(readSharedConfig([], 'input')).toEqual({
+      ok: false,
+      rejection: ShareRejection.InvalidField,
+      detail: 'input',
+    })
+  })
+})

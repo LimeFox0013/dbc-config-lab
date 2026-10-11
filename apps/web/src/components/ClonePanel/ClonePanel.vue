@@ -21,8 +21,8 @@
         >
           <option
             v-for="original in originals"
-            :key="keyOf(original)"
-            :value="keyOf(original)"
+            :key="onChainKey(original)"
+            :value="onChainKey(original)"
           >
             {{ t('components.clonePanel.originalName', { address: shortAddress(original.configAddress), network: original.network }) }}
           </option>
@@ -147,14 +147,14 @@
 </template>
 
 <script setup lang="ts">
-import { EntryIdPrefix, parametersEntry } from '../../features/comparison'
+import { EntryIdPrefix, parametersEntry } from '@dbc-config-lab/core/features/comparison'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { clonedParameters, cloneRefusal, LIQUIDITY_SHARES } from '../../core/config-clone'
-import { feeScheduleOf } from '../../core/launch-simulator'
-import { PERCENT, shortAddress } from '../../core/shared'
-import type { ComparisonEntry } from '../../features/comparison'
-import type { OnChainConfig } from '../../features/onchain-config'
+import { clonedParameters, cloneRefusal, LIQUIDITY_SHARES } from '@dbc-config-lab/core/core/config-clone'
+import { feeScheduleOf } from '@dbc-config-lab/core/core/launch-simulator'
+import { PERCENT, shortAddress } from '@dbc-config-lab/core/core/shared'
+import type { ComparisonEntry } from '@dbc-config-lab/core/features/comparison'
+import { onChainKey } from '../../shared'
 import type { ClonePanelProps, CloneForm } from './types'
 import { adjustmentsOf, formOf } from './utils'
 
@@ -162,14 +162,13 @@ const props = defineProps<ClonePanelProps>()
 const emit = defineEmits<{ add: [entry: ComparisonEntry] }>()
 const { t } = useI18n()
 
-const keyOf = (config: OnChainConfig): string => `${config.network}:${config.configAddress}`
 const originalKey = ref('')
-const selected = computed(() => props.originals.find((o) => keyOf(o) === originalKey.value) ?? null)
+const selected = computed(() => props.originals.find((o) => onChainKey(o) === originalKey.value) ?? null)
 // A newly added config becomes the one to clone.
 watch(
   () => props.originals[0],
   (newest) => {
-    if (newest) originalKey.value = keyOf(newest)
+    if (newest) originalKey.value = onChainKey(newest)
   },
   { immediate: true },
 )
@@ -205,7 +204,7 @@ const add = (): void => {
     'add',
     parametersEntry(
       {
-        id: `${EntryIdPrefix.Clone}:${keyOf(original)}`,
+        id: `${EntryIdPrefix.Clone}:${onChainKey(original)}`,
         name: t('components.clonePanel.name', { address }),
         intent: t(changed.value ? 'components.clonePanel.intentAdjusted' : 'components.clonePanel.intentExact', { address }),
       },

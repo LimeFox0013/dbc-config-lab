@@ -22,6 +22,16 @@ jobs:
   check:
     name: Typecheck, test, build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lab
+          POSTGRES_PASSWORD: lab
+          POSTGRES_DB: lab_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U lab" --health-interval 2s --health-timeout 2s --health-retries 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,6 +43,10 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run typecheck
       - run: npm test
+        env:
+          # The API's database-backed specs run against this real Postgres, concurrent ones included.
+          TEST_DATABASE_URL: postgresql://lab:lab@127.0.0.1:5432/lab_test
+          TEST_DATABASE_CONCURRENT: '1'
       - run: npm run build
 
   e2e:
@@ -67,7 +81,11 @@ jobs:
           curl -sf -o page.html -D headers.txt http://127.0.0.1:8080/
           grep -qi '^content-security-policy:' headers.txt
           ! grep -q ci-placeholder-key page.html
-          docker exec web grep -q 'api-key=ci-placeholder-key' /etc/nginx/conf.d/default.conf
+          docker exec web grep -q 'proxy_pass https://mainnet.helius-rpc.com/?api-key=ci-placeholder-key;' /etc/nginx/conf.d/default.conf
+          # Another provider is one environment variable, no rebuild (hosting-portability).
+          docker run -d --name web-other-rpc -e DBC_LAB_MAINNET_RPC_URL=https://rpc.example.com/ci dbc-config-lab-web:ci
+          for i in $(seq 1 30); do docker exec web-other-rpc test -f /etc/nginx/conf.d/default.conf && break; sleep 1; done
+          docker exec web-other-rpc grep -q 'proxy_pass https://rpc.example.com/ci;' /etc/nginx/conf.d/default.conf
           # The placeholder key is refused by the provider; any answer from it shows the
           # proxy reached it, where a gateway error or a 404 would not.
           code=$(curl -s -o rpc.txt -w '%{http_code}' -X POST \
@@ -87,9 +105,52 @@ jobs:
       - if: failure()
         run: docker logs web
 
+  api-container:
+    name: API container smoke test
+    needs: check
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: lab
+          POSTGRES_PASSWORD: lab
+          POSTGRES_DB: lab
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U lab" --health-interval 2s --health-timeout 2s --health-retries 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -f apps/api/Dockerfile -t dbc-config-lab-api:ci .
+      - name: Starts on its own database and serves the agent tools over MCP
+        run: |
+          docker run -d --name api --network host \
+            -e DATABASE_URL=postgresql://lab:lab@127.0.0.1:5432/lab \
+            -e CALLER_HASH_KEY=ci-hash-key dbc-config-lab-api:ci
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:8080/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:8080/health
+          accept='Accept: application/json, text/event-stream'
+          curl -sf -D init-headers.txt -o init.txt -H 'content-type: application/json' -H "$accept" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            http://127.0.0.1:8080/mcp
+          session=$(grep -i '^mcp-session-id:' init-headers.txt | cut -d' ' -f2 | tr -d '\r')
+          test -n "$session"
+          curl -sf -o /dev/null -H 'content-type: application/json' -H "$accept" -H "mcp-session-id: $session" \
+            -d '{"jsonrpc":"2.0","method":"notifications/initialized"}' http://127.0.0.1:8080/mcp
+          curl -sf -o tools.txt -H 'content-type: application/json' -H "$accept" -H "mcp-session-id: $session" \
+            -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' http://127.0.0.1:8080/mcp
+          grep -q 'preview_deploy_config' tools.txt
+          # A request without a session that is not an initialize is refused, not served.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'content-type: application/json' -H "$accept" \
+            -d '{"jsonrpc":"2.0","id":3,"method":"tools/list"}' http://127.0.0.1:8080/mcp)" = 400
+      - if: failure()
+        run: docker logs api
+
   image:
-    name: Build and push image
-    needs: [check, e2e, container]
+    name: Build and push images
+    needs: [check, e2e, container, api-container]
     # Only main is ever published. Skipped until the registry and deploy credentials are
     # configured for this repo.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.REGISTRY_URL != ''
@@ -113,7 +174,16 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: true
+          # Optional: the hosted API's address, when it is not the lab's own default.
+          build-args: |
+            ${{ vars.DBC_LAB_API_URL != '' && format('DBC_LAB_API_URL={0}', vars.DBC_LAB_API_URL) || '' }}
           tags: ${{ vars.REGISTRY_URL }}/limefox0013/dbc-config-lab-web:${{ env.IMAGE_TAG }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ vars.REGISTRY_URL }}/limefox0013/dbc-config-lab-api:${{ env.IMAGE_TAG }}
 
   deploy:
     name: Declare/redeploy on lime-fox-infra
@@ -139,5 +209,10 @@ jobs:
           LFI_KEYCLOAK_REALM: limefox
           LFI_DEPLOY_CLIENT_ID: ${{ secrets.LFI_DEPLOY_CLIENT_ID }}
           LFI_DEPLOY_CLIENT_SECRET: ${{ secrets.LFI_DEPLOY_CLIENT_SECRET }}
-          # The site's mainnet RPC proxy key; handed to the container, never to the page.
+          # The RPC provider key: the site's mainnet proxy and the API's chain reads.
           HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+          # Keys the API's stored caller hashes (any long random string; keep it stable).
+          CALLER_HASH_KEY: ${{ secrets.CALLER_HASH_KEY }}
+          # Paid plans (optional): USDC receiving wallet and network (mainnet-beta or devnet).
+          DBC_LAB_PAY_RECIPIENT: ${{ vars.DBC_LAB_PAY_RECIPIENT }}
+          DBC_LAB_PAY_NETWORK: ${{ vars.DBC_LAB_PAY_NETWORK }}

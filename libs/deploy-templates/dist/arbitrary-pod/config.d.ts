@@ -1,4 +1,6 @@
 import type { ArbitraryPodDeployConfig, ArbitraryPodSpec } from './types.js';
+/** The value of a required environment variable; throws, naming it, when unset or empty. */
+export declare const requireEnv: (name: string) => string;
 /**
  * Reads the Keycloak/platform connection fields from the environment (the
  * shape every graduated repo's CI passes via its GitHub Actions `env:`

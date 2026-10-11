@@ -1,6 +1,6 @@
-import type { DeployTarget } from '../../features/deployment'
-import type { ConnectedWallet } from '../../features/wallet'
-import type { SolanaNetwork } from '../../core/shared'
+import type { DeployTarget } from '@dbc-config-lab/core/features/deployment'
+import type { ConnectedWallet } from '@dbc-config-lab/core/features/wallet'
+import type { SolanaNetwork } from '@dbc-config-lab/core/core/shared'
 
 export interface ConfigDeployProps {
   target: DeployTarget

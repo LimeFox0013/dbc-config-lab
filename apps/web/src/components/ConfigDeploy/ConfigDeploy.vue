@@ -114,10 +114,10 @@
 <script setup lang="ts">
 import { toRefs, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { explorerAddressUrl, explorerTransactionUrl } from '../../core/config-deploy'
-import { QUOTE_TOKENS } from '../../core/quote-token'
-import { DeployStep, useDeployment } from '../../features/deployment'
-import { useFeeScheduleText } from '../../features/fee-text'
+import { explorerAddressUrl, explorerTransactionUrl } from '@dbc-config-lab/core/core/config-deploy'
+import { QUOTE_TOKENS } from '@dbc-config-lab/core/core/quote-token'
+import { DeployStep, useDeployment } from '@dbc-config-lab/core/features/deployment'
+import { useFeeScheduleText } from '@dbc-config-lab/core/features/fee-text'
 import { ConfigTermsRows } from '../ConfigTermsRows'
 import type { ConfigDeployProps } from './types'
 

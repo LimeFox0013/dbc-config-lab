@@ -124,11 +124,11 @@
 <script setup lang="ts">
 import { toRefs, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { explorerTransactionUrl } from '../../core/config-deploy'
-import { BRANDING_NAME_LIMIT, BRANDING_URL_LIMIT } from '../../core/partner-branding'
-import { DeployStep } from '../../features/deployment'
-import { launchPagePath } from '../../features/launch-page'
-import { usePartnerBranding } from '../../features/partner-branding'
+import { explorerTransactionUrl } from '@dbc-config-lab/core/core/config-deploy'
+import { BRANDING_NAME_LIMIT, BRANDING_URL_LIMIT } from '@dbc-config-lab/core/core/partner-branding'
+import { DeployStep } from '@dbc-config-lab/core/features/deployment'
+import { launchPagePath } from '@dbc-config-lab/core/features/launch-page'
+import { usePartnerBranding } from '@dbc-config-lab/core/features/partner-branding'
 import type { BrandingSectionProps } from './types'
 
 const props = defineProps<BrandingSectionProps>()

@@ -1,0 +1,16 @@
+{
+  "name": "@lf/mcp-http-sessions",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Session handling for an MCP server over Streamable HTTP: one server per protocol session, routed by session id, capped and expired when idle. Vendored source from the LimeFox platform; not edited in this repo.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "tslib": "^2.3.0"
+  }
+}

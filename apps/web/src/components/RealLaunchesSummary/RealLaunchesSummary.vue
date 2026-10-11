@@ -53,7 +53,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { formatShare, formatSol } from '../../core/shared'
+import { formatShare, formatSol } from '@dbc-config-lab/core/core/shared'
 import type { RealLaunchesSummaryProps } from './types'
 
 defineProps<RealLaunchesSummaryProps>()

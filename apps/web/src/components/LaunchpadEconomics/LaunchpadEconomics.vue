@@ -161,14 +161,14 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import { explorerAddressUrl } from '../../core/config-deploy'
-import { reportPagePath } from '../../features/launch-page'
-import { migratedUnsupportedReason, pullableLiquidityPercent } from '../../core/migrated-pool'
-import { QUOTE_TOKENS, wholeQuoteTokens } from '../../core/quote-token'
-import { formatAmount, formatCount, formatShare, formatSol, shortAddress } from '../../core/shared'
-import { AfterGraduationBasis, graduationRate, LaunchpadSort, rankLaunchpads, useLaunchpadSnapshot } from '../../features/launchpad-economics'
-import type { LaunchpadFilter, LaunchpadRecord } from '../../features/launchpad-economics'
-import type { OnChainConfig } from '../../features/onchain-config'
+import { explorerAddressUrl } from '@dbc-config-lab/core/core/config-deploy'
+import { reportPagePath } from '@dbc-config-lab/core/features/launch-page'
+import { migratedUnsupportedReason, pullableLiquidityPercent } from '@dbc-config-lab/core/core/migrated-pool'
+import { formatCount, formatShare, formatSol, shortAddress } from '@dbc-config-lab/core/core/shared'
+import { AfterGraduationBasis, graduationRate, LaunchpadSort, rankLaunchpads, useLaunchpadSnapshot } from '@dbc-config-lab/core/features/launchpad-economics'
+import type { LaunchpadFilter, LaunchpadRecord } from '@dbc-config-lab/core/features/launchpad-economics'
+import type { OnChainConfig } from '@dbc-config-lab/core/features/onchain-config'
+import { launchpadTermsValues, selectedValue } from '../../shared'
 import { ANY, FILTER_KEYS, FILTER_VALUES, SHOWN_LAUNCHPADS } from './constants'
 import type { FilterKey } from './types'
 
@@ -180,8 +180,8 @@ const { open, records, takenAt, onToggle } = useLaunchpadSnapshot()
 const sort = ref<LaunchpadSort>(LaunchpadSort.PartnerIncome)
 const filter = ref<LaunchpadFilter>({})
 const setFilter = (key: FilterKey, event: Event): void => {
-  if (!(event.target instanceof HTMLSelectElement)) return
-  const value = event.target.value
+  const value = selectedValue(event)
+  if (value === null) return
   // An unset key (the "any" option) matches every launchpad.
   filter.value = { ...filter.value, [key]: FILTER_VALUES[key].find((v) => v === value) }
 }
@@ -209,15 +209,11 @@ const afterText = (record: LaunchpadRecord): string => {
   }
 }
 
-const termsText = (record: LaunchpadRecord): string => {
-  const { parameters, quoteToken } = record.config
-  return t('components.launchpadEconomics.terms', {
-    threshold: formatAmount(wholeQuoteTokens(parameters.migrationQuoteThreshold, quoteToken)),
-    symbol: QUOTE_TOKENS[quoteToken].symbol,
+const termsText = (record: LaunchpadRecord): string =>
+  t('components.launchpadEconomics.terms', {
+    ...launchpadTermsValues(record.config),
     fee: t(`common.launchpadTerms.feeShape.${record.archetype.feeShape}`),
-    creator: parameters.creatorTradingFeePercentage,
   })
-}
 </script>
 
 <style lang="scss">

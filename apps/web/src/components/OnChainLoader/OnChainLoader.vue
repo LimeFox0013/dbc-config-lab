@@ -70,16 +70,16 @@
 </template>
 
 <script setup lang="ts">
-import { SolanaNetwork } from '../../core/shared'
+import { SolanaNetwork } from '@dbc-config-lab/core/core/shared'
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { connectionFor } from '../../core/config-deploy'
-import { reportPagePath } from '../../features/launch-page'
-import { loadOnChainConfig, MAX_ADDRESS_LENGTH } from '../../features/onchain-config'
-import type { OnChainConfig } from '../../features/onchain-config'
-import { fetchRealLaunches } from '../../features/real-launches'
-import type { RealLaunchesState } from '../../features/real-launches'
+import { connectionFor } from '@dbc-config-lab/core/core/config-deploy'
+import { reportPagePath } from '@dbc-config-lab/core/features/launch-page'
+import { loadOnChainConfig, MAX_ADDRESS_LENGTH } from '@dbc-config-lab/core/features/onchain-config'
+import type { OnChainConfig } from '@dbc-config-lab/core/features/onchain-config'
+import type { RealLaunchesState } from '@dbc-config-lab/core/features/real-launches'
+import { readRealLaunches } from '../../shared'
 import { RealLaunchesSummary } from '../RealLaunchesSummary'
 
 const emit = defineEmits<{ load: [loaded: OnChainConfig] }>()
@@ -114,8 +114,7 @@ const load = async (): Promise<void> => {
   emit('load', result.loaded)
   loadedConfig.value = result.loaded
   real.value = { loading: true }
-  const { configAddress, parameters, quoteToken } = result.loaded
-  const launches = await fetchRealLaunches(connectionFor(result.loaded.network), configAddress, parameters, quoteToken)
+  const launches = await readRealLaunches(result.loaded)
   if (current === lookup) real.value = { loading: false, result: launches }
 }
 </script>

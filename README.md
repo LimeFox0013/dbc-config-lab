@@ -30,6 +30,7 @@ A DBC config sets the rules of a token launch: curve shape, fee schedule, gradua
 | **Config report** | `/config/<config or pool>?network=…` — a read-only page for anyone deciding whether to buy or launch on a config, no wallet: the risks its terms leave open (graduation liquidity that can be withdrawn and by whom, mint or metadata authority kept, no automatic graduation, terms Meteora's SDK no longer accepts for new configs), its terms, how the real launches on it went, and a simulated typical launch — each figure labelled read or simulated. Downloads as JSON; the agent tools return the same report. Over the 200 most-graduated mainnet launchpads it finds withdrawable liquidity on 199. |
 | **Report feed** | The report for every one of the 200 launchpads in the snapshot, published with the site as JSON any terminal or script can fetch, no key: `/data/launchpads/index.json` lists each with the risks its terms leave open, its launches, graduation rate and partner income, and links its full entry (`/data/launchpads/<config>.json` — terms, risks, a simulated typical launch, the snapshot record). Each entry says what it does not carry (branding, royalty split, the page's live read of every pool). Regenerated from the snapshot on every build. |
 | **For AI agents (MCP)** | The lab as a Model Context Protocol server: an agent lists the presets, situations and goals, compares any configs (built-in, shared, edited or on chain), asks for a recommendation by goal or by its own criterion weights, reads an on-chain config with its real launches, searches the launchpad economics snapshot, and exports a config as a share link and SDK code. In agent mode it also proposes deploying a config or an adjusted copy of a real one, publishing launchpad branding, launching a token and claiming fees: it dry-runs each for the owner's address and returns a hand-off link where the owner checks the same summary and signs in their own wallet. Same simulator, same validation as the UI; it never signs or sends a transaction. `npx dbc-config-lab-mcp`. |
+| **Account** | `/account` — your account on the lab's hosted service. Sign in by signing the service's challenge with your wallet (no password; the session is the service's own cookie). See your plan and today's tool calls, and pay for Pro in USDC from your wallet — shown as paid only once the service credits the transfer. Create API keys for agents (each shown once, then listed by label and prefix; revoke any), watch configs or fee wallets for new pools, graduations, risk changes or unclaimed fees (pause, resume, delete; the changes seen are listed), and register webhook addresses (signing secret shown once; send a test; read the delivery log). Refusals are shown in the service's own words. |
 
 ## Reference
 
@@ -41,6 +42,7 @@ A DBC config sets the rules of a token launch: curve shape, fee schedule, gradua
 | `/launch/<config>?network=…`         | Creators launching on one launchpad: its name and logo (marked unverified), terms, a simulated typical launch, the launch form                                                                                                                     | To launch                                         |
 | `/config/<config or pool>?network=…` | Anyone deciding whether to trade or launch on a config: its risks, terms, real launches and a simulated typical launch; downloads as JSON                                                                                                          | None                                              |
 | `/act#action=…`                      | The owner of an action an agent proposed: the action rebuilt in the browser, dry-run, with the same summary as the lab's own screens; only the wallet the agent named can sign | To sign the proposed action |
+| `/account`                           | Anyone using the hosted service: sign-in, plan and usage, Pro payment, API keys, watches, webhook addresses | To sign in and to pay |
 | `#config=…` on any page              | A shared config, decoded in the browser and never sent to a server                                                                                                                                                                                 | —                                                 |
 
 `network` is `devnet` or `mainnet-beta` (default).
@@ -67,7 +69,7 @@ Every situation takes a seed, the counts and sizes of each trader group, an opti
 | `long-tax`      | Long tax             | Fee falls 50% → 1% over a minute; a warning: early humans pay too                    |
 | `stock-listing` | Stock listing (USDC) | Opens at a 37,500 USDC market cap, just under a ~45,000 USDC (300 SOL) outside price |
 
-Community presets live in `apps/web/src/features/community-presets/presets.json` (a share link's encoded config, a name, an intent and an optional royalty); add one by pull request.
+Community presets live in `packages/core/src/features/community-presets/presets.json` (a share link's encoded config, a name, an intent and an optional royalty); add one by pull request.
 
 ### Recommender goals and criteria
 
@@ -96,7 +98,7 @@ Every goal keeps some weight on human buyers. Custom weights (0–1) go on the c
 
 ### Agent tools (MCP)
 
-Nothing is signed, sent or stored, and no tool asks for a key. A config can be given as `{ source: "preset", id }`, `{ source: "shared", link }` (a share link or its encoded part), `{ source: "config", config }` (a full config object, validated by the program's rules) or, where noted, `{ source: "on-chain", address, network }`.
+Unless you turn on the [local policy signer](#signing-locally-under-a-policy), nothing is signed, sent or stored, and no tool asks for a key. A config can be given as `{ source: "preset", id }`, `{ source: "shared", link }` (a share link or its encoded part), `{ source: "config", config }` (a full config object, validated by the program's rules) or, where noted, `{ source: "on-chain", address, network }`.
 
 | Tool                  | Input                                                                                              | Returns                                                                                                                      |
 | --------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -113,8 +115,93 @@ Nothing is signed, sent or stored, and no tool asks for a key. A config can be g
 | `find_earnings` | `owner`, `network?` | Every pool owing the wallet trading fees, by role, and a link to the claim page |
 | `preview_fee_claim` | `owner`, `pool`, `role`, `network?`, `acknowledgeMainnet?` | Dry run of claiming what one pool owes in one role, hand-off link |
 | `read_operator_dashboard` | `feeWallet`, `network` | The live dashboard for any launchpad fee wallet: each config's launches, graduations, lifetime and unclaimed curve fees, graduated-pool earnings, totals |
+| `execute_deploy_config`, `execute_clone_config`, `execute_partner_branding`, `execute_token_launch`, `execute_fee_claim` | the matching preview's input, without `owner` and `acknowledgeMainnet` | Local signer only: signs and sends the action within your policy; signatures, explorer links, the new accounts, SOL spent and spent today |
 
 **Agent mode.** The `preview_*` tools take only the owner's address. Each dry-runs the action on the target network (devnet by default) and returns what the owner will sign plus a `handoffLink` to `/act`. The link carries the proposed action, never a transaction — a prepared transaction expires within about a minute and is partly signed by a one-off key that must stay in the owner's browser — so the page builds it again, dry-runs it, shows the same summary as the lab's own screens, and lets only the wallet the agent named sign. The fee claimer, leftover receiver and pool creator are always the owner. Mainnet actions are refused unless the agent passes `acknowledgeMainnet: true`, and the owner still ticks the page's own mainnet acknowledgement. Addresses of one-off accounts (a new config, a new mint and its pool) are assigned when the owner signs. Each preview also reports `ownerBalanceSol`, and a dry run that fails because the owner holds no SOL says so. Config terms come back with the SDK's option names (`tokenAuthority: "Immutable"`) rather than numbers. A proposed clone's link carries only the original's address and the adjustments: the page reads the original from chain and rebuilds the copy itself.
+
+#### Signing locally under a policy
+
+The locally run server can also act on its own, as one wallet you give it and only within limits you write down. Set both variables, each naming a file:
+
+```bash
+DBC_LAB_KEYPAIR=~/.config/solana/lab-agent.json   # a Solana keypair file, as solana-keygen writes it
+DBC_LAB_POLICY=~/.config/dbc-lab/policy.json
+```
+
+```json
+{
+  "actions": ["execute_token_launch", "execute_fee_claim"],
+  "networks": ["devnet"],
+  "maxSolPerAction": 0.1,
+  "maxSolPerDay": 0.5
+}
+```
+
+With both set and valid, the server adds the `execute_*` tools for the actions the previews cover. That wallet is the owner: it pays, claims fees and creates pools, and each action is built exactly as its preview builds it. Every transaction is simulated and checked before it is signed, and anything outside the policy is refused with the rule it broke, with nothing signed:
+
+- `actions` — the `execute_*` tools allowed to run;
+- `networks` — `devnet`, and `mainnet-beta` only if you list it;
+- `maxSolPerAction` and `maxSolPerDay` — SOL leaving the wallet in the simulation, fees included; the day is UTC, and its spend is kept in `<policy file>.spend.json`, so a restart does not reset it;
+- `programs` (optional) — the programs a transaction may call, directly or through another program. Without it: DBC, DAMM v2, fee sharing, System, SPL Token, Associated Token, Compute Budget and Token Metadata. A list you give replaces that one.
+
+An action is checked in full before any of it is signed, and actions run one at a time. If only one variable is set, or either file is unreadable or invalid, the server starts with previews only and says why in its log. Use a wallet that holds only what you are willing to let the agent spend. The hosted endpoint never offers these tools, whatever its environment holds.
+
+### Hosted agent API
+
+`apps/api` serves the same agent tools over the network, plus accounts, API keys, paid plans, watches and webhooks. It is a NestJS service with its own Postgres database; migrations run at start-up.
+
+**Agent tools.** `POST /mcp` (and `GET`/`DELETE /mcp` for the session stream) speaks MCP Streamable HTTP and runs the same server as the npm package — the same tools, inputs and figures, previews only. Without a key, calls count against the caller's network address (stored only as a keyed hash). With `Authorization: Bearer <key>`, they count against the key's account and its plan. Only `tools/call` messages count; listing tools is free. A call over the day's allowance gets HTTP 429 with JSON-RPC error `-32001`; a revoked or unknown key gets HTTP 401 with `-32002` and is never served as anonymous. Allowances reset at 00:00 UTC.
+
+**Plans.**
+
+| Plan | Tool calls per UTC day | Watches | Price |
+|---|---|---|---|
+| Free | 200 | 3 | — |
+| Pro | 20,000 | 50 | 49 USDC per 30 days |
+
+A Pro period runs on from the current end while one is active. When it lapses the account is Free again: extra watches stay stored, and only the oldest ones within the Free limit keep being checked.
+
+**Sign-in.** Sign-In With Solana: `POST /auth/challenge { address }` returns a message naming the site; the wallet signs it with `signMessage`; `POST /auth/session { message, signature }` checks the signature, the site's domain and the one-time challenge (5 minutes, burned on first use) and sets an http-only `lab_session` cookie (7 days, only the hash of its token is stored). `DELETE /auth/session` signs out. One account per wallet, created on first sign-in. Only the site's own origin may call with the cookie.
+
+**Account endpoints** (signed in):
+
+| Endpoint | What it does |
+|---|---|
+| `GET /account` | Wallet, plan, plan end, today's calls and the plan's limits |
+| `GET /account/keys`, `POST /account/keys { label }`, `DELETE /account/keys/:id` | API keys. The full key is in the create response only; listings show its label and prefix |
+| `POST /account/payments { plan: "pro" }` | A Solana Pay USDC transfer request (a `solana:` URL with a unique reference) for the wallet to sign |
+| `GET /account/payments/:reference` | Checks the chain and credits the plan once the transfer is finalized and pays the full amount |
+| `GET /account/watches`, `POST /account/watches`, `PATCH /account/watches/:id { paused }`, `DELETE /account/watches/:id` | Watches |
+| `GET /account/events` | The last 100 recorded changes, newest first |
+| `GET /account/webhooks`, `POST /account/webhooks { url }`, `DELETE /account/webhooks/:id`, `POST /account/webhooks/:id/test` | Webhook addresses, and a test delivery sent at once |
+| `GET /account/deliveries` | The last 100 deliveries with every attempt |
+
+The service never signs or sends: the wallet pays, and the service only reads the chain. A transfer credits a plan once, however often it is checked. A background check also credits requests up to 7 days old, so a payer who closes the page is still credited. Paid plans are off until `DBC_LAB_PAY_RECIPIENT` is set.
+
+**Watches.** `POST /account/watches { kind, target, network?, thresholdSol? }`. A `config` watch follows a launch config: new pools, graduations, and changes to its open risks. A `fee-wallet` watch follows a launchpad fee wallet and reports once each time its unclaimed fees rise to `thresholdSol` (required). The first check only records a baseline. Every 3 minutes one instance (a Postgres advisory lock) checks each active watch, records each change once and queues its deliveries in the same transaction. Paused watches count towards the plan's limit.
+
+**Webhooks.** Up to 5 https addresses per account; private, loopback and link-local addresses are refused when registered and again at every send, and redirects are not followed. The signing secret (`whsec_…`) is shown once, at registration, and stored encrypted. Each delivery is a JSON `POST` with:
+
+- `X-Lab-Event` — the change type (`new-pool`, `graduation`, `risks-changed`, `fees-above-threshold`, or `test`);
+- `X-Lab-Timestamp` — seconds since the epoch;
+- `X-Lab-Signature` — `sha256=` + hex HMAC-SHA256 of `<timestamp>.<body>`, keyed with the secret.
+
+Any 2xx answer is delivered. Otherwise it is retried after 30 s, doubling each time, for 6 attempts in all.
+
+**Configuration.**
+
+| Variable | |
+|---|---|
+| `DATABASE_URL` | Postgres connection string (required) |
+| `CALLER_HASH_KEY` | Secret that keys the address hash and the webhook-secret encryption (required) |
+| `DBC_LAB_SITE_ORIGIN` | The site's origin: the sign-in domain and the only CORS origin allowed with a cookie (default: `DBC_LAB_URL`'s origin) |
+| `DBC_LAB_PAY_RECIPIENT` | Wallet that receives plan payments; unset turns paid plans off |
+| `DBC_LAB_PAY_NETWORK` | `mainnet-beta` (default) or `devnet` |
+| `DBC_LAB_URL`, `DBC_LAB_RPC_MAINNET`, `DBC_LAB_RPC_DEVNET` | As for the [local agent server](#use-it-from-an-ai-agent) |
+| `PORT` | Listening port (default 8080) |
+| `MIGRATIONS_DIR` | Migrations folder (default: `drizzle` next to the bundle) |
+
+`GET /health` answers `{ "status": "ok" }`. Errors other than deliberate refusals reach the caller as a generic message only.
 
 ### Report feed format
 
@@ -180,14 +267,15 @@ Averages over 20 seeded scenarios. Profit counts tokens still held at what each 
 - **Slot-based configs** (often from other launchpads) count time in slots; scenario seconds are converted at 400 ms per slot.
 - **Exit values** assume each group sells all remaining tokens at the end.
 - **Vested tokens** are sold in one sale after the last trade: nobody trades between unlocks in this model, so the unlock schedule itself does not change the outcome.
-- **Checked against real pools:** the full swap history of eight mainnet launches replays with every fee, output, price and pool balance equal to what the programs recorded (`apps/web/scripts/mainnet-replay-verify.ts`): 386 bonding-curve swaps, covering the volatility fee, fees taken in SOL and in the token and a creator's first buy at the minimum fee, and — for the seven launches that graduated — each migrated DAMM v2 pool's opening state, its 970 swaps since (four of the pools compounding, with their reserves checked after every swap; three with the graduated pool's own volatility fee; two with a fee falling as the price rises) and liquidity added and withdrawn. Liquidity providers adding or removing liquidity after graduation is modelled only as the option above (all unlocked liquidity pulled at once); the replay applies it as recorded.
+- **Checked against real pools:** the full swap history of eight mainnet launches replays with every fee, output, price and pool balance equal to what the programs recorded (`packages/core/scripts/mainnet-replay-verify.ts`): 386 bonding-curve swaps, covering the volatility fee, fees taken in SOL and in the token and a creator's first buy at the minimum fee, and — for the seven launches that graduated — each migrated DAMM v2 pool's opening state, its 970 swaps since (four of the pools compounding, with their reserves checked after every swap; three with the graduated pool's own volatility fee; two with a fee falling as the price rises) and liquidity added and withdrawn. Liquidity providers adding or removing liquidity after graduation is modelled only as the option above (all unlocked liquidity pulled at once); the replay applies it as recorded.
 - **Fees in either token:** a fee a config collects in the launched token is reported in SOL, valued at the price of the trade that paid it. Real pools' fees in the launched token (launchpad economics, live configs) are valued at the curve's average price — what it raises ÷ the tokens it sells — because a curve can end far above what its tokens sold for.
 - **Income after graduation** counts quote-token fees on the positions a launchpad's fee wallet still holds (claimed plus pending, up to 500 sampled); fees taken in the launched token are not counted, and launchpads sharing one fee wallet share one figure.
 
 ## Security
 
 - **No keys handled.** Your wallet signs; the config account's one-off keypair is generated in the browser, signs once and is discarded. The fee claimer and leftover receiver are always the connected wallet.
-- **Agents propose, owners sign.** The agent tools never hold a key or send a transaction. A hand-off link is untrusted input, decoded and checked like a share link; the page rebuilds the action itself and refuses any wallet but the one the agent named.
+- **Agents propose, owners sign.** The agent tools never hold a key or send a transaction — unless you run the server yourself with the [local policy signer](#signing-locally-under-a-policy) turned on, and then only within your policy. A hand-off link is untrusted input, decoded and checked like a share link; the page rebuilds the action itself and refuses any wallet but the one the agent named.
+- **The hosted API stores no secrets in the clear.** Session tokens and API keys are kept as hashes, callers' network addresses as keyed hashes, and webhook signing secrets encrypted. It holds no wallet key and never signs.
 - **Dry run before signing.** Every deployment is simulated on the target network first; a failing transaction is reported instead of being offered for signature. Before signing you see every setting that decides who earns fees, who can withdraw the graduated liquidity and who controls the token, read from the exact parameters in the transaction. Changing the config, network or wallet discards a prepared transaction — including one still being prepared; mainnet requires an explicit acknowledgement, and unticking it withdraws the transaction. A config opened from someone else's link is never the preselected one.
 - **Royalties hold no funds.** A royalty is split by Meteora's fee-sharing program; this tool only builds the transactions. A royalty config's vault also receives the launchpad's position in the graduated pool (the program gives it to the fee claimer), so that liquidity cannot be withdrawn — said before signing.
 - **Branding from chain is untrusted.** Anyone's wallet can publish any name, so a launch page marks it as unverified and shows the full fee wallet and config it belongs to. Names are shown as plain text with hidden characters removed; websites and logos only when they are plain https URLs, links by the host they open. Logos load from their own host (any https image is allowed by the page's policy, with no referrer sent), so that host sees the viewer's IP address.
@@ -211,6 +299,16 @@ npm run typecheck
 npm run build
 ```
 
+### Run the hosted API
+
+```bash
+npm run build -w apps/api
+DATABASE_URL=postgres://… CALLER_HASH_KEY=… npm start -w apps/api   # http://localhost:8080
+npm test -w apps/api   # unit tests; set TEST_DATABASE_URL to a scratch Postgres to run the database tests too
+```
+
+The database tests migrate the database they are given and leave rows in it, so never point `TEST_DATABASE_URL` at real data. See [Hosted agent API](#hosted-agent-api) for the other variables.
+
 ### Fetch the report feed
 
 `npm run build` writes the feed into `apps/web/dist/data/launchpads/`; the site serves it from any origin:
@@ -231,17 +329,19 @@ claude mcp add dbc-config-lab -- npx -y dbc-config-lab-mcp
 or from a clone of this repo:
 
 ```bash
-claude mcp add dbc-config-lab -- npx tsx apps/web/src/mcp/server.ts
+claude mcp add dbc-config-lab -- npx tsx packages/core/src/mcp/server.ts
 ```
 
-Any other MCP client takes the same command. Set `DBC_LAB_URL` to the lab's site so share and hand-off links open there (default `http://localhost:5180/`). Chain reads use Solana's public endpoints, which rate-limit heavy reads (earnings, dashboards, real launches); set `DBC_LAB_RPC_MAINNET` and/or `DBC_LAB_RPC_DEVNET` to a provider's http(s) URL to use it instead — the URL is never echoed back to the agent. The tools are listed under [Agent tools](#agent-tools-mcp).
+Any other MCP client takes the same command. Set `DBC_LAB_URL` to the lab's site so share and hand-off links open there (default: the live site, `https://lf-aw-pod.dbc-lab.at.lime-fox.net/`; use `http://localhost:5180/` with `npm run dev`). Chain reads use Solana's public endpoints, which rate-limit heavy reads (earnings, dashboards, real launches); set `DBC_LAB_RPC_MAINNET` and/or `DBC_LAB_RPC_DEVNET` to a provider's http(s) URL to use it instead — the URL is never echoed back to the agent. The tools are listed under [Agent tools](#agent-tools-mcp).
 
-`npm run build:mcp -w apps/web` bundles the server, its dependencies and the launchpad snapshot into `apps/web/mcp-package/server.mjs`, the file the npm package publishes.
+To use the hosted endpoint instead, point an MCP client that speaks Streamable HTTP at `https://<api host>/mcp`, adding `Authorization: Bearer <key>` for a key's plan. See [Hosted agent API](#hosted-agent-api).
+
+`npm run build:mcp -w packages/core` bundles the server, its dependencies and the launchpad snapshot into `packages/core/mcp-package/server.mjs`, the file the npm package publishes.
 
 ### Replay a real pool
 
 ```bash
-npx tsx apps/web/scripts/mainnet-replay-verify.ts <pool address>
+npx tsx packages/core/scripts/mainnet-replay-verify.ts <pool address>
 ```
 
 Read-only, over the public mainnet RPC. Loads a DBC pool and its config, then replays every swap the pool ever executed — from its on-chain swap events — through the simulator's math from a fresh pool, and compares each swap's fees, output, price and quote reserve with what the program recorded. Add the address of the DAMM v2 pool the launch migrated to (`<pool> <migrated pool>`) to also check the simulator's migrated pool against the one the program opened and replay that pool's swaps.
@@ -249,7 +349,7 @@ Read-only, over the public mainnet RPC. Loads a DBC pool and its config, then re
 ### Verify the simulator against devnet
 
 ```bash
-npx tsx apps/web/scripts/devnet-verify.ts
+npx tsx packages/core/scripts/devnet-verify.ts
 ```
 
 Generates a throwaway keypair in memory, funds it (faucet airdrop, or prints the address to fund from https://faucet.solana.com), deploys a flat-fee config through the same code path as the UI, creates a pool, makes real swaps, and compares the stored config, pool reserve, price and fee totals with the simulator's numbers.
@@ -257,7 +357,7 @@ Generates a throwaway keypair in memory, funds it (faucet airdrop, or prints the
 ### Check that cloning reproduces a real config
 
 ```bash
-npx tsx apps/web/scripts/devnet-clone-verify.ts <devnet keypair.json> <mainnet config>...
+npx tsx packages/core/scripts/devnet-clone-verify.ts <devnet keypair.json> <mainnet config>...
 ```
 
 Reads each mainnet config, clones it unchanged onto devnet through the same code the UI uses (the keypair file must hold some devnet SOL), and compares the two accounts byte for byte — only the fee claimer, the leftover receiver and, for USDC, the quote mint may differ.
@@ -265,7 +365,7 @@ Reads each mainnet config, clones it unchanged onto devnet through the same code
 ### Check royalties on devnet
 
 ```bash
-npx tsx apps/web/scripts/devnet-royalty-verify.ts <devnet keypair.json>
+npx tsx packages/core/scripts/devnet-royalty-verify.ts <devnet keypair.json>
 ```
 
 Deploys a royalty config through the UI's code path (deployer 90%, a fresh author 10%), launches a token on it with a first buy, has the vault claim the launchpad's fees and the author claim their share, and compares every amount to the lamport.
@@ -273,7 +373,7 @@ Deploys a royalty config through the UI's code path (deployer 90%, a fresh autho
 ### Rebuild the launchpad economics snapshot
 
 ```bash
-npx tsx apps/web/scripts/build-launchpad-economics.ts
+npx tsx packages/core/scripts/build-launchpad-economics.ts
 ```
 
 Read-only and slow (public mainnet RPC, about 40 minutes): ranks every DBC config by graduated launches and reads the top 200's pools into `src/features/launchpad-economics/launchpads.json`.
@@ -281,7 +381,7 @@ Read-only and slow (public mainnet RPC, about 40 minutes): ranks every DBC confi
 ## Project layout
 
 ```
-apps/web/
+packages/core/                the lab's engine, shared by the site and the agent server
   src/core/launch-config      config ↔ SDK parameters, curve shapes, fee schedules, presets
   src/core/launch-simulator   offline replay with the DBC SDK's swap math, through graduation
   src/core/migrated-pool      the post-graduation DAMM v2 pool, priced with the DAMM v2 SDK
@@ -292,12 +392,16 @@ apps/web/
   src/core/config-clone       a real config's parameters, adjusted and checked, for a new owner
   src/core/partner-branding   a launchpad's on-chain name, website and logo
   src/core/preset-royalty     an author's share of a launchpad's fees, through a Meteora fee-sharing vault
+  src/core/pool-launch        a token launched on an existing config, with the creator's first buy
+  src/core/fee-claim          claiming a pool's trading fees as partner, creator or royalty recipient
+  src/core/…                  quote tokens, the volatility-fee tracker, graduated positions, shared math
+                              (packages/core/README.md lists every module)
   src/features/config-report  a config's open risks, terms, real and simulated launches, as one report
   src/features/report-feed    the report for every snapshot launchpad, as static JSON files
-  src/features/…              comparison, editor, recommendation (Web Worker), sharing, wallet, on-chain lookup,
-                              launchpad economics and income forecast, launch page
-  src/views, src/components   the single-page UI
   src/features/agent-handoff  the link an agent hands an owner, and its untrusted-input decoder
+  src/features/…              comparison, editor, recommendation, sharing, wallet, on-chain lookup,
+                              launchpad economics and income forecast, launch page
+  src/workers                 the recommender's Web Worker
   src/mcp                     the lab's tools for AI agents, as an MCP server over stdio
   mcp-package/                the npm package that runs the bundled MCP server with npx
   scripts/build-mcp.ts        bundles the MCP server into mcp-package/server.mjs
@@ -306,7 +410,17 @@ apps/web/
   scripts/devnet-clone-verify.ts        clones mainnet configs on devnet and compares them byte for byte
   scripts/devnet-royalty-verify.ts      deploys a royalty config on devnet and checks the split to the lamport
   scripts/build-launchpad-economics.ts  rebuilds the launchpad economics snapshot
+  scripts/build-after-graduation.ts     adds each launchpad's income after graduation to that snapshot
+apps/web/                     the single-page site (views, components, router), built on packages/core
+  scripts/build-report-feed.ts  writes the report feed into the built site
 apps/web-e2e/                 Playwright browser tests (fake wallet, mocked RPC)
+apps/api/                     the hosted agent API (NestJS, Postgres), built on packages/core
+  src/mcp                     the agent tools over MCP Streamable HTTP, with daily allowances
+  src/accounts                wallet sign-in, accounts, API keys, plans and USDC payments
+  src/watches                 watches and the background poller
+  src/webhooks                webhook addresses, signed deliveries and retries
+  src/usage                   tool calls per caller per UTC day
+  drizzle/                    database migrations
 libs/deploy-templates         vendored deploy trigger for the hosting platform (build output)
 ops/deploy.mts                CI deploy step
 ```

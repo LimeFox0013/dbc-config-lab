@@ -1,0 +1,85 @@
+{
+  "name": "@dbc-config-lab/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "@dbc-config-lab/core": "*",
+    "@lf/agentic-account": "^0.0.1",
+    "@lf/agentic-account-drizzle": "^0.0.1",
+    "@lf/mcp-http-sessions": "^0.0.1",
+    "@lf/safe-fetch": "^0.0.1",
+    "@nestjs/common": "^11.2.0",
+    "@nestjs/core": "^11.2.0",
+    "@nestjs/platform-express": "^11.2.0",
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "^6.0.0",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "tweetnacl": "^0.14.5",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.2.0",
+    "@swc/core": "^1.15.18",
+    "@types/express": "^5.0.6",
+    "copy-webpack-plugin": "^10.2.4",
+    "drizzle-kit": "^0.31.10",
+    "ts-loader": "^9.6.2",
+    "unplugin-swc": "^1.5.11",
+    "vitest": "^4.0.18",
+    "webpack": "^5.109.2",
+    "webpack-cli": "^6.0.1"
+  },
+  "nx": {
+    "name": "api",
+    "targets": {
+      "build": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "webpack-cli build --node-env=production",
+          "cwd": "apps/api"
+        }
+      },
+      "serve": {
+        "executor": "nx:run-commands",
+        "continuous": true,
+        "options": {
+          "command": "webpack-cli build --node-env=development --watch & node --watch dist/main.js",
+          "cwd": "apps/api"
+        }
+      },
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "tsc -b tsconfig.app.json",
+          "cwd": "apps/api"
+        }
+      },
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "vitest run",
+          "cwd": "apps/api"
+        }
+      },
+      "db:generate": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "drizzle-kit generate",
+          "cwd": "apps/api"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "webpack-cli build --node-env=production",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "db:generate": "drizzle-kit generate"
+  }
+}

@@ -5,7 +5,8 @@ import { FAKE_WALLET_ADDRESS, FAKE_WALLET_NAME } from './constants'
  * Registers a Wallet Standard wallet in the page before the app loads, using the
  * standard's own handshake events, so the app discovers it exactly like a real
  * extension. It connects with one fake devnet/mainnet account and records any
- * sign-and-send request instead of signing.
+ * sign-and-send request and any message it is asked to sign, answering with fixed
+ * fake signatures.
  */
 export const installFakeWallet = async (page: Page): Promise<void> => {
   await page.addInitScript(
@@ -17,10 +18,14 @@ export const installFakeWallet = async (page: Page): Promise<void> => {
         address,
         publicKey,
         chains,
-        features: ['solana:signAndSendTransaction'],
+        features: ['solana:signAndSendTransaction', 'solana:signMessage'],
       }
       const requests: unknown[] = []
       Object.defineProperty(window, '__fakeWalletRequests', { value: requests })
+      const signedMessages: string[] = []
+      Object.defineProperty(window, '__fakeWalletMessages', {
+        value: signedMessages,
+      })
 
       const wallet = {
         version: '1.0.0',
@@ -41,6 +46,17 @@ export const installFakeWallet = async (page: Page): Promise<void> => {
               requests.push(...inputs)
               return [{ signature: new Uint8Array(64).fill(7) }]
             },
+          },
+          'solana:signMessage': {
+            version: '1.0.0',
+            signMessage: async (...inputs: { message: Uint8Array }[]) =>
+              inputs.map((input) => {
+                signedMessages.push(new TextDecoder().decode(input.message))
+                return {
+                  signedMessage: input.message,
+                  signature: new Uint8Array(64).fill(9),
+                }
+              }),
           },
         },
       }

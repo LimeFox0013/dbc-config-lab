@@ -142,18 +142,18 @@ import { ConfigDeploy } from '../components/ConfigDeploy'
 import { EarningsSection } from '../components/EarningsSection'
 import { PoolLaunch } from '../components/PoolLaunch'
 import { WalletAcknowledgement, WalletBar } from '../components/WalletBar'
+import { useWalletConnect } from '../composables'
 import {
   CloneStatus,
   decodeHandoff,
   HandoffAction,
   handoffDeployTarget,
   useHandoffClone,
-} from '../features/agent-handoff'
-import type { CloneSource } from '../features/agent-handoff'
-import type { DeployTarget } from '../features/deployment'
-import { shortAddress } from '../core/shared'
-import { useWalletSession } from '../features/wallet'
-import type { DeployWallet } from '../features/wallet'
+} from '@dbc-config-lab/core/features/agent-handoff'
+import type { CloneSource } from '@dbc-config-lab/core/features/agent-handoff'
+import type { DeployTarget } from '@dbc-config-lab/core/features/deployment'
+import { shortAddress } from '@dbc-config-lab/core/core/shared'
+import { useWalletSession } from '@dbc-config-lab/core/features/wallet'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -167,10 +167,7 @@ watch(
   },
   { immediate: true },
 )
-const connectError = ref<string | null>(null)
-const connect = async (wallet: DeployWallet): Promise<void> => {
-  connectError.value = await session.connect(wallet)
-}
+const { connectError, connect } = useWalletConnect(session.connect)
 /** The action is being prepared or signed; the wallet must not change meanwhile. */
 const busy = ref(false)
 

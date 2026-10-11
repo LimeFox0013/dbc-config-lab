@@ -1,17 +1,11 @@
 import type { App } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import {
+  ACCOUNT_PAGE_PATH,
   HANDOFF_PAGE_PATH,
   LAUNCH_PAGE_PATH,
   REPORT_PAGE_PATH,
-} from './constants'
-
-export {
-  HANDOFF_PAGE_PATH,
-  LAUNCH_PAGE_PATH,
-  NETWORK_QUERY_KEY,
-  REPORT_PAGE_PATH,
-} from './constants'
+} from '@dbc-config-lab/core/router/constants'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -35,6 +29,11 @@ const router = createRouter({
       path: HANDOFF_PAGE_PATH,
       name: 'act',
       component: () => import('../views/ActView.vue'),
+    },
+    {
+      path: ACCOUNT_PAGE_PATH,
+      name: 'account',
+      component: () => import('../views/AccountView.vue'),
     },
   ],
 })

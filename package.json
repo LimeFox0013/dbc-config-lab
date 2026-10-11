@@ -6,6 +6,7 @@
   "license": "MIT",
   "workspaces": [
     "apps/*",
+    "packages/*",
     "libs/*"
   ],
   "scripts": {
@@ -15,6 +16,9 @@
     "typecheck": "nx run-many -t typecheck",
     "deploy": "tsx ops/deploy.mts",
     "e2e": "nx run-many -t e2e"
+  },
+  "dependencies": {
+    "bigint-buffer": "file:./vendor/bigint-buffer"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
@@ -29,6 +33,7 @@
     },
     "@coral-xyz/anchor": {
       "toml": "^4.2.0"
-    }
+    },
+    "bigint-buffer": "$bigint-buffer"
   }
 }

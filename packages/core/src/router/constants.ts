@@ -1,0 +1,9 @@
+/** A launch page: `/launch/<config>?network=<devnet|mainnet-beta>`. */
+export const LAUNCH_PAGE_PATH = '/launch'
+export const NETWORK_QUERY_KEY = 'network'
+/** A config report: `/config/<config or pool>?network=<devnet|mainnet-beta>`. */
+export const REPORT_PAGE_PATH = '/config'
+/** Where a person reviews and signs an action an agent proposed: `/act#action=…`. */
+export const HANDOFF_PAGE_PATH = '/act'
+/** The signed-in account on the hosted service: `/account`. */
+export const ACCOUNT_PAGE_PATH = '/account'

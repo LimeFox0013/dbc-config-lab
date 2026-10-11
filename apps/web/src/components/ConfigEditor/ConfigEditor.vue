@@ -203,14 +203,14 @@
 </template>
 
 <script setup lang="ts">
-import { MAX_ADDRESS_LENGTH } from '../../features/onchain-config'
-import type { PresetRoyalty } from '../../core/preset-royalty'
-import { ROYALTY_PERCENT_LIMITS, royaltyRejection } from '../../core/preset-royalty'
+import { MAX_ADDRESS_LENGTH } from '@dbc-config-lab/core/features/onchain-config'
+import type { PresetRoyalty } from '@dbc-config-lab/core/core/preset-royalty'
+import { ROYALTY_PERCENT_LIMITS, royaltyRejection } from '@dbc-config-lab/core/core/preset-royalty'
 import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { compileLaunchConfig, DEFAULT_LAUNCH_CONFIG, parseLaunchConfig, serializeLaunchConfig, UserPresetId } from '../../core/launch-config'
-import type { LaunchConfig, LaunchPreset } from '../../core/launch-config'
-import { QUOTE_TOKENS } from '../../core/quote-token'
+import { compileLaunchConfig, DEFAULT_LAUNCH_CONFIG, parseLaunchConfig, serializeLaunchConfig, UserPresetId } from '@dbc-config-lab/core/core/launch-config'
+import type { LaunchConfig, LaunchPreset } from '@dbc-config-lab/core/core/launch-config'
+import { QUOTE_TOKENS } from '@dbc-config-lab/core/core/quote-token'
 import {
   applyEdit,
   EDITOR_FIELDS,
@@ -218,10 +218,11 @@ import {
   FieldGroup,
   FieldKind,
   FieldUnit,
-} from '../../features/config-editor'
-import type { EditorField } from '../../features/config-editor'
+} from '@dbc-config-lab/core/features/config-editor'
+import type { EditorField } from '@dbc-config-lab/core/features/config-editor'
+import { numberFromEvent, selectedValue } from '../../shared'
 import { DEFAULT_ROYALTY_PERCENT, NAME_MAX_LENGTH } from './constants'
-import { shareLink, toTypeScript } from '../../features/config-sharing'
+import { shareLink, toTypeScript } from '@dbc-config-lab/core/features/config-sharing'
 import type { ConfigEditorProps } from './types'
 
 const props = defineProps<ConfigEditorProps>()
@@ -251,15 +252,8 @@ const unitLabel = (unit: FieldUnit): string =>
 const visibleFields = (group: FieldGroup): EditorField[] =>
   EDITOR_FIELDS.filter((field) => field.group === group && field.visible(config.value))
 
-const readInput = (event: Event): number => {
-  const target = event.target
-  if (target instanceof HTMLInputElement) return target.valueAsNumber
-  if (target instanceof HTMLSelectElement) return Number(target.value)
-  return Number.NaN
-}
-
 const onEdit = (field: EditorField, event: Event): void => {
-  const result = applyEdit(config.value, field, readInput(event))
+  const result = applyEdit(config.value, field, numberFromEvent(event))
   if (result.ok) {
     config.value = result.config
     lastRejection.value = null
@@ -281,7 +275,8 @@ const startWith = (id: LaunchPreset['id']): void => {
 }
 
 const startFrom = (event: Event): void => {
-  if (event.target instanceof HTMLSelectElement) startWith(event.target.value)
+  const id = selectedValue(event)
+  if (id !== null) startWith(id)
 }
 
 /** Opens a copy of a preset, as `startWith`, and brings the editor into view. */

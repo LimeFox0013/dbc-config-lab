@@ -34,7 +34,7 @@
           min="0"
           :max="SCENARIO_LIMITS.maxSeed"
           :value="modelValue.seed"
-          @change="update({ seed: readNumber($event) })"
+          @change="update({ seed: numberFromEvent($event) })"
         />
       </label>
       <label class="scenario-controls__field">
@@ -45,7 +45,7 @@
           :min="SCENARIO_LIMITS.minTraders"
           :max="SCENARIO_LIMITS.maxTraders"
           :value="modelValue.snipers.count"
-          @change="update({ snipers: { ...modelValue.snipers, count: readNumber($event) } })"
+          @change="update({ snipers: { ...modelValue.snipers, count: numberFromEvent($event) } })"
         />
       </label>
       <label class="scenario-controls__field">
@@ -56,7 +56,7 @@
           :min="SCENARIO_LIMITS.minTraders"
           :max="SCENARIO_LIMITS.maxTraders"
           :value="modelValue.humans.count"
-          @change="update({ humans: { ...modelValue.humans, count: readNumber($event) } })"
+          @change="update({ humans: { ...modelValue.humans, count: numberFromEvent($event) } })"
         />
       </label>
       <label class="scenario-controls__field">
@@ -67,7 +67,7 @@
           :min="SCENARIO_LIMITS.minTraders"
           :max="SCENARIO_LIMITS.maxTraders"
           :value="modelValue.adaptiveSnipers.count"
-          @change="update({ adaptiveSnipers: { ...modelValue.adaptiveSnipers, count: readNumber($event) } })"
+          @change="update({ adaptiveSnipers: { ...modelValue.adaptiveSnipers, count: numberFromEvent($event) } })"
         />
       </label>
       <label class="scenario-controls__field">
@@ -78,7 +78,7 @@
           :min="SCENARIO_LIMITS.minTraders"
           :max="SCENARIO_LIMITS.maxTraders"
           :value="modelValue.arbitrageurs.count"
-          @change="update({ arbitrageurs: { ...modelValue.arbitrageurs, count: readNumber($event) } })"
+          @change="update({ arbitrageurs: { ...modelValue.arbitrageurs, count: numberFromEvent($event) } })"
         />
       </label>
       <label
@@ -92,7 +92,7 @@
           :min="SCENARIO_LIMITS.minFairMarketCapSol"
           :max="SCENARIO_LIMITS.maxFairMarketCapSol"
           :value="modelValue.arbitrageurs.fairMarketCapSol"
-          @change="update({ arbitrageurs: { ...modelValue.arbitrageurs, fairMarketCapSol: readNumber($event) } })"
+          @change="update({ arbitrageurs: { ...modelValue.arbitrageurs, fairMarketCapSol: numberFromEvent($event) } })"
         />
       </label>
     </div>
@@ -156,21 +156,19 @@
 </template>
 
 <script setup lang="ts">
-import { percentFromBps } from '../../core/shared'
+import { percentFromBps } from '@dbc-config-lab/core/core/shared'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { sanitizeScenario, SCENARIO_LIMITS } from '../../features/comparison'
-import { SCENARIO_PRESETS, ScenarioPresetId } from '../../core/sniper-scenario'
-import type { ScenarioSpec } from '../../core/sniper-scenario'
+import { sanitizeScenario, SCENARIO_LIMITS } from '@dbc-config-lab/core/features/comparison'
+import { SCENARIO_PRESETS, ScenarioPresetId } from '@dbc-config-lab/core/core/sniper-scenario'
+import type { ScenarioSpec } from '@dbc-config-lab/core/core/sniper-scenario'
+import { numberFromEvent, selectedValue } from '../../shared'
 import { CUSTOM } from './constants'
 import type { ScenarioControlsProps } from './types'
 
 const props = defineProps<ScenarioControlsProps>()
 const emit = defineEmits<{ 'update:modelValue': [value: ScenarioSpec] }>()
 const { t } = useI18n()
-
-const readNumber = (event: Event): number =>
-  event.target instanceof HTMLInputElement ? event.target.valueAsNumber : Number.NaN
 
 const readChecked = (event: Event): boolean =>
   event.target instanceof HTMLInputElement && event.target.checked
@@ -191,9 +189,10 @@ const presetId = computed<ScenarioPresetId | typeof CUSTOM>(
 )
 
 const selectPreset = (event: Event): void => {
-  if (!(event.target instanceof HTMLSelectElement) || !isPresetId(event.target.value)) return
+  const id = selectedValue(event)
+  if (id === null || !isPresetId(id)) return
   emit('update:modelValue', {
-    ...SCENARIO_PRESETS[event.target.value],
+    ...SCENARIO_PRESETS[id],
     seed: props.modelValue.seed,
     unlockedLiquidityPulled: props.modelValue.unlockedLiquidityPulled,
     vestedTokensSold: props.modelValue.vestedTokensSold,

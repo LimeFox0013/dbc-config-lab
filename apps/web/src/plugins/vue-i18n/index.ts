@@ -1,6 +1,6 @@
 import type { App } from 'vue'
 import { createI18n } from 'vue-i18n'
-import en from '../../locales/en.json'
+import en from '@dbc-config-lab/core/locales/en.json'
 
 export const setupVueI18n = (app: App): void => {
   app.use(

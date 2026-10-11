@@ -1,6 +1,6 @@
-import type { TokenMetadata } from '../../core/pool-launch'
-import type { ConnectedWallet } from '../../features/wallet'
-import type { SolanaNetwork } from '../../core/shared'
+import type { TokenMetadata } from '@dbc-config-lab/core/core/pool-launch'
+import type { ConnectedWallet } from '@dbc-config-lab/core/features/wallet'
+import type { SolanaNetwork } from '@dbc-config-lab/core/core/shared'
 
 export interface PoolLaunchProps {
   network: SolanaNetwork

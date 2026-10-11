@@ -1,0 +1,63 @@
+{
+  "name": "@dbc-config-lab/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./core/*": "./src/core/*/index.ts",
+    "./features/*": "./src/features/*/index.ts",
+    "./mcp": "./src/mcp/index.ts",
+    "./locales/*": "./src/locales/*",
+    "./router/constants": "./src/router/constants.ts",
+    "./plugins/*": "./src/plugins/*/index.ts"
+  },
+  "dependencies": {
+    "@meteora-ag/cp-amm-sdk": "^1.5.1",
+    "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.13",
+    "@meteora-ag/dynamic-fee-sharing-sdk": "^1.1.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@solana/wallet-standard-features": "^1.5.0",
+    "@solana/web3.js": "^1.98.4",
+    "@wallet-standard/app": "^1.1.1",
+    "@wallet-standard/base": "^1.1.1",
+    "@wallet-standard/features": "^1.1.1",
+    "bn.js": "^5.2.1",
+    "bs58": "^6.0.0",
+    "buffer": "^6.0.3",
+    "vue": "^3.5.41",
+    "vue-i18n": "^11.4.8",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@types/bn.js": "^5.1.6",
+    "esbuild": "^0.27.7",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build:mcp": "tsx scripts/build-mcp.ts",
+    "verify:devnet": "tsx scripts/devnet-verify.ts"
+  },
+  "nx": {
+    "name": "core",
+    "targets": {
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "tsc --noEmit -p tsconfig.json",
+          "cwd": "packages/core"
+        }
+      },
+      "test": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "vitest run",
+          "cwd": "packages/core"
+        }
+      }
+    }
+  }
+}

@@ -76,9 +76,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { DeployTarget } from '../../features/deployment'
-import { useWalletSession } from '../../features/wallet'
-import type { DeployWallet } from '../../features/wallet'
+import type { DeployTarget } from '@dbc-config-lab/core/features/deployment'
+import { useWalletSession } from '@dbc-config-lab/core/features/wallet'
+import { useWalletConnect } from '../../composables'
 import { BrandingSection } from '../BrandingSection'
 import { ConfigDeploy } from '../ConfigDeploy'
 import { EarningsSection } from '../EarningsSection'
@@ -97,10 +97,7 @@ const target = computed<DeployTarget>(() => {
 })
 
 const { network, mainnetAcknowledged, wallets, connected, connect: connectWallet } = useWalletSession()
-const connectError = ref<string | null>(null)
-const connect = async (wallet: DeployWallet): Promise<void> => {
-  connectError.value = await connectWallet(wallet)
-}
+const { connectError, connect } = useWalletConnect(connectWallet)
 
 /** A config deploy is being prepared or signed on the panel's network and wallet. */
 const busy = ref(false)

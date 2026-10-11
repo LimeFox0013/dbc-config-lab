@@ -130,11 +130,11 @@
 </template>
 
 <script setup lang="ts">
-import { formatPercentChange, formatSol, formatSolChange } from '../../core/shared'
+import { formatPercentChange, formatSol, formatSolChange } from '@dbc-config-lab/core/core/shared'
 import { useI18n } from 'vue-i18n'
-import type { ComparisonMetrics, ComparisonRow } from '../../features/comparison'
-import { pullableLiquidityPercent } from '../../core/migrated-pool'
-import { keepersMigrate, QUOTE_TOKENS, QuoteToken, REFERENCE_USD_PER_SOL } from '../../core/quote-token'
+import type { ComparisonMetrics, ComparisonRow } from '@dbc-config-lab/core/features/comparison'
+import { pullableLiquidityPercent } from '@dbc-config-lab/core/core/migrated-pool'
+import { keepersMigrate, QUOTE_TOKENS, QuoteToken, REFERENCE_USD_PER_SOL } from '@dbc-config-lab/core/core/quote-token'
 import type { ComparisonTableProps } from './types'
 
 defineProps<ComparisonTableProps>()

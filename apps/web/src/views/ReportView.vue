@@ -115,50 +115,38 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { ComparisonTable } from '../components/ComparisonTable'
 import { ConfigTermsRows } from '../components/ConfigTermsRows'
 import { LaunchpadIdentity } from '../components/LaunchpadIdentity'
 import { RealLaunchesSummary } from '../components/RealLaunchesSummary'
-import { connectionFor } from '../core/config-deploy'
-import { feeScheduleOf } from '../core/launch-simulator'
+import { useRoutedLaunchPage } from '../composables'
+import { readRealLaunches } from '../shared'
 import {
   configReport,
   reportFileName,
   ReportRisk,
   simulationOf,
   typicalLaunchRow,
-} from '../features/config-report'
-import type { ReportFinding } from '../features/config-report'
-import { useFeeScheduleText } from '../features/fee-text'
+} from '@dbc-config-lab/core/features/config-report'
+import type { ReportFinding } from '@dbc-config-lab/core/features/config-report'
+import { useFeeScheduleText } from '@dbc-config-lab/core/features/fee-text'
 import {
   LaunchPageStatus,
   launchPagePath,
-  networkFromQuery,
-  useLaunchPage,
-} from '../features/launch-page'
-import { fetchRealLaunches } from '../features/real-launches'
-import type { RealLaunchesState } from '../features/real-launches'
-import { NETWORK_QUERY_KEY } from '../router'
+} from '@dbc-config-lab/core/features/launch-page'
+import type { RealLaunchesState } from '@dbc-config-lab/core/features/real-launches'
 
 const { t } = useI18n()
 const feeScheduleText = useFeeScheduleText()
-const route = useRoute()
-const network = computed(() => networkFromQuery(route.query[NETWORK_QUERY_KEY]))
-const address = computed(() => String(route.params.config ?? ''))
-const { state } = useLaunchPage(network, address)
-
-const ready = computed(() => (state.value.status === LaunchPageStatus.Ready ? state.value : null))
-
-const schedule = computed(() => (ready.value ? feeScheduleOf(ready.value.config.parameters) : null))
+const { state, ready, schedule } = useRoutedLaunchPage()
 
 /** The real launches on the loaded config, read once it has loaded. */
 const real = shallowRef<RealLaunchesState | null>(null)
 watch(ready, async (current) => {
   real.value = current ? { loading: true } : null
   if (!current) return
-  const { config } = current
-  const result = await fetchRealLaunches(connectionFor(config.network), config.configAddress, config.parameters, config.quoteToken)
+  const result = await readRealLaunches(current.config)
   if (ready.value === current) real.value = { loading: false, result }
 }, { immediate: true })
 

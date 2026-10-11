@@ -1,0 +1,4 @@
+# Sourced by the nginx image's entrypoint before it fills in the server template.
+# The mainnet RPC the site's /rpc/mainnet proxy forwards to: DBC_LAB_MAINNET_RPC_URL when
+# set (any provider, key included), else Helius with HELIUS_API_KEY.
+export DBC_LAB_MAINNET_RPC_URL="${DBC_LAB_MAINNET_RPC_URL:-https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}}"

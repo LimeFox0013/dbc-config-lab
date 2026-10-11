@@ -131,12 +131,12 @@
 <script setup lang="ts">
 import { toRefs, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { explorerAddressUrl, explorerTransactionUrl } from '../../core/config-deploy'
-import { QUOTE_TOKENS, wholeQuoteTokens } from '../../core/quote-token'
-import { formatSol, shortAddress } from '../../core/shared'
-import { DeployStep } from '../../features/deployment'
-import { useEarnings } from '../../features/earnings'
-import type { EarningsRow } from '../../features/earnings'
+import { explorerAddressUrl, explorerTransactionUrl } from '@dbc-config-lab/core/core/config-deploy'
+import { QUOTE_TOKENS, wholeQuoteTokens } from '@dbc-config-lab/core/core/quote-token'
+import { formatSol, shortAddress } from '@dbc-config-lab/core/core/shared'
+import { DeployStep } from '@dbc-config-lab/core/features/deployment'
+import { useEarnings } from '@dbc-config-lab/core/features/earnings'
+import type { EarningsRow } from '@dbc-config-lab/core/features/earnings'
 import type { EarningsSectionProps } from './types'
 
 const props = defineProps<EarningsSectionProps>()

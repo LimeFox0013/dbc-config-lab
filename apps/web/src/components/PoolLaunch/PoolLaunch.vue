@@ -211,15 +211,15 @@
 </template>
 
 <script setup lang="ts">
-import { formatCount, percentFromBps } from '../../core/shared'
+import { formatCount, percentFromBps } from '@dbc-config-lab/core/core/shared'
 import { computed, toRefs, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { explorerAddressUrl, explorerTransactionUrl } from '../../core/config-deploy'
-import { METADATA_LIMITS, PARTNER_AUTHORITY_OPTIONS } from '../../core/pool-launch'
-import { QUOTE_TOKENS } from '../../core/quote-token'
-import { DeployStep } from '../../features/deployment'
-import { MAX_ADDRESS_LENGTH } from '../../features/onchain-config'
-import { usePoolLaunch } from '../../features/pool-launch'
+import { explorerAddressUrl, explorerTransactionUrl } from '@dbc-config-lab/core/core/config-deploy'
+import { METADATA_LIMITS, PARTNER_AUTHORITY_OPTIONS } from '@dbc-config-lab/core/core/pool-launch'
+import { QUOTE_TOKENS } from '@dbc-config-lab/core/core/quote-token'
+import { DeployStep } from '@dbc-config-lab/core/features/deployment'
+import { MAX_ADDRESS_LENGTH } from '@dbc-config-lab/core/features/onchain-config'
+import { usePoolLaunch } from '@dbc-config-lab/core/features/pool-launch'
 import { ConfigTermsRows } from '../ConfigTermsRows'
 import { HIGH_FIRST_BUY_FEE_BPS } from './constants'
 import type { PoolLaunchProps } from './types'

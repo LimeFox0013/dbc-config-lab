@@ -4,28 +4,17 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@meteora-ag/cp-amm-sdk": "^1.5.1",
+    "@dbc-config-lab/core": "*",
     "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.13",
-    "@meteora-ag/dynamic-fee-sharing-sdk": "^1.1.0",
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "@solana/wallet-standard-features": "^1.5.0",
-    "@solana/web3.js": "^1.98.4",
-    "@wallet-standard/app": "^1.1.1",
-    "@wallet-standard/base": "^1.1.1",
-    "@wallet-standard/features": "^1.1.1",
-    "bn.js": "^5.2.1",
-    "bs58": "^6.0.0",
     "buffer": "^6.0.3",
     "vue": "^3.5.41",
     "vue-i18n": "^11.4.8",
-    "vue-router": "^5.2.0",
-    "zod": "^3.25.76"
+    "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "@coral-xyz/anchor": "^0.31.1",
     "@types/bn.js": "^5.1.6",
     "@vitejs/plugin-vue": "^6.0.8",
-    "esbuild": "^0.27.7",
+    "jsdom": "^28.1.0",
     "sass": "^1.102.0",
     "typescript": "^5.7.3",
     "vite": "^7.3.1",
@@ -35,10 +24,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && tsx scripts/build-report-feed.ts",
-    "build:mcp": "tsx scripts/build-mcp.ts",
     "test": "vitest run",
-    "typecheck": "vue-tsc --noEmit",
-    "verify:devnet": "tsx scripts/devnet-verify.ts"
+    "typecheck": "vue-tsc --noEmit"
   },
   "nx": {
     "name": "web",

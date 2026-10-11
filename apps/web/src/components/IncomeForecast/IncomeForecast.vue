@@ -97,8 +97,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { clamp, formatCount, formatSol } from '../../core/shared'
-import { archetypeOf, incomeForecast, useLaunchpadSnapshot } from '../../features/launchpad-economics'
+import { clamp, formatCount, formatSol } from '@dbc-config-lab/core/core/shared'
+import { archetypeOf, incomeForecast, useLaunchpadSnapshot } from '@dbc-config-lab/core/features/launchpad-economics'
 import { DEFAULT_LAUNCHES, MAX_LAUNCHES } from './constants'
 import type { IncomeForecastProps } from './types'
 

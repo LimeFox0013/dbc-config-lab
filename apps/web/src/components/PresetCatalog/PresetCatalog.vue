@@ -110,22 +110,22 @@
 </template>
 
 <script setup lang="ts">
-import { communityPresets } from '../../features/community-presets'
+import { communityPresets } from '@dbc-config-lab/core/features/community-presets'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import { explorerAddressUrl } from '../../core/config-deploy'
-import { reportPagePath } from '../../features/launch-page'
-import { LAUNCH_PRESETS } from '../../core/launch-config'
-import type { LaunchPreset } from '../../core/launch-config'
-import { migratedUnsupportedReason, pullableLiquidityPercent } from '../../core/migrated-pool'
-import { QUOTE_TOKENS, wholeQuoteTokens } from '../../core/quote-token'
-import { formatAmount, formatCount, formatSolChange, shortAddress } from '../../core/shared'
-import { compareConfigs, parametersEntry, presetEntry } from '../../features/comparison'
-import type { ComparisonEntry } from '../../features/comparison'
-import type { OnChainConfig } from '../../features/onchain-config'
-import { useLaunchpadSnapshot } from '../../features/launchpad-economics'
-import type { LaunchpadRecord } from '../../features/launchpad-economics'
+import { explorerAddressUrl } from '@dbc-config-lab/core/core/config-deploy'
+import { reportPagePath } from '@dbc-config-lab/core/features/launch-page'
+import { LAUNCH_PRESETS } from '@dbc-config-lab/core/core/launch-config'
+import type { LaunchPreset } from '@dbc-config-lab/core/core/launch-config'
+import { migratedUnsupportedReason, pullableLiquidityPercent } from '@dbc-config-lab/core/core/migrated-pool'
+import { formatCount, formatSolChange, shortAddress } from '@dbc-config-lab/core/core/shared'
+import { compareConfigs, parametersEntry, presetEntry } from '@dbc-config-lab/core/features/comparison'
+import type { ComparisonEntry } from '@dbc-config-lab/core/features/comparison'
+import type { OnChainConfig } from '@dbc-config-lab/core/features/onchain-config'
+import { useLaunchpadSnapshot } from '@dbc-config-lab/core/features/launchpad-economics'
+import type { LaunchpadRecord } from '@dbc-config-lab/core/features/launchpad-economics'
+import { launchpadTermsValues } from '../../shared'
 import { CATALOG_LAUNCHPADS, COMMUNITY_REGISTRY_URL } from './constants'
 import type { PresetCatalogProps } from './types'
 
@@ -173,14 +173,8 @@ const outcomeText = (id: string): string => {
 }
 
 /** The terms a builder judges a launchpad by, read from its config. */
-const termsText = (launchpad: LaunchpadRecord): string => {
-  const { parameters, quoteToken } = launchpad.config
-  return t('components.presetCatalog.terms', {
-    threshold: formatAmount(wholeQuoteTokens(parameters.migrationQuoteThreshold, quoteToken)),
-    symbol: QUOTE_TOKENS[quoteToken].symbol,
-    creator: parameters.creatorTradingFeePercentage,
-  })
-}
+const termsText = (launchpad: LaunchpadRecord): string =>
+  t('components.presetCatalog.terms', launchpadTermsValues(launchpad.config))
 </script>
 
 <style lang="scss">

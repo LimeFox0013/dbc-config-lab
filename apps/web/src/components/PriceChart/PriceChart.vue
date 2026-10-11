@@ -80,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { formatMultiple } from '../../core/shared'
+import { formatMultiple } from '@dbc-config-lab/core/core/shared'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { clonedParameters } from '../../core/config-clone'
-import { compileLaunchConfig, LAUNCH_PRESETS } from '../../core/launch-config'
+import { clonedParameters } from '@dbc-config-lab/core/core/config-clone'
+import {
+  compileLaunchConfig,
+  LAUNCH_PRESETS,
+} from '@dbc-config-lab/core/core/launch-config'
 import { adjustmentsOf, bpsOf, formOf } from './utils'
 
 const parametersOf = (id: string) => {

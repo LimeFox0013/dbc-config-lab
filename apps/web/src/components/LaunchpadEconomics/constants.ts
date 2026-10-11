@@ -1,10 +1,10 @@
-import { QUOTE_TOKEN_ORDER } from '../../core/quote-token'
+import { QUOTE_TOKEN_ORDER } from '@dbc-config-lab/core/core/quote-token'
 import {
   ARCHETYPE_KEYS,
   CreatorShareBand,
   FeeShape,
   ThresholdBand,
-} from '../../features/launchpad-economics'
+} from '@dbc-config-lab/core/features/launchpad-economics'
 import type { FilterKey } from './types'
 
 /** Launchpads listed at once; the ranking itself covers the whole snapshot. */
