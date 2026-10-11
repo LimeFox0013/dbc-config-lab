@@ -95,6 +95,10 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.REGISTRY_URL != ''
     runs-on: ubuntu-latest
     environment: production
+    # Pushing to the owner's ghcr.io namespace uses the run's own token: no stored registry credential.
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -102,8 +106,8 @@ jobs:
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ vars.REGISTRY_URL }}
-          username: ${{ secrets.REGISTRY_USER }}
-          password: ${{ secrets.REGISTRY_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
