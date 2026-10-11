@@ -82,10 +82,11 @@ jobs:
           grep -qi '^content-security-policy:' headers.txt
           ! grep -q ci-placeholder-key page.html
           docker exec web grep -q 'proxy_pass https://mainnet.helius-rpc.com/?api-key=ci-placeholder-key;' /etc/nginx/conf.d/default.conf
-          # Another provider is one environment variable, no rebuild (hosting-portability).
-          docker run -d --name web-other-rpc -e DBC_LAB_MAINNET_RPC_URL=https://rpc.example.com/ci dbc-config-lab-web:ci
+          # Another provider is one environment variable, no rebuild (hosting-portability). The
+          # host must resolve: nginx looks up its proxy target when it starts.
+          docker run -d --name web-other-rpc -e DBC_LAB_MAINNET_RPC_URL=https://example.com/ci dbc-config-lab-web:ci
           for i in $(seq 1 30); do docker exec web-other-rpc test -f /etc/nginx/conf.d/default.conf && break; sleep 1; done
-          docker exec web-other-rpc grep -q 'proxy_pass https://rpc.example.com/ci;' /etc/nginx/conf.d/default.conf
+          docker exec web-other-rpc grep -q 'proxy_pass https://example.com/ci;' /etc/nginx/conf.d/default.conf
           # The placeholder key is refused by the provider; any answer from it shows the
           # proxy reached it, where a gateway error or a 404 would not.
           code=$(curl -s -o rpc.txt -w '%{http_code}' -X POST \
